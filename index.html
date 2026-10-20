@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>꿈수 신당</title>
+<meta name="description" content="어젯밤 꿈을 들려주면 한국식 해몽과 함께 꿈에서 나온 로또 번호를 점지해 드려요.">
+<meta property="og:title" content="꿈수 신당 · 내 꿈에서 나온 로또 번호">
+<meta property="og:description" content="어젯밤 꿈, 길몽일까? 해몽과 번호 풀이까지">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&family=Gowun+Batang:wght@400;700&display=swap">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  if(window.tailwind) tailwind.config={theme:{extend:{
+    colors:{
+      ink:"#1c1714",      // 먹색 밤하늘
+      wood:"#3b2a20",     // 기둥·대청 나무
+      hanji:"#f4ead3",    // 한지
+      hanjiDeep:"#e8d9b6",
+      dan:"#b3352a",      // 단청 주홍
+      jade:"#2f6b55",     // 단청 녹청
+      sky:"#2c4f7c",      // 단청 군청
+      brass:"#d8a83c"     // 놋쇠 방울
+    },
+    fontFamily:{brush:["Nanum Brush Script","cursive"],body:["Gowun Batang","Batang","serif"]}
+  }}};
+</script>
+<script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+<style>
+  body{background:#1c1714;word-break:keep-all}
+  .night{background:radial-gradient(ellipse at 50% 0%,#4a2e22 0,transparent 55%),linear-gradient(#211a16,#1c1714 40%,#191410)}
+  .hanji{background-color:#f4ead3;background-image:
+    radial-gradient(rgba(120,90,50,.07) 1px,transparent 1.2px),
+    radial-gradient(rgba(120,90,50,.05) 1px,transparent 1.2px);
+    background-size:7px 7px,11px 11px;background-position:0 0,3px 5px}
+  .munsal{background-image:linear-gradient(#3b2a20 2px,transparent 2px),linear-gradient(90deg,#3b2a20 2px,transparent 2px);background-size:18px 18px}
+  .dancheong{height:14px;background:
+    repeating-linear-gradient(90deg,#b3352a 0 14px,#2f6b55 14px 22px,#f4ead3 22px 25px,#2c4f7c 25px 37px,#f4ead3 37px 40px,#2f6b55 40px 48px)}
+  .ball{box-shadow:inset -5px -6px 10px rgba(0,0,0,.28),inset 4px 4px 8px rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.3)}
+  .ball.hit{outline:3px solid #d8a83c;outline-offset:2px;transform:scale(1.08)}
+  .ball.miss{opacity:.32}
+  .pop{animation:pop .45s cubic-bezier(.3,1.6,.5,1) both}
+  @keyframes pop{from{transform:scale(0) rotate(-90deg);opacity:0}to{transform:none;opacity:1}}
+  .sway{transform-origin:top center;animation:sway 3.2s ease-in-out infinite}
+  @keyframes sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(5deg)}}
+  .glow{animation:glow 2.8s ease-in-out infinite}
+  @keyframes glow{50%{opacity:.65}}
+  .ring{animation:ring .6s ease-in-out infinite}
+  @keyframes ring{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(14deg)}}
+  .fade{animation:fade .35s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .shimmer{background:linear-gradient(90deg,rgba(59,42,32,.08),rgba(59,42,32,.18),rgba(59,42,32,.08));background-size:200% 100%;animation:shim 1.2s linear infinite}
+  @keyframes shim{to{background-position:-200% 0}}
+  @media (prefers-reduced-motion:reduce){.pop,.sway,.glow,.ring,.fade,.shimmer{animation:none}}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body class="night min-h-screen font-body text-hanji">
+
+<!-- ===== 배경: 한옥 처마 + 단청 + 청사초롱 ===== -->
+<div class="pointer-events-none absolute inset-x-0 top-0 z-0" aria-hidden="true">
+  <svg viewBox="0 0 400 70" preserveAspectRatio="none" class="block w-full h-[70px]">
+    <path d="M0 8 Q40 30 120 34 L280 34 Q360 30 400 8 L400 0 L0 0Z" fill="#120e0b"/>
+    <path d="M0 8 Q40 30 120 34 L280 34 Q360 30 400 8" fill="none" stroke="#3b2a20" stroke-width="3"/>
+    <g fill="#0d0a08">
+      <circle cx="40" cy="22" r="5"/><circle cx="80" cy="30" r="5"/><circle cx="120" cy="33" r="5"/><circle cx="160" cy="34" r="5"/><circle cx="200" cy="34" r="5"/><circle cx="240" cy="34" r="5"/><circle cx="280" cy="33" r="5"/><circle cx="320" cy="30" r="5"/><circle cx="360" cy="22" r="5"/>
+    </g>
+  </svg>
+  <div class="dancheong opacity-90"></div>
+  <div class="absolute left-[7%] top-[84px] flex flex-col items-center sway"><div class="w-px h-6 bg-[#7a5a3c]"></div>
+    <div class="glow w-7 h-10 rounded-md bg-gradient-to-b from-sky via-dan to-dan border-y-4 border-[#120e0b] shadow-[0_0_28px_8px_rgba(216,140,60,.35)]"></div><div class="w-1 h-3 bg-dan"></div></div>
+  <div class="absolute right-[7%] top-[84px] flex flex-col items-center sway" style="animation-delay:-1.4s"><div class="w-px h-6 bg-[#7a5a3c]"></div>
+    <div class="glow w-7 h-10 rounded-md bg-gradient-to-b from-sky via-dan to-dan border-y-4 border-[#120e0b] shadow-[0_0_28px_8px_rgba(216,140,60,.35)]"></div><div class="w-1 h-3 bg-dan"></div></div>
+</div>
+
+<!-- ===== 배경: 당산나무 + 오색천 + 금줄 ===== -->
+<div class="pointer-events-none fixed left-0 z-0 w-[300px] max-w-[75vw] opacity-60" aria-hidden="true" style="bottom:env(safe-area-inset-bottom,0px)">
+  <svg viewBox="0 0 300 380" class="w-full h-auto">
+    <g fill="#120e0b">
+      <circle cx="70" cy="90" r="70"/><circle cx="150" cy="70" r="65"/><circle cx="210" cy="120" r="55"/><circle cx="40" cy="160" r="50"/><circle cx="120" cy="140" r="60"/>
+      <path d="M95 380 C100 300 85 250 70 200 L95 190 C110 240 120 200 130 160 L150 165 C140 220 135 270 150 380Z"/>
+      <path d="M120 200 C150 180 180 170 210 150" stroke="#120e0b" stroke-width="10" fill="none"/>
+    </g>
+    <path d="M78 285 Q118 300 152 285" stroke="#c9b48a" stroke-width="4" fill="none"/>
+    <g fill="#f4ead3">
+      <path d="M90 291 l-4 10 l6 0 l-4 10"/><path d="M110 296 l-4 10 l6 0 l-4 10"/><path d="M132 294 l-4 10 l6 0 l-4 10"/>
+    </g>
+  </svg>
+  <div class="absolute flex gap-1.5" style="left:44%;top:43%">
+    <span class="sway block w-1.5 h-16 bg-[#f4ead3]"></span>
+    <span class="sway block w-1.5 h-20 bg-dan" style="animation-delay:-.6s"></span>
+    <span class="sway block w-1.5 h-14 bg-brass" style="animation-delay:-1.2s"></span>
+    <span class="sway block w-1.5 h-[4.5rem] bg-sky" style="animation-delay:-1.8s"></span>
+    <span class="sway block w-1.5 h-12 bg-jade" style="animation-delay:-2.4s"></span>
+  </div>
+  <div class="absolute flex gap-1.5" style="left:66%;top:36%">
+    <span class="sway block w-1.5 h-12 bg-dan" style="animation-delay:-.3s"></span>
+    <span class="sway block w-1.5 h-16 bg-brass" style="animation-delay:-1s"></span>
+    <span class="sway block w-1.5 h-10 bg-sky" style="animation-delay:-2s"></span>
+  </div>
+</div>
+
+<main class="relative z-10 mx-auto max-w-md px-4 pt-[150px] pb-16">
+
+<!-- ================= 메인 화면 ================= -->
+<div id="mainView" class="flex flex-col gap-5">
+
+  <header class="text-center">
+    <div class="inline-flex items-center gap-1.5 rounded-sm border border-brass/50 bg-wood/60 px-3 py-1 text-xs text-brass tracking-widest">
+      ✦ 꿈풀이 · 로또 점지 ✦
+    </div>
+    <h1 class="mt-3 leading-none"><button id="homeBtn" type="button" aria-label="처음 화면으로" class="font-brush text-6xl text-hanji leading-none rounded-sm active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass">꿈수 <span class="text-dan">신당</span></button></h1>
+    <p class="mt-3 text-sm text-hanji/80 leading-6">간밤에 꾼 꿈을 들려주시게.<br>꿈에 담긴 뜻과 번호를 풀어 드리리다.</p>
+    <button id="openDiaryBtn" type="button"
+      class="mt-4 inline-flex items-center gap-1.5 rounded-sm border border-brass/60 bg-wood/70 px-4 py-2 text-sm text-hanji active:translate-y-0.5 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass">
+      <i data-lucide="book-open" class="w-4 h-4 text-brass"></i> 내 꿈 일기 <span id="diaryCount" class="text-brass"></span>
+    </button>
+  </header>
+
+  <!-- 이번 주 당첨번호 -->
+  <section id="drawCard" class="hanji rounded-sm text-wood shadow-2xl shadow-black/50 overflow-hidden" aria-live="polite">
+    <div class="munsal h-3 opacity-60"></div>
+    <div class="p-5">
+      <div class="flex items-baseline justify-between gap-2">
+        <h2 id="drawTitle" class="font-brush text-3xl text-wood">이번 주 당첨번호</h2>
+        <span id="drawDate" class="text-xs text-wood/60"></span>
+      </div>
+
+      <div id="drawLoading" class="mt-4 flex gap-2">
+        <span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span>
+        <span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span>
+      </div>
+
+      <div id="drawError" class="mt-4 text-center" hidden>
+        <p class="text-sm text-wood/75">당첨번호를 불러오지 못했어요</p>
+        <button id="drawRetry" type="button" class="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-wood/40 px-3 py-1.5 text-sm text-wood active:bg-hanjiDeep">
+          <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> 다시 시도
+        </button>
+      </div>
+
+      <div id="drawBody" hidden>
+        <div id="drawBalls" class="mt-4 flex items-center justify-between gap-1"></div>
+        <div id="myMatch" class="mt-4"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="inputCard" class="hanji rounded-sm text-wood p-5 shadow-2xl shadow-black/50 border-t-4 border-dan">
+    <label for="dream" class="font-brush text-3xl flex items-center gap-2">
+      <span class="ring inline-block text-xl">🔔</span> 어떤 꿈을 꾸었는고?
+    </label>
+    <textarea id="dream" maxlength="500" rows="5"
+      class="mt-3 w-full rounded-sm border border-wood/30 bg-hanji/60 p-3.5 text-[15px] leading-relaxed focus:border-dan focus:outline-none focus:ring-2 focus:ring-dan/30 resize-none placeholder:text-wood/40"
+      placeholder="예) 커다란 황금 돼지가 대문을 열고 들어와 제 품에 안겼어요"></textarea>
+    <div class="mt-1 flex justify-between text-xs text-wood/55">
+      <span>다 적고 엔터를 누르면 바로 풀어 드려요</span><span><span id="cnt">0</span>/500</span>
+    </div>
+    <div id="chips" class="mt-3 flex flex-wrap gap-1.5"></div>
+    <p id="err" class="mt-3 text-sm text-dan" hidden></p>
+    <button id="goBtn" type="button"
+      class="mt-4 w-full rounded-sm bg-dan py-3.5 font-brush text-3xl text-hanji shadow-lg shadow-black/30 border-b-4 border-[#7d2219] active:translate-y-0.5 active:border-b-2 transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-brass">
+      꿈 풀이 &amp; 로또 번호 받기
+    </button>
+  </section>
+
+  <section id="loading" class="rounded-sm bg-wood/85 border border-brass/30 p-8 text-center" hidden>
+    <div class="ring inline-block text-6xl">🔔</div>
+    <p id="loadMsg" class="fade mt-5 font-brush text-3xl text-brass min-h-[2.25rem]"></p>
+    <div class="mt-4 h-1.5 rounded-full bg-black/30 overflow-hidden"><div id="bar" class="h-full w-0 bg-dan rounded-full transition-[width] ease-linear"></div></div>
+  </section>
+
+  <section id="result" class="flex flex-col gap-4" hidden>
+    <div class="hanji rounded-sm text-wood shadow-2xl shadow-black/50 overflow-hidden">
+      <div class="dancheong"></div>
+      <div class="p-5">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs text-wood/60 tracking-widest">신령님 말씀</span>
+          <span id="grade" class="rounded-sm bg-dan px-2.5 py-0.5 text-xs font-bold text-hanji"></span>
+        </div>
+        <h2 id="title" class="mt-1 font-brush text-4xl text-wood leading-tight"></h2>
+        <p id="summary" class="mt-3 text-[15px] leading-7 text-wood/85"></p>
+        <div id="tags" class="mt-3 flex flex-wrap gap-1.5"></div>
+      </div>
+    </div>
+
+    <div class="hanji rounded-sm text-wood shadow-2xl shadow-black/50 overflow-hidden">
+      <div class="munsal h-3 opacity-60"></div>
+      <div class="p-5">
+        <div class="flex items-baseline justify-between gap-2">
+          <span class="font-brush text-3xl text-dan">이 꿈에서 나온 번호</span>
+          <span id="resultRound" class="text-xs text-wood/60"></span>
+        </div>
+        <div id="balls" class="mt-4 grid grid-cols-6 gap-2 justify-items-center"></div>
+        <p id="savedNote" class="mt-3 text-xs text-jade flex items-center gap-1" hidden><i data-lucide="check" class="w-3.5 h-3.5"></i> 내 꿈 일기에 저장했어요</p>
+        <div class="mt-5 border-t border-dashed border-wood/25 pt-4">
+          <h3 class="font-brush text-2xl text-wood">번호마다 담긴 뜻</h3>
+          <ul id="reasons" class="mt-3 flex flex-col gap-3.5"></ul>
+        </div>
+      </div>
+    </div>
+
+    <button id="imgBtn" type="button" class="w-full rounded-sm bg-dan text-hanji font-bold py-3.5 flex items-center justify-center gap-1.5 border-b-4 border-[#7d2219] active:translate-y-0.5 active:border-b-2 transition">
+      <i data-lucide="image-down" class="w-4 h-4"></i> 이미지로 저장
+    </button>
+    <div class="grid grid-cols-2 gap-2.5">
+      <button id="copyBtn" type="button" class="rounded-sm bg-brass text-wood font-bold py-3.5 flex items-center justify-center gap-1.5 border-b-4 border-[#9c7522] active:translate-y-0.5 active:border-b-2 transition">
+        <i data-lucide="link" class="w-4 h-4"></i> 결과 링크 복사
+      </button>
+      <button id="againBtn" type="button" class="rounded-sm bg-wood/80 border border-brass/40 text-hanji py-3.5 flex items-center justify-center gap-1.5 active:translate-y-0.5 transition">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i> 다시 번호 받기
+      </button>
+    </div>
+    <button id="newBtn" type="button" class="text-sm text-hanji/70 underline underline-offset-4 py-1">다른 꿈 풀어보기</button>
+  </section>
+</div>
+
+<!-- ================= 내 꿈 일기: 목록 ================= -->
+<div id="diaryView" class="flex flex-col gap-4" hidden>
+  <div class="flex items-center justify-between">
+    <button type="button" data-back class="inline-flex items-center gap-1 text-sm text-hanji/80 py-2 pr-3"><i data-lucide="chevron-left" class="w-4 h-4"></i> 신당으로</button>
+    <span id="diaryTotal" class="text-xs text-hanji/60"></span>
+  </div>
+  <h2 class="font-brush text-5xl text-hanji text-center leading-none">내 꿈 <span class="text-dan">일기</span></h2>
+
+  <div id="diaryEmpty" class="hanji rounded-sm text-wood p-8 text-center shadow-2xl shadow-black/50" hidden>
+    <div class="text-5xl">📜</div>
+    <p class="mt-4 text-[15px] leading-7">아직 기록된 꿈이 없어요.<br>오늘 꾼 꿈을 풀어보세요</p>
+    <button type="button" data-back class="mt-5 rounded-sm bg-dan px-5 py-2.5 font-brush text-2xl text-hanji border-b-4 border-[#7d2219]">꿈 풀러 가기</button>
+  </div>
+
+  <ul id="diaryList" class="flex flex-col gap-3"></ul>
+
+  <p class="mt-2 text-center text-[11px] leading-5 text-hanji/50">기록은 이 기기의 브라우저에만 저장되며, 기록 삭제 시 사라질 수 있어요</p>
+</div>
+
+<!-- ================= 내 꿈 일기: 상세 ================= -->
+<div id="detailView" class="flex flex-col gap-4" hidden>
+  <div class="flex items-center justify-between">
+    <button type="button" id="detailBack" class="inline-flex items-center gap-1 text-sm text-hanji/80 py-2 pr-3"><i data-lucide="chevron-left" class="w-4 h-4"></i> 꿈 일기 목록</button>
+  </div>
+
+  <article class="hanji rounded-sm text-wood shadow-2xl shadow-black/50 overflow-hidden">
+    <div class="dancheong"></div>
+    <div class="p-5">
+      <div class="flex items-center justify-between gap-2">
+        <span id="dDate" class="text-xs text-wood/60"></span>
+        <span id="dGrade" class="rounded-sm bg-dan px-2.5 py-0.5 text-xs font-bold text-hanji"></span>
+      </div>
+      <h2 id="dTitle" class="mt-1 font-brush text-4xl text-wood leading-tight"></h2>
+      <blockquote id="dDream" class="mt-3 border-l-4 border-brass/70 bg-hanjiDeep/50 px-3 py-2 text-[14px] leading-6 text-wood/80"></blockquote>
+      <p id="dSummary" class="mt-3 text-[15px] leading-7 text-wood/85"></p>
+      <div id="dTags" class="mt-3 flex flex-wrap gap-1.5"></div>
+    </div>
+  </article>
+
+  <section class="hanji rounded-sm text-wood shadow-2xl shadow-black/50 overflow-hidden">
+    <div class="munsal h-3 opacity-60"></div>
+    <div class="p-5">
+      <div class="flex items-baseline justify-between gap-2">
+        <span class="font-brush text-3xl text-dan">그날 받은 번호</span>
+        <span id="dRound" class="text-xs text-wood/60"></span>
+      </div>
+      <div id="dBalls" class="mt-4 grid grid-cols-6 gap-2 justify-items-center"></div>
+      <div id="dMatch" class="mt-4 rounded-sm border border-dashed border-wood/30 p-3 text-sm leading-6"></div>
+      <div class="mt-4 border-t border-dashed border-wood/25 pt-4">
+        <h3 class="font-brush text-2xl text-wood">번호마다 담긴 뜻</h3>
+        <ul id="dReasons" class="mt-3 flex flex-col gap-3.5"></ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid grid-cols-2 gap-2.5">
+    <button id="dImgBtn" type="button" class="rounded-sm bg-dan text-hanji font-bold py-3.5 flex items-center justify-center gap-1.5 border-b-4 border-[#7d2219] active:translate-y-0.5 active:border-b-2 transition">
+      <i data-lucide="image-down" class="w-4 h-4"></i> 이미지로 저장
+    </button>
+    <button id="dDelete" type="button" class="rounded-sm bg-wood/80 border border-dan/60 text-hanji py-3.5 flex items-center justify-center gap-1.5 active:translate-y-0.5 transition">
+      <i data-lucide="trash-2" class="w-4 h-4"></i> 이 기록 삭제
+    </button>
+  </div>
+  <p class="text-center text-[11px] leading-5 text-hanji/50">기록은 이 기기의 브라우저에만 저장되며, 기록 삭제 시 사라질 수 있어요</p>
+</div>
+
+  <p class="mt-8 text-center text-[11px] leading-5 text-hanji/50">
+    번호는 무작위로 생성되며 당첨 확률과 무관합니다.<br>해몽과 번호 풀이는 재미를 위한 이야기이니 복권은 적당히 즐기세요.
+  </p>
+</main>
+
+<!-- 삭제 확인창 -->
+<div id="confirmSheet" class="fixed inset-0 z-40 flex items-end justify-center bg-black/60 px-4" style="padding-bottom:calc(1rem + env(safe-area-inset-bottom,0px))" hidden role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+  <div class="hanji w-full max-w-md rounded-sm text-wood p-5 shadow-2xl border-t-4 border-dan fade">
+    <h3 id="confirmTitle" class="font-brush text-3xl">이 꿈 기록을 지울까요?</h3>
+    <p id="confirmText" class="mt-2 text-sm leading-6 text-wood/75"></p>
+    <div class="mt-4 grid grid-cols-2 gap-2.5">
+      <button id="confirmNo" type="button" class="rounded-sm border border-wood/40 py-3 text-wood">그대로 두기</button>
+      <button id="confirmYes" type="button" class="rounded-sm bg-dan py-3 font-bold text-hanji border-b-4 border-[#7d2219]">삭제하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 이미지 미리보기 / 길게 눌러 저장 -->
+<div id="imgOverlay" class="fixed inset-0 z-50 flex flex-col items-center gap-3 overflow-y-auto bg-black/90 px-4 py-6" style="padding-top:calc(1.5rem + env(safe-area-inset-top,0px));padding-bottom:calc(1.5rem + env(safe-area-inset-bottom,0px))" hidden role="dialog" aria-modal="true" aria-label="결과 이미지">
+  <p id="imgHint" class="text-center text-sm text-brass leading-6"></p>
+  <img id="imgPreview" alt="꿈수 결과 이미지" class="w-auto max-w-full max-h-[64vh] rounded-sm shadow-2xl">
+  <div class="grid w-full max-w-xs gap-2">
+    <button id="imgShare" type="button" class="rounded-sm bg-dan py-3 font-bold text-hanji border-b-4 border-[#7d2219]" hidden>공유 / 저장하기</button>
+    <button id="imgDownload" type="button" class="rounded-sm bg-brass py-3 font-bold text-wood border-b-4 border-[#9c7522]" hidden>이미지 다운로드</button>
+    <button id="imgClose" type="button" class="rounded-sm border border-hanji/40 py-3 text-hanji">닫기</button>
+  </div>
+</div>
+
+<div id="toast" class="fixed z-[60] left-1/2 -translate-x-1/2 rounded-sm bg-wood border border-brass/50 px-4 py-2.5 text-sm text-hanji shadow-xl text-center max-w-[90vw]" style="bottom:calc(2rem + env(safe-area-inset-bottom,0px))" hidden></div>
+
+<script>
+/* =========================================================
+   설정
+   ========================================================= */
+const USE_MOCK = true;   // 실제 AI 해몽을 쓰려면 false 로 바꾸고 아래 callGemini() 주석을 풀어 연결하세요
+
+// 당첨번호 중계 API 주소
+//  - Vercel에 배포하면 그대로 "/api/lotto"
+//  - GitHub Pages에 두고 함수만 Vercel/Cloudflare에 올렸다면 그 전체 주소 (예: "https://kkumsu.vercel.app/api/lotto")
+const LOTTO_API = "/api/lotto";
+// 중계 API가 없거나 실패할 때 브라우저가 바로 읽는 공개 JSON (GitHub Pages라 CORS 허용)
+const LOTTO_FALLBACK = "https://smok95.github.io/lotto/results/";
+// 이미지 카드 하단에 넣을 사이트 주소. 비우면 현재 접속 주소를 씁니다.
+const SITE_URL = "";
+
+const DIARY_KEY = "kkumsu_diary_v1";   // 꿈 일기
+const DRAW_KEY  = "kkumsu_draws_v1";   // 당첨번호 캐시 (추첨이 끝난 회차는 바뀌지 않으므로 보관)
+const DIARY_MAX = 200;
+
+/* =========================================================
+   목업 해몽 사전 — k: 꿈에서 찾을 말(단어 첫머리 기준), sym: 번호 풀이에 쓸 이름
+   ========================================================= */
+const DICT = [
+  {k:["돼지"],sym:"돼지",tag:["#돼지꿈","#재물운"],g:"대길",t:"복덩이가 굴러 들어온 돼지꿈",
+   s:"돼지는 예로부터 재물을 몰고 오는 짐승이라 했어요. 집 안으로 들어오거나 품에 안기면 돈복이 제 발로 찾아오는 꿈이에요. 들어온 복이 새지 않게 이번 주는 지갑 단속을 잘 하세요."},
+  {k:["똥","대변"],sym:"똥",tag:["#똥꿈","#대박운"],g:"대길",t:"묻을수록 돈 되는 황금 똥꿈",
+   s:"더러워 보여도 똥은 해몽에서 재물 그 자체예요. 많이 볼수록, 몸에 묻을수록 큰돈이 들어온다고 풀어요. 꿈에서 찝찝했다면 그만큼 복이 크다는 뜻이에요."},
+  {k:["조상","할머니","할아버지"],sym:"조상님",tag:["#조상꿈","#귀인운"],g:"대길",t:"조상님이 찾아오신 꿈",
+   s:"조상님이 밝은 얼굴로 나타나면 집안을 돌봐 주신다는 뜻이에요. 무언가를 건네주셨다면 복을 손에 직접 쥐여 주신 것이니 가장 반가운 꿈이에요."},
+  {k:["대통령","왕","임금"],sym:"대통령",tag:["#대통령꿈","#귀인운"],g:"대길",t:"귀인을 만나는 대통령꿈",
+   s:"대통령이나 임금을 만나는 꿈은 예로부터 귀한 꿈으로 이름났어요. 높은 자리의 도움이나 큰 기회가 문 앞까지 와 있다는 뜻이에요."},
+  {k:["용이","용을","용꿈","청룡","황룡","용 "],sym:"용",tag:["#용꿈","#승천운"],g:"대길",t:"하늘로 오르는 용꿈",
+   s:"용이 하늘로 오르는 꿈은 합격, 승진, 큰 성공을 알리는 으뜸 길몽이에요. 오래 준비해 온 일이 있다면 이제 때가 왔다는 신호예요."},
+  {k:["뱀","구렁이"],sym:"구렁이",tag:["#뱀꿈","#재물운"],g:"길",t:"복을 휘감는 구렁이 꿈",
+   s:"큰 구렁이가 몸을 감는 꿈은 재물이나 귀한 인연이 몸에 붙는다는 뜻이에요. 태몽으로도 귀하게 여기는 꿈이에요."},
+  {k:["호랑이","범이"],sym:"호랑이",tag:["#호랑이꿈","#권세운"],g:"길",t:"든든한 뒷배가 생기는 호랑이꿈",
+   s:"호랑이는 산신령의 심부름꾼이라 했어요. 호랑이가 집에 들어오면 힘 있는 사람이 뒤를 봐준다는 뜻이에요."},
+  {k:["불이","불길","불타","화재","불꽃"],sym:"불길",tag:["#불꿈","#사업운"],g:"길",t:"활활 타오르는 재물운",
+   s:"불이 크게 타오르는 꿈은 하는 일과 재물이 크게 일어난다는 뜻이에요. 연기 없이 밝게 탈수록 좋은 꿈이에요."},
+  {k:["물이","바다","강물","냇물","홍수","우물"],sym:"맑은 물",tag:["#물꿈","#재물운"],g:"길",t:"맑은 물이 넘치는 꿈",
+   s:"맑은 물이 가득 차오르면 재물이 불어나고 막힌 일이 술술 풀린다는 뜻이에요. 흙탕물이었다면 작은 걱정부터 정리하라는 신호예요."},
+  {k:["이빨","이가","치아","이 빠"],sym:"빠진 이",tag:["#이빨꿈","#정리운"],g:"평",t:"묵은 일이 빠져나가는 꿈",
+   s:"이가 빠지는 꿈은 걱정의 꿈으로 알려졌지만, 피 없이 빠졌다면 오래 묵은 골칫거리가 빠져나간다는 뜻이에요. 가까운 어른 안부를 한 번 챙겨 보세요."},
+  {k:["죽","시체","장례"],sym:"죽음",tag:["#반전꿈","#새출발"],g:"길",t:"무서워도 사실은 길몽",
+   s:"죽음이나 시체가 나오는 꿈은 해몽에서 오히려 새 출발과 재물을 뜻해요. 묵은 것이 끝나야 새 복이 들어온다는 반전의 꿈이에요."},
+  {k:["황금","금반지","금덩이","금이","금을","반지"],sym:"황금",tag:["#황금꿈","#명예운"],g:"대길",t:"번쩍이는 황금 꿈",
+   s:"황금을 얻는 꿈은 재물과 이름이 함께 오는 길몽이에요. 반지였다면 좋은 약속이나 계약이 맺어진다는 뜻도 있어요."},
+  {k:["보름달","달이","달을","달빛"],sym:"보름달",tag:["#달꿈","#소원운"],g:"길",t:"소원이 차오르는 보름달 꿈",
+   s:"밝은 보름달은 바라던 일이 둥글게 이루어지고 집안이 두루 편안해진다는 뜻이에요."},
+  {k:["태양","해가","해를","햇님"],sym:"해",tag:["#태양꿈","#성공운"],g:"대길",t:"품에 안긴 태양 꿈",
+   s:"해가 품에 들어오는 꿈은 큰 성공이나 귀한 태몽으로 풀어요. 하는 일이 환하게 빛을 본다는 뜻이에요."},
+  {k:["돈","지폐","동전","만원"],sym:"돈",tag:["#돈꿈","#금전운"],g:"평",t:"돈이 오가는 꿈",
+   s:"꿈에서 돈을 받으면 오히려 나갈 일이 생기고, 남에게 주면 근심이 덜어진다고 풀어요. 어느 쪽이든 돈의 흐름이 바뀐다는 뜻이에요."},
+  {k:["강아지","개가","개를","개한테","누렁이"],sym:"강아지",tag:["#강아지꿈","#인연운"],g:"길",t:"반가운 손님이 찾아오는 꿈",
+   s:"강아지가 반갑게 달려드는 꿈은 믿을 만한 사람이 곁에 생긴다는 뜻이에요. 짖었다면 곧 반가운 소식이 문을 두드린다고 풀어요. 물렸다면 가까운 사이에서 말조심하라는 신호예요."},
+  {k:["고양이"],sym:"고양이",tag:["#고양이꿈","#촉운"],g:"평",t:"눈치와 촉이 살아나는 꿈",
+   s:"고양이는 해몽에서 영리함과 날카로운 촉을 뜻해요. 고양이가 따라왔다면 작은 행운이 슬그머니 붙는다는 뜻이고, 할퀴었다면 시샘하는 사람을 조심하라는 신호예요."},
+  {k:["새집","새 집","이사","대문"],sym:"대문",tag:["#집꿈","#변화운"],g:"길",t:"새 터전이 열리는 꿈",
+   s:"새 집이나 큰 대문이 나오는 꿈은 생활에 새로운 문이 열린다는 뜻이에요. 넓고 밝은 집일수록 좋은 일이 커요."}
+];
+const FALLBACK = {sym:"꿈속 장면",tag:["#신비한꿈","#변화운"],g:"길",t:"새 기운이 스며드는 꿈",
+  s:"뚜렷한 상징은 없어도 꿈이 이렇게 선명하게 남았다는 건 마음에 새 기운이 들어왔다는 뜻이에요. 며칠 안에 생기는 작은 변화를 반갑게 맞아 보세요."};
+const EXAMPLES = ["황금 돼지가 대문으로 들어왔어요","돌아가신 할머니가 금반지를 주셨어요","대통령이랑 악수했어요","용이 바다에서 하늘로 올라갔어요","이가 빠지는 꿈"];
+const LOAD_MSGS = ["방울 흔들며 신령님을 부르는 중...","당산나무에 꿈 사연을 고하는 중...","조상님께 번호를 여쭙는 중...","오방기를 하나씩 뽑아 보는 중...","엽전을 던져 점괘를 보는 중..."];
+
+/* =========================================================
+   실제 AI 연동 예시 (Gemini) — USE_MOCK = false 일 때
+   번호는 화면에서 무작위로 뽑고, AI는 해몽과 '번호마다 그럴듯한 풀이'만 씁니다.
+   ⚠ API 키를 브라우저에 두면 누구나 볼 수 있어요. 실제 서비스에서는
+   이 함수를 서버로 옮기고 브라우저는 내 서버(/api/dream)만 부르세요.
+   =========================================================
+async function callGemini(dream, nums){
+  const GEMINI_API_KEY = "여기에_Gemini_API_키";
+  const prompt = `당신은 한국 전통 해몽을 잘 아는 정겨운 무당입니다.
+1) 아래 꿈을 한국식 해몽으로 풀어 주세요. 기분 좋고 흥미롭게, 겁주지 말고, 당첨을 약속하지 마세요.
+2) 이미 뽑힌 로또 번호 ${nums.join(", ")} 각각에 대해, 꿈 속 장면·사물·행동과 연결지어
+   그 번호가 나온 이유를 한두 문장으로 그럴듯하게 풀어 주세요. (개수, 시간, 날짜, 걸음 수, 모양 등 자유롭게)
+사주·오행 이야기는 하지 마세요. 해요체로 쓰세요.
+JSON만 출력:
+{"title":"한 줄 제목","grade":"대길|길|평","summary":"3문장 해몽","tags":["#키워드","#키워드","#키워드"],
+ "reasons":[{"n":번호,"why":"풀이"}, ... 6개]}
+꿈: ${dream}`;
+  const res = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY,
+    {method:"POST", headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
+                          generationConfig:{responseMimeType:"application/json",temperature:1}})});
+  if(!res.ok) throw new Error("AI 응답 오류 " + res.status);
+  const r = JSON.parse((await res.json()).candidates[0].content.parts[0].text);
+  const map = Object.fromEntries((r.reasons||[]).map(x=>[+x.n, String(x.why)]));
+  return {t:r.title, g:r.grade, s:r.summary, tag:(r.tags||[]).slice(0,3),
+          picks: nums.map(n=>({n, why: map[n] || "꿈의 기운을 따라 함께 나온 번호예요."}))};
+}
+   ========================================================= */
+
+const $ = id => document.getElementById(id);
+let current = null;   // {dream,t,g,s,tag,syms,picks:[{n,why}],round,createdAt,entryId}
+
+function rand(n){ const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]%n; }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=rand(i+1);[a[i],a[j]]=[a[j],a[i]];} return a; }
+function drawNumbers(){ return shuffle(Array.from({length:45},(_,i)=>i+1)).slice(0,6).sort((a,b)=>a-b); }
+
+/* ---------- 조사 붙이기 ---------- */
+function hasBatchim(word){
+  const ch=String(word).trim().slice(-1);
+  if(/\d/.test(ch)) return "013678".includes(ch);   // 영 일 삼 육 칠 팔
+  const c=ch.charCodeAt(0)-0xAC00;
+  return c>=0 && c<=11171 && c%28!==0;
+}
+const J = { 이:w=>w+(hasBatchim(w)?"이":"가"), 을:w=>w+(hasBatchim(w)?"을":"를"), 과:w=>w+(hasBatchim(w)?"과":"와"), 이라는:w=>w+(hasBatchim(w)?"이라는":"라는"), 은:w=>w+(hasBatchim(w)?"은":"는") };
+
+/* ---------- 꿈에서 상징 고르기 ---------- */
+const hasWord = (text,k) => new RegExp("(^|[^가-힣])"+k).test(text);
+function matchDict(dream){ return DICT.filter(d=>d.k.some(k=>hasWord(dream,k))); }
+function guessSymbols(dream){
+  const verbEnd=/(다|요|어|았|었|고|서|는데|니|며|게|지|면|듯|했|된|한|던|꿈)$/;
+  const skip=["어제","오늘","갑자기","너무","정말","그냥","같이","다시","제가","내가","우리"];
+  return [...new Set(dream.replace(/[^가-힣\s]/g," ").split(/\s+/)
+    .map(w=>w.replace(/(이랑|에서|에게|한테|으로|은|는|이|가|을|를|에|의|와|과|랑|도|로|만)$/,""))
+    .filter(w=>w.length>=2 && !verbEnd.test(w) && !skip.includes(w)))].slice(0,3);
+}
+
+/* ---------- 번호 풀이 문장 틀 ---------- */
+const DIGIT_SHAPE = {"1":"곧게 선 당산나무","2":"고개 숙여 절하는 학","3":"복을 듣는 귀","4":"반쯤 열린 대문","5":"엽전 꾸러미","6":"배부른 복주머니","7":"복을 걸어 올리는 갈고리","8":"넉넉한 표주박","9":"꼬리 말아 올린 구렁이","0":"둥근 엽전"};
+const TEMPLATES = [
+  (n,s)=>`꿈속 ${J.이(s)} 남긴 복이 ${n}갈래로 나뉘어 집안 곳곳에 고루 퍼진다는 뜻이에요.`,
+  (n,s)=> n<=24 ? `${J.이(s)} 나타난 꿈의 기운은 하루 중 ${n}시 무렵에 가장 세게 닿는다고 해서 짚은 번호예요.`
+                : `${s}의 기운이 ${n}번 겹겹이 쌓인 모양이라, 한 번 들어온 복이 쉽게 빠져나가지 않는다는 뜻이에요.`,
+  (n,s)=> n<=31 ? `${s} 꿈의 복은 ${n}일 안에 소식이 온다고 하여 이 번호가 따라 나왔어요.`
+                : `${s} 꿈의 복은 ${n}일 동안 머문다고 하니, 그동안 좋은 일을 놓치지 말라는 번호예요.`,
+  (n,s)=>`${J.이(s)} 대문 문턱까지 ${n}걸음이면 닿는 곳에 있었다는 뜻이에요. 복이 그만큼 가까이 왔다는 거죠.`,
+  (n,s)=>{ const d=String(n).slice(-1); return `${n<10?"숫자 "+n+"의 생김새는":J.은(n+"의 끝자리 "+d)} ${J.을(DIGIT_SHAPE[d])} 닮았어요. 꿈속 ${s}의 모습과 겹쳐 보여 뽑힌 번호예요.`; },
+  (n,s)=>`${J.이(s)} 품고 온 복주머니 속 엽전이 ${n}닢이었다고 풀어요. 작게 시작해 크게 불어나는 재물이에요.`,
+  (n,s)=>`신령님께 ${s} 이야기를 아뢰고 엽전을 던지니 ${n}번 자리에 앞면이 떨어졌어요. 그래서 점지된 번호예요.`,
+  (n,s)=>`꿈속에서 ${J.과(s)} 마주친 순간을 ${n}번째 복이 열리는 문으로 보았어요.`,
+  (n,s)=>`${s} 꿈을 꾼 사람은 ${J.이라는(n)} 수와 인연이 닿는다고 해요. 오가며 이 숫자가 자주 보이면 좋은 징조예요.`,
+  (n,s)=>`당산나무에 ${s} 이야기를 고하니 오색천이 ${n}번 흔들렸다 하여 점지된 번호예요.`
+];
+function explain(nums, syms){
+  const tpl=shuffle([...TEMPLATES]);
+  return nums.map((n,i)=>({n, why: tpl[i%tpl.length](n, syms[i%syms.length])}));
+}
+
+function mockInterpret(dream){
+  const hits=matchDict(dream);
+  if(hits.length){
+    const main=hits[0], more=hits.slice(1,3).map(h=>h.sym);
+    const joined = more.length===2 ? J.과(more[0])+" "+more[1] : more[0];
+    const extra = more.length ? ` 여기에 ${joined}의 기운까지 겹쳐 더 반가운 꿈이에요.` : "";
+    return {t:main.t, g:main.g, s:main.s+extra, tag:[...new Set(hits.flatMap(h=>h.tag))].slice(0,3), syms:hits.map(h=>h.sym)};
+  }
+  const guess=guessSymbols(dream);
+  return {...FALLBACK, syms: guess.length?guess:[FALLBACK.sym],
+          tag: guess.length ? ["#"+guess[0]+"꿈", ...FALLBACK.tag].slice(0,3) : FALLBACK.tag};
+}
+
+/* =========================================================
+   로또 회차 계산 (1회: 2002-12-07 토 20:45 KST, 매주 1회씩)
+   ========================================================= */
+const WEEK = 7*24*60*60*1000;
+const FIRST_DRAW = Date.UTC(2002,11,7,11,45);   // 20:45 KST = 11:45 UTC
+const SALES_GAP = 45*60*1000;                  // 토요일 20:00 판매 마감
+const drawTimeOf = r => FIRST_DRAW + (r-1)*WEEK;
+const latestDrawnRound = (now=Date.now()) => Math.floor((now-FIRST_DRAW)/WEEK)+1;           // 추첨 시각이 지난 마지막 회차
+const targetRound = (now=Date.now()) => Math.floor((now-(FIRST_DRAW-SALES_GAP))/WEEK)+2;     // 지금 산다면 들어갈 회차
+
+const KST_FMT = new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit",weekday:"short"});
+function fmtDate(ts, short){
+  const p=Object.fromEntries(KST_FMT.formatToParts(new Date(ts)).map(x=>[x.type,x.value]));
+  return short ? `${p.month}.${p.day} (${p.weekday})` : `${p.year}.${p.month}.${p.day} (${p.weekday})`;
+}
+
+/* =========================================================
+   localStorage 안전하게 다루기
+   ========================================================= */
+function readStore(key, fallback){
+  try{ const raw=localStorage.getItem(key); if(!raw) return fallback; const v=JSON.parse(raw); return v ?? fallback; }
+  catch(e){ return fallback; }
+}
+function writeStore(key, value){
+  try{ localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch(e){ return false; }
+}
+
+/* ---------- 꿈 일기 ---------- */
+function validEntry(e){ return e && typeof e.id==="string" && Array.isArray(e.nums) && e.nums.length===6 && Number.isFinite(e.createdAt) && Number.isInteger(e.round); }
+function loadDiary(){ const v=readStore(DIARY_KEY, []); return Array.isArray(v) ? v.filter(validEntry) : []; }
+let storeWarned=false;
+function saveDiary(list){
+  const ok=writeStore(DIARY_KEY, list.slice(0,DIARY_MAX));
+  if(!ok && !storeWarned){ storeWarned=true; toast("이 브라우저에서는 꿈 일기를 저장할 수 없어요"); }
+  return ok;
+}
+function addEntry(r){
+  const entry={ id: Date.now().toString(36)+rand(1e6).toString(36), createdAt: r.createdAt, round: r.round,
+    dream: r.dream, title: r.t, grade: r.g||"", summary: r.s, tags: r.tag||[],
+    nums: r.picks.map(p=>p.n), reasons: r.picks.map(p=>p.why) };
+  const list=loadDiary(); list.unshift(entry);
+  return saveDiary(list) ? entry.id : null;
+}
+function updateEntryPicks(id, picks){
+  const list=loadDiary(); const e=list.find(x=>x.id===id); if(!e) return;
+  e.nums=picks.map(p=>p.n); e.reasons=picks.map(p=>p.why); saveDiary(list);
+}
+function deleteEntry(id){ saveDiary(loadDiary().filter(x=>x.id!==id)); }
+function refreshDiaryCount(){ const n=loadDiary().length; $("diaryCount").textContent = n ? `(${n})` : ""; }
+
+/* =========================================================
+   당첨번호 불러오기: 중계 API → 공개 JSON 순서, 받은 회차는 캐시
+   반환: 회차 데이터 / null(아직 결과 없음) / 예외(둘 다 실패)
+   ========================================================= */
+const drawMem = {};
+function validDraw(d){
+  return d && Number.isInteger(d.round) && Array.isArray(d.numbers) && d.numbers.length===6 &&
+    d.numbers.every(n=>Number.isInteger(n)&&n>=1&&n<=45) && Number.isInteger(d.bonus) && d.bonus>=1 && d.bonus<=45;
+}
+async function fetchJSON(url){
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),8000);
+  try{
+    const r=await fetch(url,{signal:ctl.signal});
+    const isJson=(r.headers.get("content-type")||"").includes("json");
+    return {status:r.status, body: isJson ? await r.json().catch(()=>null) : null};
+  }finally{ clearTimeout(t); }
+}
+async function getDraw(round){
+  if(drawMem[round]) return drawMem[round];
+  const cache=readStore(DRAW_KEY, {});
+  if(validDraw(cache[round])) return (drawMem[round]=cache[round]);
+
+  let d=null, settled=false;
+  try{
+    const {status,body}=await fetchJSON(`${LOTTO_API}?round=${round}`);
+    if(status===200 && validDraw(body) && body.round===round){ d=body; settled=true; }
+    else if(status===404 && body && body.error==="not_found"){ settled=true; }
+  }catch(e){}
+  if(!settled){
+    try{
+      const {status,body}=await fetchJSON(`${LOTTO_FALLBACK}${round}.json`);
+      if(status===200 && body && Number(body.draw_no)===round){
+        const x={round, date:String(body.date).slice(0,10), numbers:(body.numbers||[]).map(Number).sort((a,b)=>a-b), bonus:Number(body.bonus_no)};
+        if(validDraw(x)) d=x;
+        settled=true;
+      }else if(status===404){ settled=true; }
+    }catch(e){}
+  }
+  if(!settled) throw new Error("draw_unavailable");
+  if(d){
+    drawMem[round]=d;
+    const keys=Object.keys(cache).map(Number).sort((a,b)=>b-a);
+    keys.slice(80).forEach(k=>delete cache[k]);   // 최근 80개 회차만 보관
+    cache[round]=d; writeStore(DRAW_KEY, cache);
+  }
+  return d;
+}
+
+function matchInfo(nums, d){
+  const hit=nums.filter(n=>d.numbers.includes(n));
+  const bonus=nums.includes(d.bonus);
+  const c=hit.length;
+  const rank = c===6?"1등": c===5&&bonus?"2등": c===5?"3등": c===4?"4등": c===3?"5등": "";
+  return {hit, bonus, count:c, rank};
+}
+function matchText(m){
+  if(!m.count) return "이번엔 비켜 갔어요. 다음 꿈을 기다려 보세요";
+  return `${m.count}개 일치!` + (m.rank?` (${m.rank} 해당)`:"") + (m.bonus&&m.count===5?" · 보너스 번호도 맞았어요":"");
+}
+
+/* =========================================================
+   화면 조각
+   ========================================================= */
+function ballColor(n){   // 동행복권 공 색상
+  if(n<=10) return "bg-[#fbc400] text-[#3b2a20]";
+  if(n<=20) return "bg-[#69c8f2] text-[#1c1714]";
+  if(n<=30) return "bg-[#ff7272] text-white";
+  if(n<=40) return "bg-[#aaaaaa] text-white";
+  return "bg-[#b0d840] text-[#1c1714]";
+}
+const BALL_SIZE = {lg:"w-11 h-11 text-lg", md:"w-10 h-10 text-base", sm:"w-7 h-7 text-xs"};
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+function makeBall(n, size="lg", state="", delay=null){
+  const b=el("span",`ball ${state} ${delay!=null?"pop":""} shrink-0 rounded-full grid place-items-center font-bold transition ${BALL_SIZE[size]} ${ballColor(n)}`, n);
+  if(delay!=null) b.style.animationDelay=delay+"ms";
+  if(state==="hit") b.setAttribute("aria-label", n+"번 일치");
+  return b;
+}
+function renderReasons(ul, picks){
+  ul.innerHTML="";
+  picks.forEach(p=>{
+    const li=el("li","flex gap-3 items-start");
+    li.append(makeBall(p.n,"sm"));
+    li.append(el("p","min-w-0 text-[14px] leading-6 text-wood/85",p.why));
+    ul.append(li);
+  });
+}
+function renderTags(box, tags){
+  box.innerHTML=""; (tags||[]).forEach(t=>box.append(el("span","rounded-sm border border-dan/40 text-dan px-2 py-0.5 text-sm",t)));
+}
+
+function renderNumbers(picks){
+  const balls=$("balls"); balls.innerHTML="";
+  picks.forEach((p,i)=>balls.append(makeBall(p.n,"lg","",i*110)));
+  renderReasons($("reasons"), picks);
+}
+function renderResult(r){
+  current=r;
+  $("grade").textContent=r.g; $("grade").hidden=!r.g;
+  $("title").textContent=r.t; $("summary").textContent=r.s;
+  renderTags($("tags"), r.tag);
+  $("resultRound").textContent=`제 ${r.round}회 추첨용`;
+  $("savedNote").hidden=!r.entryId;
+  renderNumbers(r.picks);
+  $("result").hidden=false;
+  icons();
+}
+
+function playLoading(ms){
+  return new Promise(resolve=>{
+    $("loading").hidden=false;
+    const bar=$("bar"); bar.style.transitionDuration="0ms"; bar.style.width="0";
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{ bar.style.transitionDuration=ms+"ms"; bar.style.width="100%"; }));
+    const msgs=shuffle([...LOAD_MSGS]); let i=0;
+    const show=()=>{ const m=$("loadMsg"); m.classList.remove("fade"); void m.offsetWidth; m.classList.add("fade"); m.textContent=msgs[i++%msgs.length]; };
+    show(); const timer=setInterval(show,900);
+    setTimeout(()=>{ clearInterval(timer); $("loading").hidden=true; resolve(); },ms);
+  });
+}
+
+async function run(){
+  const dream=$("dream").value.trim();
+  $("err").hidden=true;
+  if(dream.length<3){ $("err").textContent="꿈 이야기를 조금만 더 들려주세요."; $("err").hidden=false; $("dream").focus(); return; }
+  $("goBtn").disabled=true; $("inputCard").hidden=true; $("result").hidden=true;
+  const nums=drawNumbers();
+  try{
+    const [r]=await Promise.all([
+      USE_MOCK ? Promise.resolve(mockInterpret(dream)) : callGemini(dream, nums),
+      playLoading(2600)
+    ]);
+    const result={...r, dream, picks: r.picks || explain(nums, r.syms), createdAt: Date.now(), round: targetRound()};
+    result.entryId = addEntry(result);          // 꿈 일기에 자동 저장
+    renderResult(result);
+    refreshDiaryCount(); renderMyMatch();
+    $("result").scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(e){
+    console.error(e);
+    $("inputCard").hidden=false;
+    $("err").textContent="풀이 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요."; $("err").hidden=false;
+  }finally{ $("goBtn").disabled=false; }
+}
+
+/* =========================================================
+   이번 주 당첨번호 카드 + 내 번호 대조
+   ========================================================= */
+let latestDraw=null;
+async function loadLatestDraw(){
+  $("drawLoading").hidden=false; $("drawError").hidden=true; $("drawBody").hidden=true;
+  $("drawTitle").textContent="이번 주 당첨번호"; $("drawDate").textContent="";
+  try{
+    const r=latestDrawnRound();
+    let d=await getDraw(r);
+    if(!d) d=await getDraw(r-1);      // 추첨 직후 아직 결과가 안 올라왔으면 직전 회차
+    if(!d) throw new Error("no_draw");
+    latestDraw=d;
+    $("drawTitle").textContent=`제 ${d.round}회 당첨번호`;
+    $("drawDate").textContent=`${fmtDate(drawTimeOf(d.round))} 추첨`;
+    const box=$("drawBalls"); box.innerHTML="";
+    d.numbers.forEach((n,i)=>box.append(makeBall(n,"md","",i*90)));
+    box.append(el("span","text-wood/50 font-bold","+"));
+    box.append(makeBall(d.bonus,"md","",6*90));
+    renderMyMatch();
+    $("drawLoading").hidden=true; $("drawBody").hidden=false;
+  }catch(e){
+    console.warn(e);
+    $("drawLoading").hidden=true; $("drawError").hidden=false;
+  }
+  icons();
+}
+function renderMyMatch(){
+  const box=$("myMatch"); if(!box) return;
+  box.innerHTML="";
+  if(!latestDraw) return;
+  const diary=loadDiary();
+  const same=diary.filter(e=>e.round===latestDraw.round);
+  if(same.length){
+    const wrap=el("div","border-t border-dashed border-wood/25 pt-3 flex flex-col gap-3");
+    same.slice(0,3).forEach(e=>{
+      const m=matchInfo(e.nums, latestDraw);
+      const row=el("button","w-full text-left rounded-sm p-2 -m-2 active:bg-hanjiDeep/60");
+      row.type="button"; row.onclick=()=>openDetail(e.id);
+      const head=el("p","text-sm");
+      head.append(el("span","font-bold "+(m.count?"text-dan":"text-wood/70"), m.count?`이번 주 내 꿈 번호: ${matchText(m)}`:"이번 주 내 꿈 번호: "+matchText(m)));
+      row.append(head);
+      row.append(el("p","mt-0.5 text-xs text-wood/55 truncate",`${fmtDate(e.createdAt,true)} · ${e.title}`));
+      const balls=el("div","mt-2 flex gap-1.5");
+      e.nums.forEach(n=>balls.append(makeBall(n,"sm", latestDraw.numbers.includes(n)?"hit":"miss")));
+      row.append(balls);
+      wrap.append(row);
+    });
+    if(same.length>3) wrap.append(el("p","text-xs text-wood/55",`외 ${same.length-3}개 기록은 내 꿈 일기에서 볼 수 있어요`));
+    box.append(wrap); return;
+  }
+  const next=latestDraw.round+1, waiting=diary.filter(e=>e.round===next).length;
+  const p=el("p","border-t border-dashed border-wood/25 pt-3 text-sm text-wood/70 leading-6");
+  p.textContent = waiting
+    ? `제 ${next}회 추첨(${fmtDate(drawTimeOf(next),true)} 20:45)을 기다리는 내 꿈 번호가 ${waiting}개 있어요. 추첨이 끝나면 여기서 바로 맞춰 봐요.`
+    : "꿈을 풀면 번호가 내 꿈 일기에 저장되고, 추첨이 끝나면 여기서 자동으로 맞춰 봐요.";
+  box.append(p);
+}
+
+/* =========================================================
+   화면 전환 (메인 / 일기 목록 / 일기 상세)
+   ========================================================= */
+const VIEWS=["mainView","diaryView","detailView"];
+function setView(v){ VIEWS.forEach(id=>$(id).hidden = id!==v); window.scrollTo(0,0); }
+function go(v, extra={}, push=true){
+  if(v==="diaryView") renderDiary();
+  if(v==="detailView" && !renderDetail(extra.id)) v="diaryView", renderDiary();
+  if(v==="mainView") { refreshDiaryCount(); renderMyMatch(); }
+  setView(v);
+  if(push){ try{ history.pushState({v, ...extra}, ""); }catch(e){} }
+  icons();
+}
+window.addEventListener("popstate", e=>{ const s=e.state||{v:"mainView"}; go(s.v||"mainView", s, false); closeOverlays(); });
+
+/* ---------- 일기 목록 ---------- */
+function renderDiary(){
+  const list=loadDiary().sort((a,b)=>b.createdAt-a.createdAt);
+  const ul=$("diaryList"); ul.innerHTML="";
+  $("diaryEmpty").hidden = list.length>0;
+  $("diaryTotal").textContent = list.length ? `총 ${list.length}개` : "";
+  const drawn=latestDrawnRound();
+  list.forEach(e=>{
+    const li=el("li");
+    const btn=el("button","hanji w-full text-left rounded-sm text-wood p-4 shadow-xl shadow-black/40 border-l-4 "+(e.grade==="평"?"border-sky":"border-dan")+" active:translate-y-0.5 transition");
+    btn.type="button"; btn.onclick=()=>openDetail(e.id);
+    const top=el("div","flex items-center justify-between gap-2 text-xs text-wood/60");
+    top.append(el("span","",`${fmtDate(e.createdAt)} · 제 ${e.round}회`));
+    const chip=el("span","rounded-sm px-2 py-0.5 text-[11px] font-bold "+(e.round>drawn?"bg-wood/10 text-wood/70":"bg-hanjiDeep text-wood/70"), e.round>drawn?"추첨 전":"확인 중…");
+    top.append(chip);
+    btn.append(top);
+    const t=el("p","mt-1 font-brush text-2xl leading-tight");
+    t.textContent=e.title; btn.append(t);
+    btn.append(el("p","mt-1 text-[13px] text-wood/70 truncate",e.dream));
+    const balls=el("div","mt-2.5 flex gap-1.5"); e.nums.forEach(n=>balls.append(makeBall(n,"sm"))); btn.append(balls);
+    li.append(btn); ul.append(li);
+    if(e.round<=drawn){
+      getDraw(e.round).then(d=>{
+        if(!d){ chip.textContent="결과 대기"; return; }
+        const m=matchInfo(e.nums,d);
+        chip.textContent = m.count ? `${m.count}개 일치` : "0개 일치";
+        chip.className="rounded-sm px-2 py-0.5 text-[11px] font-bold "+(m.count>=3?"bg-dan text-hanji":m.count?"bg-brass/30 text-wood":"bg-wood/10 text-wood/60");
+        [...balls.children].forEach((b,i)=>b.classList.add(d.numbers.includes(e.nums[i])?"hit":"miss"));
+      }).catch(()=>{ chip.textContent="결과 확인 실패"; });
+    }
+  });
+}
+function openDetail(id){ go("detailView",{id}); }
+
+/* ---------- 일기 상세 ---------- */
+let detailEntry=null;
+function renderDetail(id){
+  const e=loadDiary().find(x=>x.id===id); if(!e) return false;
+  detailEntry=e;
+  $("dDate").textContent=`${fmtDate(e.createdAt)}의 꿈`;
+  $("dGrade").textContent=e.grade; $("dGrade").hidden=!e.grade;
+  $("dTitle").textContent=e.title; $("dDream").textContent=e.dream; $("dSummary").textContent=e.summary;
+  renderTags($("dTags"), e.tags);
+  $("dRound").textContent=`제 ${e.round}회 · ${fmtDate(drawTimeOf(e.round),true)} 추첨`;
+  const balls=$("dBalls"); balls.innerHTML=""; e.nums.forEach(n=>balls.append(makeBall(n,"lg")));
+  renderReasons($("dReasons"), e.nums.map((n,i)=>({n, why:(e.reasons||[])[i]||""})));
+  const box=$("dMatch");
+  if(e.round>latestDrawnRound()){
+    box.textContent=`아직 추첨 전이에요. ${fmtDate(drawTimeOf(e.round))} 20:45 추첨이 끝나면 여기서 바로 맞춰 봐요.`;
+  }else{
+    box.textContent="당첨번호를 확인하는 중이에요…";
+    showDetailMatch(e);
+  }
+  return true;
+}
+async function showDetailMatch(e){
+  const box=$("dMatch");
+  try{
+    const d=await getDraw(e.round);
+    if(detailEntry!==e) return;
+    if(!d){ box.textContent="추첨은 끝났지만 결과가 아직 올라오지 않았어요. 잠시 후 다시 확인해 주세요."; return; }
+    const m=matchInfo(e.nums,d);
+    box.innerHTML="";
+    box.append(el("p","font-bold "+(m.count?"text-dan":"text-wood/70"), matchText(m)));
+    box.append(el("p","mt-1 text-xs text-wood/60",`제 ${d.round}회 당첨번호`));
+    const row=el("div","mt-1.5 flex flex-wrap items-center gap-1.5");
+    d.numbers.forEach(n=>row.append(makeBall(n,"sm"))); row.append(el("span","text-wood/50 text-xs font-bold","+")); row.append(makeBall(d.bonus,"sm"));
+    box.append(row);
+    [...$("dBalls").children].forEach((b,i)=>b.classList.add(d.numbers.includes(e.nums[i])?"hit":"miss"));
+  }catch(err){
+    if(detailEntry!==e) return;
+    box.innerHTML="";
+    box.append(el("p","text-wood/75","당첨번호를 불러오지 못했어요"));
+    const btn=el("button","mt-2 rounded-sm border border-wood/40 px-3 py-1.5 text-sm","다시 시도");
+    btn.type="button"; btn.onclick=()=>{ box.textContent="당첨번호를 확인하는 중이에요…"; showDetailMatch(e); };
+    box.append(btn);
+  }
+}
+
+/* ---------- 삭제 확인창 ---------- */
+let pendingDelete=null;
+function askDelete(e){
+  pendingDelete=e.id;
+  $("confirmText").textContent=`${fmtDate(e.createdAt)}에 기록한 「${e.title}」을(를) 지우면 다시 되돌릴 수 없어요.`;
+  $("confirmSheet").hidden=false; $("confirmNo").focus();
+}
+function closeConfirm(){ $("confirmSheet").hidden=true; pendingDelete=null; }
+
+/* =========================================================
+   결과 이미지 카드 (1080 x 1920, Canvas 직접 그리기)
+   ========================================================= */
+const CW=1080, CH=1920;
+const F_BRUSH='"Nanum Brush Script", cursive', F_BODY='"Gowun Batang", Batang, serif';
+const BALL_FILL=n=> n<=10?["#fbc400","#3b2a20"]: n<=20?["#69c8f2","#1c1714"]: n<=30?["#ff7272","#ffffff"]: n<=40?["#aaaaaa","#ffffff"]: ["#b0d840","#1c1714"];
+
+async function ensureFonts(text){
+  if(!document.fonts || !document.fonts.load) return;
+  const sample=text.slice(0,3000);
+  try{
+    await Promise.race([
+      Promise.all([
+        document.fonts.load(`120px ${F_BRUSH}`, sample),
+        document.fonts.load(`40px ${F_BODY}`, sample),
+        document.fonts.load(`700 40px ${F_BODY}`, sample)
+      ]),
+      new Promise(r=>setTimeout(r,5000))
+    ]);
+    await document.fonts.ready;
+  }catch(e){}
+}
+function wrapLines(ctx, text, maxW, maxLines){
+  const words=String(text).replace(/\s+/g," ").trim().split(" ");
+  const lines=[]; let line="";
+  const pushChars=w=>{ for(const ch of w){ if(ctx.measureText(line+ch).width>maxW && line){ lines.push(line); line=""; } line+=ch; } };
+  for(const w of words){
+    const test=line?line+" "+w:w;
+    if(ctx.measureText(test).width<=maxW){ line=test; continue; }
+    if(line){ lines.push(line); line=""; }
+    if(ctx.measureText(w).width>maxW) pushChars(w); else line=w;
+  }
+  if(line) lines.push(line);
+  if(lines.length>maxLines){
+    const kept=lines.slice(0,maxLines); let last=kept[maxLines-1];
+    while(last && ctx.measureText(last+"…").width>maxW) last=last.slice(0,-1);
+    kept[maxLines-1]=last.replace(/[\s,.]+$/,"")+"…"; return kept;
+  }
+  return lines;
+}
+function ellipsize(ctx, text, maxW){
+  if(ctx.measureText(text).width<=maxW) return text;
+  let t=text; while(t && ctx.measureText(t+"…").width>maxW) t=t.slice(0,-1);
+  return t.replace(/\s+$/,"")+"…";
+}
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function dancheongBand(ctx,x,y,w,h,scale){
+  const seg=[["#b3352a",14],["#2f6b55",8],["#f4ead3",3],["#2c4f7c",12],["#f4ead3",3],["#2f6b55",8]];
+  ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
+  let cx=x; while(cx<x+w){ for(const [c,len] of seg){ ctx.fillStyle=c; ctx.fillRect(cx,y,len*scale+0.5,h); cx+=len*scale; } }
+  ctx.restore();
+}
+function drawBallC(ctx,n,cx,cy,r){
+  const [fill,txt]=BALL_FILL(n);
+  ctx.save();
+  ctx.shadowColor="rgba(0,0,0,.35)"; ctx.shadowBlur=18; ctx.shadowOffsetY=8;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle=fill; ctx.fill();
+  ctx.shadowColor="transparent";
+  const g=ctx.createRadialGradient(cx-r*.38,cy-r*.42,r*.08,cx,cy,r);
+  g.addColorStop(0,"rgba(255,255,255,.65)"); g.addColorStop(.35,"rgba(255,255,255,.05)"); g.addColorStop(1,"rgba(0,0,0,.28)");
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=txt; ctx.font=`700 ${Math.round(r*.9)}px ${F_BODY}`; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(String(n),cx,cy+r*.04);
+  ctx.restore();
+}
+function drawTree(ctx,ox,oy,s){
+  ctx.save(); ctx.translate(ox,oy); ctx.scale(s,s); ctx.globalAlpha=.75; ctx.fillStyle="#0d0a08";
+  [[70,90,70],[150,70,65],[210,120,55],[40,160,50],[120,140,60]].forEach(([x,y,r])=>{ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); });
+  ctx.beginPath(); ctx.moveTo(95,380); ctx.bezierCurveTo(100,300,85,250,70,200); ctx.lineTo(95,190); ctx.bezierCurveTo(110,240,120,200,130,160); ctx.lineTo(150,165); ctx.bezierCurveTo(140,220,135,270,150,380); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha=1;
+  // 금줄
+  ctx.strokeStyle="#c9b48a"; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(78,285); ctx.quadraticCurveTo(118,300,152,285); ctx.stroke();
+  ctx.fillStyle="#f4ead3"; [[90,291],[110,296],[132,294]].forEach(([x,y])=>{ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-4,y+10); ctx.lineTo(x+2,y+10); ctx.lineTo(x-2,y+20); ctx.lineTo(x+3,y+20); ctx.lineTo(x+5,y+10); ctx.lineTo(x+2,y); ctx.closePath(); ctx.fill(); });
+  // 오색천
+  [["#f4ead3",132,165,64,-3],["#b3352a",141,165,80,4],["#d8a83c",150,166,56,-2],["#2c4f7c",159,166,72,5],["#2f6b55",168,167,48,-4],["#b3352a",196,140,48,3],["#d8a83c",205,139,64,-3],["#2c4f7c",214,138,40,4]]
+    .forEach(([c,x,y,h,deg])=>{ ctx.save(); ctx.translate(x,y); ctx.rotate(deg*Math.PI/180); ctx.fillStyle=c; ctx.fillRect(-3,0,6,h); ctx.restore(); });
+  ctx.restore();
+}
+function drawLantern(ctx,x,top){
+  ctx.save();
+  ctx.strokeStyle="#7a5a3c"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(x,top); ctx.lineTo(x,top+50); ctx.stroke();
+  const g=ctx.createRadialGradient(x,top+100,10,x,top+100,150); g.addColorStop(0,"rgba(216,140,60,.45)"); g.addColorStop(1,"rgba(216,140,60,0)");
+  ctx.fillStyle=g; ctx.fillRect(x-160,top-60,320,320);
+  const body=ctx.createLinearGradient(0,top+50,0,top+150); body.addColorStop(0,"#2c4f7c"); body.addColorStop(.45,"#b3352a"); body.addColorStop(1,"#b3352a");
+  ctx.fillStyle=body; roundRect(ctx,x-34,top+50,68,100,12); ctx.fill();
+  ctx.fillStyle="#120e0b"; ctx.fillRect(x-36,top+48,72,10); ctx.fillRect(x-36,top+142,72,10);
+  ctx.fillStyle="#b3352a"; ctx.fillRect(x-4,top+152,8,34);
+  ctx.restore();
+}
+
+async function makeCardImage(data){
+  // data: {title, grade, summary, tags, nums, round, createdAt}
+  const site = SITE_URL || (location.host ? (location.host+location.pathname).replace(/\/index\.html$/,"").replace(/\/$/,"") : "");
+  const dateLine = `${fmtDate(data.createdAt)} · 제 ${data.round}회 추첨용`;
+  const disclaimer="재미로 보는 꿈 풀이 · 번호는 당첨과 무관합니다";
+  await ensureFonts(["꿈수 신당 꿈풀이 로또 점지 신령님 말씀 이 꿈에서 나온 번호", data.title, data.grade, data.summary, (data.tags||[]).join(" "), dateLine, site, disclaimer, "0123456789…"].join(" "));
+
+  const c=document.createElement("canvas"); c.width=CW; c.height=CH;
+  const ctx=c.getContext("2d");
+
+  // 밤하늘 배경
+  const bg=ctx.createLinearGradient(0,0,0,CH); bg.addColorStop(0,"#2a1f19"); bg.addColorStop(.45,"#1c1714"); bg.addColorStop(1,"#14100d");
+  ctx.fillStyle=bg; ctx.fillRect(0,0,CW,CH);
+  const warm=ctx.createRadialGradient(CW/2,0,40,CW/2,0,900); warm.addColorStop(0,"rgba(122,72,44,.55)"); warm.addColorStop(1,"rgba(122,72,44,0)");
+  ctx.fillStyle=warm; ctx.fillRect(0,0,CW,900);
+
+  // 당산나무 (카드 뒤로 살짝 보이게)
+  drawTree(ctx,-70,CH-640,1.7);
+
+  // 한옥 처마 + 막새 + 단청
+  ctx.fillStyle="#120e0b";
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,22); ctx.quadraticCurveTo(108,80,324,92); ctx.lineTo(756,92); ctx.quadraticCurveTo(972,80,1080,22); ctx.lineTo(1080,0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle="#0d0a08"; [[108,58],[216,80],[324,89],[432,92],[540,92],[648,92],[756,89],[864,80],[972,58]].forEach(([x,y])=>{ ctx.beginPath(); ctx.arc(x,y,13,0,Math.PI*2); ctx.fill(); });
+  dancheongBand(ctx,0,96,CW,30,2.4);
+  drawLantern(ctx,120,126); drawLantern(ctx,960,126);
+
+  // 제목
+  ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+  ctx.font=`150px ${F_BRUSH}`;
+  const w1=ctx.measureText("꿈수 ").width, w2=ctx.measureText("신당").width, tx=CW/2-(w1+w2)/2;
+  ctx.textAlign="left"; ctx.fillStyle="#f4ead3"; ctx.fillText("꿈수 ",tx,380); ctx.fillStyle="#d24a3c"; ctx.fillText("신당",tx+w1,380);
+  ctx.textAlign="center"; ctx.fillStyle="#d8a83c"; ctx.font=`32px ${F_BODY}`; ctx.fillText("✦  꿈풀이 · 로또 점지  ✦",CW/2,440);
+
+  // 한지 카드
+  const X=90, Y=500, W=900, H=1010, P=70;
+  ctx.save(); ctx.shadowColor="rgba(0,0,0,.55)"; ctx.shadowBlur=50; ctx.shadowOffsetY=20;
+  ctx.fillStyle="#f4ead3"; ctx.fillRect(X,Y,W,H); ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.rect(X,Y,W,H); ctx.clip();
+  for(let i=0;i<5200;i++){ ctx.fillStyle=`rgba(120,90,50,${(Math.random()*.09).toFixed(3)})`; ctx.fillRect(X+Math.random()*W, Y+Math.random()*H, 1.6, 1.6); }
+  for(let i=0;i<70;i++){ ctx.strokeStyle="rgba(140,110,70,.08)"; ctx.lineWidth=1; ctx.beginPath(); const sx=X+Math.random()*W, sy=Y+Math.random()*H; ctx.moveTo(sx,sy); ctx.quadraticCurveTo(sx+20,sy+Math.random()*30,sx+40+Math.random()*60,sy+Math.random()*20); ctx.stroke(); }
+  ctx.restore();
+  dancheongBand(ctx,X,Y,W,24,1.8);
+
+  const L=X+P, R=X+W-P, IW=R-L; let y=Y+100;
+  ctx.textAlign="left"; ctx.fillStyle="rgba(59,42,32,.6)"; ctx.font=`30px ${F_BODY}`; ctx.fillText("신령님 말씀",L,y);
+  if(data.grade){
+    ctx.font=`700 32px ${F_BODY}`; const gw=ctx.measureText(data.grade).width+40;
+    ctx.fillStyle="#b3352a"; ctx.fillRect(R-gw,y-38,gw,52);
+    ctx.fillStyle="#f4ead3"; ctx.textAlign="center"; ctx.fillText(data.grade,R-gw/2,y-1); ctx.textAlign="left";
+  }
+  y+=105; ctx.fillStyle="#3b2a20";
+  let ts=104; do{ ctx.font=`${ts}px ${F_BRUSH}`; ts-=4; }while(ts>=72 && ctx.measureText(data.title).width>IW);   // 길면 글자 크기부터 줄이고
+  ctx.fillText(ellipsize(ctx,data.title,IW),L,y);                                                              // 그래도 길면 말줄임
+  y+=42; ctx.strokeStyle="rgba(59,42,32,.25)"; ctx.setLineDash([10,10]); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(R,y); ctx.stroke(); ctx.setLineDash([]);
+  y+=72; ctx.font=`38px ${F_BODY}`; ctx.fillStyle="rgba(59,42,32,.88)";
+  wrapLines(ctx,data.summary,IW,3).forEach(line=>{ ctx.fillText(line,L,y); y+=64; });
+  if(data.tags && data.tags.length){
+    y+=6; ctx.font=`30px ${F_BODY}`; let tx2=L;
+    data.tags.slice(0,3).forEach(t=>{ const w=ctx.measureText(t).width+28; if(tx2+w>R) return;
+      ctx.strokeStyle="rgba(179,53,42,.55)"; ctx.lineWidth=2; ctx.strokeRect(tx2,y-34,w,48); ctx.fillStyle="#b3352a"; ctx.fillText(t,tx2+14,y); tx2+=w+14; });
+    y+=40;
+  }
+  y=Math.max(y+60, Y+700);
+  ctx.textAlign="center"; ctx.fillStyle="#b3352a"; ctx.font=`66px ${F_BRUSH}`; ctx.fillText("이 꿈에서 나온 번호",CW/2,y);
+  const r=56, gap=22, total=6*r*2+5*gap; let bx=CW/2-total/2+r; const by=y+100;
+  data.nums.forEach(n=>{ drawBallC(ctx,n,bx,by,r); bx+=r*2+gap; });
+  ctx.fillStyle="rgba(59,42,32,.7)"; ctx.font=`30px ${F_BODY}`; ctx.fillText(dateLine,CW/2,Y+H-50);
+
+  // 하단: 사이트 주소 + 안내
+  ctx.textAlign="center";
+  if(site){ ctx.fillStyle="#d8a83c"; ctx.font=`700 34px ${F_BODY}`; ctx.fillText(site,CW/2,1640); }
+  ctx.fillStyle="rgba(244,234,211,.55)"; ctx.font=`24px ${F_BODY}`; ctx.fillText(disclaimer,CW/2,CH-70);
+
+  const blob=await new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error("toBlob")),"image/png"));
+  const stamp=fmtDate(data.createdAt).slice(0,10).replace(/\./g,"");
+  return {blob, file:new File([blob],`kkumsu-${stamp}.png`,{type:"image/png"})};
+}
+
+/* ---------- 저장/공유 흐름: Web Share → 다운로드 → 길게 눌러 저장 ---------- */
+const UA=navigator.userAgent||"";
+const IS_IOS=/iP(hone|ad|od)/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints>1);
+const IN_APP=/KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp/i.test(UA);
+let lastImage=null, lastUrl=null;
+
+function canShareFile(file){ try{ return !!(navigator.canShare && navigator.share && navigator.canShare({files:[file]})); }catch(e){ return false; } }
+async function shareFile(file){
+  await navigator.share({files:[file], title:"꿈수 신당", text:"내 꿈에서 나온 번호"});
+}
+function downloadFile(file){
+  const a=document.createElement("a"); a.href=lastUrl; a.download=file.name; a.rel="noopener";
+  document.body.append(a); a.click(); a.remove();
+}
+function showImageOverlay(mode){
+  $("imgPreview").src=lastUrl;
+  const share=canShareFile(lastImage.file);
+  $("imgShare").hidden=!share;
+  $("imgDownload").hidden= IS_IOS || IN_APP || !("download" in HTMLAnchorElement.prototype);
+  $("imgHint").textContent = (IS_IOS||IN_APP||mode==="longpress")
+    ? "이미지를 길게 눌러 사진에 저장하세요"
+    : "버튼으로 저장하거나, 이미지를 길게 눌러(오른쪽 클릭) 저장할 수 있어요";
+  $("imgOverlay").hidden=false;
+}
+async function saveAsImage(data, btn){
+  const label=btn.innerHTML; btn.disabled=true; btn.textContent="이미지 만드는 중…";
+  try{
+    lastImage=await makeCardImage(data);
+    if(lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl=URL.createObjectURL(lastImage.blob);
+    if(canShareFile(lastImage.file)){
+      try{ await shareFile(lastImage.file); return; }
+      catch(e){ if(e && e.name==="AbortError") return; showImageOverlay(); return; }   // 사용자 동작이 만료됐으면 버튼으로 다시
+    }
+    if(!IS_IOS && !IN_APP && "download" in HTMLAnchorElement.prototype){
+      downloadFile(lastImage.file); toast("이미지를 저장했어요"); showImageOverlay(); return;
+    }
+    showImageOverlay("longpress");
+  }catch(e){
+    console.error(e); toast("이미지를 만들지 못했어요. 다시 시도해 주세요.");
+  }finally{ btn.disabled=false; btn.innerHTML=label; icons(); }
+}
+function resultCardData(){ return {title:current.t, grade:current.g, summary:current.s, tags:current.tag, nums:current.picks.map(p=>p.n), round:current.round, createdAt:current.createdAt}; }
+function entryCardData(e){ return {title:e.title, grade:e.grade, summary:e.summary, tags:e.tags, nums:e.nums, round:e.round, createdAt:e.createdAt}; }
+
+/* =========================================================
+   링크 복사 · 공유 링크
+   ========================================================= */
+function shareUrl(){
+  const p=new URLSearchParams({d:current.dream, n:current.picks.map(p=>p.n).join("-")});
+  return location.origin+location.pathname+"?"+p.toString();
+}
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2400); }
+async function copyLink(){
+  if(!current) return;
+  try{ await navigator.clipboard.writeText(shareUrl()); toast("결과 링크를 복사했어요! 친구에게 보내 보세요"); }
+  catch(e){ toast("복사가 막혀 있어요. 주소창의 링크를 직접 복사해 주세요."); }
+}
+function loadShared(){
+  const q=new URLSearchParams(location.search);
+  const dream=(q.get("d")||"").slice(0,500), nums=(q.get("n")||"").split("-").map(Number).filter(n=>n>=1&&n<=45);
+  if(!dream||nums.length!==6||new Set(nums).size!==6) return;
+  const r=mockInterpret(dream);   // 친구의 꿈이라 내 일기에는 저장하지 않습니다
+  renderResult({...r, dream, picks:explain(nums.sort((a,b)=>a-b), r.syms), createdAt:Date.now(), round:targetRound(), entryId:null});
+  $("inputCard").hidden=true; $("newBtn").textContent="나도 내 꿈 풀어보기";
+}
+
+function closeOverlays(){ $("imgOverlay").hidden=true; closeConfirm(); }
+function icons(){ try{ window.lucide && lucide.createIcons(); }catch(e){} }
+
+/* =========================================================
+   이벤트
+   ========================================================= */
+$("dream").addEventListener("input",e=>$("cnt").textContent=e.target.value.length);
+EXAMPLES.forEach(x=>{
+  const b=el("button","rounded-sm border border-wood/30 px-2.5 py-1 text-xs text-wood/80 active:bg-hanjiDeep",x);
+  b.type="button"; b.onclick=()=>{ $("dream").value=x; $("cnt").textContent=x.length; };
+  $("chips").append(b);
+});
+$("goBtn").onclick=run;
+$("copyBtn").onclick=copyLink;
+$("imgBtn").onclick=e=>current && saveAsImage(resultCardData(), e.currentTarget);
+$("againBtn").onclick=()=>{
+  if(!current) return;
+  current.picks=explain(drawNumbers(), current.syms||[FALLBACK.sym]);
+  if(current.entryId) updateEntryPicks(current.entryId, current.picks);   // 일기에도 새 번호로 바꿔 둡니다
+  renderNumbers(current.picks); renderMyMatch();
+  toast("신령님이 새 번호를 점지하셨어요 🔔");
+};
+function resetToStart(focus=true){
+  if(!$("loading").hidden) return;                 // 풀이 중에는 그대로 둡니다
+  closeOverlays();
+  if($("mainView").hidden) go("mainView");
+  $("result").hidden=true; $("inputCard").hidden=false; $("err").hidden=true;
+  $("dream").value=""; $("cnt").textContent="0";
+  $("newBtn").textContent="다른 꿈 풀어보기";
+  try{ history.replaceState({v:"mainView"},"",location.pathname); }catch(e){}
+  window.scrollTo({top:0,behavior:"smooth"});
+  if(focus) $("dream").focus({preventScroll:true});
+}
+$("newBtn").onclick=()=>resetToStart();
+$("homeBtn").onclick=()=>resetToStart(false);
+// 엔터로 바로 풀이 (Shift+Enter는 줄바꿈, 한글 입력 조합 중에는 무시)
+$("dream").addEventListener("keydown",e=>{
+  if(e.key!=="Enter" || e.shiftKey || e.isComposing || e.keyCode===229) return;
+  e.preventDefault();
+  if(!$("goBtn").disabled) run();
+});
+$("drawRetry").onclick=loadLatestDraw;
+$("openDiaryBtn").onclick=()=>go("diaryView");
+document.querySelectorAll("[data-back]").forEach(b=>b.onclick=()=>go("mainView"));
+$("detailBack").onclick=()=>go("diaryView");
+$("dImgBtn").onclick=e=>detailEntry && saveAsImage(entryCardData(detailEntry), e.currentTarget);
+$("dDelete").onclick=()=>detailEntry && askDelete(detailEntry);
+$("confirmNo").onclick=closeConfirm;
+$("confirmSheet").addEventListener("click",e=>{ if(e.target===$("confirmSheet")) closeConfirm(); });
+$("confirmYes").onclick=()=>{
+  if(!pendingDelete) return;
+  deleteEntry(pendingDelete); closeConfirm(); detailEntry=null;
+  toast("꿈 기록을 지웠어요"); refreshDiaryCount(); go("diaryView");
+};
+$("imgShare").onclick=async()=>{ try{ await shareFile(lastImage.file); }catch(e){ if(!e||e.name!=="AbortError") toast("공유를 열 수 없어요. 이미지를 길게 눌러 저장해 주세요."); } };
+$("imgDownload").onclick=()=>{ downloadFile(lastImage.file); toast("이미지를 저장했어요"); };
+$("imgClose").onclick=()=>{ $("imgOverlay").hidden=true; };
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeOverlays(); });
+
+try{ history.replaceState({v:"mainView"},""); }catch(e){}
+refreshDiaryCount();
+icons();
+loadShared();
+loadLatestDraw();
+</script>
+</body>
+</html>
