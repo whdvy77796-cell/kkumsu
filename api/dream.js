@@ -193,7 +193,7 @@ async function callGemini(key, userText, reasonsOnly) {
       contents: [{ role: "user", parts: [{ text: userText }] }],
       generationConfig: cfg,
     }),
-  }, 16000);
+  }, 25000);
   let r = await send(generationConfig);
   if (!r.ok && r.status === 400 && generationConfig.thinkingConfig) {
     const t = await r.text();
@@ -233,7 +233,7 @@ async function callOpenRouter(key, userText, reasonsOnly) {
       response_format: { type: "json_object" },
       provider,
     }),
-  }, 12000);
+  }, 15000);
   if (!r.ok) throw httpErr(r.status, await r.text());
   const data = await r.json();
   const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
