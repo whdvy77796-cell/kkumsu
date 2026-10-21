@@ -26,6 +26,8 @@
   }}};
 </script>
 <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+<!-- 쿠팡파트너스 링크는 coupang.js 에서 관리합니다 -->
+<script src="coupang.js"></script>
 <style>
   body{background:#1c1714;word-break:keep-all}
   .night{background:radial-gradient(ellipse at 50% 0%,#4a2e22 0,transparent 55%),linear-gradient(#211a16,#1c1714 40%,#191410)}
@@ -164,6 +166,40 @@
           <h3 class="font-brush text-2xl text-wood">번호마다 담긴 뜻</h3>
           <ul id="reasons" class="mt-3 flex flex-col gap-3.5"></ul>
         </div>
+      </div>
+    </div>
+
+    <!-- 행운 아이템 (쿠팡파트너스) -->
+    <div id="luckyCard" class="hanji rounded-sm text-wood shadow-2xl shadow-black/50 overflow-hidden border-l-4 border-brass" hidden>
+      <div class="p-5">
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-brush text-2xl text-dan">신령님이 권하는 행운 아이템</span>
+          <span class="shrink-0 rounded-sm border border-wood/30 px-1.5 py-px text-[10px] text-wood/60">광고</span>
+        </div>
+        <p id="luckyCopy" class="mt-2 text-[15px] leading-7 text-wood/85"></p>
+        <a id="luckyLink" href="#" target="_blank" rel="sponsored noopener" class="mt-3 flex items-center gap-3 rounded-sm border border-wood/15 bg-white/70 p-2.5 text-wood shadow-sm active:translate-y-0.5 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass">
+          <span class="relative grid h-[76px] w-[76px] shrink-0 place-items-center overflow-hidden rounded-sm border border-wood/10 bg-white">
+            <img id="luckyImg" alt="" referrerpolicy="no-referrer" class="h-full w-full object-contain" hidden>
+            <span id="luckyEmoji" class="text-3xl"></span>
+          </span>
+          <span class="min-w-0 flex-1">
+            <span id="luckyBadge" class="inline-block rounded-sm bg-sky/10 px-1.5 py-px text-[10px] font-bold text-sky" hidden></span>
+            <span id="luckyName" class="mt-0.5 block font-bold leading-snug line-clamp-2"></span>
+            <span class="mt-1 block text-sm font-bold text-dan">쿠팡에서 가격 보기 →</span>
+          </span>
+        </a>
+        <div id="luckyWidgetRow" class="mt-3 flex items-start gap-3" hidden>
+          <div class="shrink-0 overflow-hidden rounded-sm border border-wood/15 bg-white" style="width:120px;height:240px">
+            <iframe id="luckyWidget" title="쿠팡 상품" width="120" height="240" frameborder="0" scrolling="no" referrerpolicy="unsafe-url" loading="lazy" style="display:block;border:0"></iframe>
+          </div>
+          <div class="min-w-0 flex-1 pt-1">
+            <span id="luckyWBadge" class="inline-block rounded-sm bg-sky/10 px-1.5 py-px text-[10px] font-bold text-sky" hidden></span>
+            <p id="luckyWName" class="mt-1 font-bold leading-snug text-wood"></p>
+            <p class="mt-1 text-xs leading-5 text-wood/60">사진을 누르거나 아래 버튼으로 쿠팡에서 바로 볼 수 있어요.</p>
+            <a id="luckyWLink" href="#" target="_blank" rel="sponsored noopener" class="mt-3 inline-flex items-center gap-1 rounded-sm bg-wood px-3 py-2 text-sm font-bold text-hanji active:translate-y-0.5 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass">쿠팡에서 보기 →</a>
+          </div>
+        </div>
+        <p class="mt-2 text-[11px] leading-5 text-wood/55">이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>
       </div>
     </div>
 
@@ -747,6 +783,76 @@ function mockInterpret(dream){
 }
 
 /* =========================================================
+   행운 아이템 (쿠팡파트너스) — 링크는 coupang.js 에 넣습니다
+   꿈 내용·해몽 제목·상징에서 위에서부터 먼저 맞는 규칙을 고릅니다.
+   링크가 비어 있는 상품은 건너뛰고, 아무것도 안 맞으면 default 를 씁니다.
+   ========================================================= */
+const LUCKY_RULES = [
+  {item:"tissue", emoji:"🧻", keys:["똥","대변","응가","화장실","변기","휴지"],
+   copy:"똥이나 뒷간이 나오는 꿈은 예로부터 재물이 쌓이고 근심이 빠져나가는 꿈이라오. 복이 드나드는 자리는 늘 넉넉해야 하니, 집에 휴지가 떨어지지 않았는지 살펴보시게."},
+  {item:"piggy", emoji:"🐷", keys:["돼지","황금","금반지","금덩이","돈","지폐","동전","복권","로또","보석"],
+   copy:"재물 기운이 들어온 꿈이라오. 들어온 복은 담아 둘 그릇이 있어야 새지 않는 법이니, 복돼지 하나 들여 보시구려."},
+  {item:"lucky", emoji:"🧧", keys:["용이","용을","용꿈","청룡","황룡","호랑이","대통령","임금","왕이","뱀","구렁이","봉황","해가","태양"],
+   copy:"큰 기운을 받은 길몽이라오. 그 복을 늘 품고 다닐 수 있게 복주머니 하나 곁에 두어 보시게."},
+  {item:"gift", emoji:"🎁", keys:["조상","돌아가신","할머니","할아버지","제사","산소","엄마","어머니","아빠","아버지"],
+   copy:"어른의 은덕이 닿은 꿈이라오. 받은 마음은 정성으로 돌려드려야 복이 오래 머무니, 작은 선물로 안부를 전해 보시구려."},
+  {item:"tooth", emoji:"🪥", keys:["이빨","이가","치아","이 빠","어금니","앞니"],
+   copy:"이 꿈은 몸과 가까운 이를 챙기라는 뜻이라오. 묵은 것을 털어 내는 셈 치고 칫솔부터 새것으로 바꿔 보시게."},
+  {item:"rice", emoji:"🍚", keys:["밥","식사","먹었","먹고","먹는","먹다","먹음","잔치","뷔페","요리","라면","고기","반찬","도시락","식당","쌀","떡"],
+   copy:"배불리 먹는 꿈은 복록이 넉넉하게 들어온다는 뜻이라오. 들어온 복이 끊기지 않게 집에 따끈한 밥 한 그릇은 늘 채워 두시게."},
+  {item:"water", emoji:"💧", keys:["물이","물에","물을","물속","바다","강물","냇물","호수","폭포","계곡","우물","홍수","비가","비를","소나기","빗물","수영","생수"],
+   copy:"맑은 물 기운이 흘러든 꿈이라오. 물은 곧 재물이니 복이 마르지 않게 집에 물부터 넉넉히 채워 두시게."},
+  {item:"plant", emoji:"🪴", keys:["꽃","나무","숲","장미","벚꽃","화분","정원"],
+   copy:"꽃과 나무의 생기가 들어온 꿈이라오. 집 안에도 푸른 기운을 들이면 좋은 일이 함께 자란다오."},
+  {item:"towel", emoji:"🛁", keys:["목욕","샤워","씻었","세수","온천","사우나","청소","빨래"],
+   copy:"묵은 기운을 씻어 낸 꿈이라오. 새 기운은 뽀송한 새 수건으로 맞이해 보시구려."},
+  {item:"default", emoji:"💧", keys:[],
+   copy:"꿈을 가만히 보니 물의 기운이 조금 모자라 보이는구려. 예로부터 물은 재물이라 했으니, 집에 물이 떨어지지 않게 넉넉히 채워 두시게."}
+];
+const COUPANG_LINK_RE=/^https:\/\/(link\.coupang\.com|coupa\.ng|www\.coupang\.com|m\.coupang\.com)\//;
+function luckyFor(r){
+  const cfg=window.KKUMSU_COUPANG||{};
+  const ok=item=>cfg[item] && COUPANG_LINK_RE.test(String(cfg[item].link||"").trim());
+  const text=[r.dream, r.t, (r.syms||[]).join(" "), (r.tag||[]).join(" ")].join(" ");
+  let rule=LUCKY_RULES.find(x=>x.keys.length && ok(x.item) && x.keys.some(k=>hasWord(text,k)));
+  if(!rule && ok("default")) rule=LUCKY_RULES.find(x=>x.item==="default");
+  if(!rule) return null;
+  const c=cfg[rule.item], img=String(c.image||"").trim();
+  return {...rule, link:String(c.link).trim(), name:c.name||"", badge:String(c.badge||"").trim(),
+          image: /^(https:\/\/|\.?\/?[\w-]+\/)/.test(img) ? img : "",
+          widget: /^https:\/\/(coupa\.ng|link\.coupang\.com)\//.test(String(c.widget||"").trim()) ? String(c.widget).trim() : "",
+          copy:String(c.copy||"").trim()||rule.copy};
+}
+function renderLucky(r){
+  const card=$("luckyCard"); if(!card) return;
+  const l=luckyFor(r);
+  if(!l){ card.hidden=true; return; }
+  $("luckyEmoji").textContent=l.emoji; $("luckyEmoji").hidden=false;
+  const img=$("luckyImg");
+  img.hidden=true; img.onload=null; img.onerror=null; img.removeAttribute("src");
+  if(l.image){
+    img.onload=()=>{ img.hidden=false; $("luckyEmoji").hidden=true; };
+    img.onerror=()=>{ img.hidden=true; $("luckyEmoji").hidden=false; };   // 사진을 못 불러오면 이모지로
+    img.alt=l.name||"행운 아이템"; img.src=l.image;
+  }
+  $("luckyBadge").textContent=l.badge; $("luckyBadge").hidden=!l.badge;
+  const useWidget=!!l.widget && !window.KKUMSU_NO_WIDGET;
+  $("luckyLink").hidden=useWidget;
+  $("luckyWidgetRow").hidden=!useWidget;
+  if(useWidget){
+    const f=$("luckyWidget");
+    if(f.getAttribute("src")!==l.widget) f.src=l.widget;
+    $("luckyWName").textContent=l.name||"행운 아이템";
+    $("luckyWBadge").textContent=l.badge; $("luckyWBadge").hidden=!l.badge;
+    $("luckyWLink").href=l.link;
+  }
+  $("luckyCopy").textContent=l.copy;
+  $("luckyName").textContent=l.name||"행운 아이템";
+  $("luckyLink").href=l.link;
+  card.hidden=false;
+}
+
+/* =========================================================
    로또 회차 계산 (1회: 2002-12-07 토 20:45 KST, 매주 1회씩)
    ========================================================= */
 const WEEK = 7*24*60*60*1000;
@@ -902,6 +1008,7 @@ function renderResult(r){
   $("resultRound").textContent=`제 ${r.round}회 추첨용`;
   $("savedNote").hidden=!r.entryId;
   renderNumbers(r.picks);
+  renderLucky(r);
   $("result").hidden=false;
   icons();
 }
