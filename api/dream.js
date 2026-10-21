@@ -41,7 +41,7 @@ const SYSTEM = `당신은 한국에서 30년 동안 신당을 지켜 온 무당�
 
 [번호 풀이]
 - 번호는 이미 정해져 있습니다. 바꾸거나 빼거나 더하지 말고, 주어진 번호마다 하나씩 풀이를 씁니다.
-- 각 번호를 꿈의 구체적인 장면과 엮어 1~2문장으로 그럴듯하게 풀어 줍니다.
+- 각 번호를 꿈의 구체적인 장면과 엮어 짧은 한 문장으로 그럴듯하게 풀어 줍니다.
 - 개수, 걸음 수, 층수, 시각, 날짜, 나이, 숫자의 생김새, 전통 풍습의 수(삼신, 칠성, 보름, 삼월 삼짇날 등)처럼 엮는 방법을 번호마다 다르게 씁니다. 같은 문장 틀을 되풀이하지 않습니다.
 
 [특별한 경우]
@@ -55,7 +55,7 @@ const REASONS = {
   description: "주어진 번호마다 하나씩, 주어진 순서대로",
   items: {
     type: "OBJECT",
-    properties: { n: { type: "INTEGER" }, why: { type: "STRING", description: "꿈의 구체적인 장면과 엮은 1~2문장" } },
+    properties: { n: { type: "INTEGER" }, why: { type: "STRING", description: "꿈의 구체적인 장면과 엮은 짧은 한 문장" } },
     required: ["n", "why"],
   },
 };
@@ -66,7 +66,7 @@ const FULL_SCHEMA = {
     notDream: { type: "BOOLEAN" },
     title: { type: "STRING", description: "꿈을 한 줄로 부르는 제목, 20자 안쪽 (예: 복덩이가 굴러 들어온 돼지꿈)" },
     grade: { type: "STRING", enum: ["대길", "길", "평", "흉 속 길"] },
-    summary: { type: "STRING", description: "꿈의 맥락을 읽은 해몽 4~6문장. 꿈에 나온 표현을 직접 짚고, 요즘 마음과 오늘의 처신을 덧붙임" },
+    summary: { type: "STRING", description: "꿈의 맥락을 읽은 해몽 3~4문장. 꿈에 나온 표현을 직접 짚고, 요즘 마음과 오늘의 처신을 덧붙임" },
     symbols: { type: "ARRAY", items: { type: "STRING" }, description: "꿈의 핵심 상징 1~4개, 짧은 명사 (예: 황금 돼지, 대문)" },
     tags: { type: "ARRAY", items: { type: "STRING" }, description: "#으로 시작하는 짧은 태그 3개 (예: #돼지꿈 #재물운)" },
     reasons: REASONS,
@@ -78,11 +78,11 @@ const REASONS_SCHEMA = { type: "OBJECT", properties: { reasons: REASONS }, requi
 // OpenRouter(DeepSeek)용 출력 형식 안내
 const FORMAT_FULL = `[출력 형식]
 반드시 아래 모양의 JSON 하나만 답하세요. 앞뒤에 다른 글자를 쓰지 마세요.
-{"care":false,"notDream":false,"title":"꿈을 한 줄로 부르는 제목(20자 안쪽)","grade":"대길|길|평|흉 속 길 중 하나","summary":"꿈의 맥락을 읽은 해몽 4~6문장","symbols":["핵심 상징 1~4개, 짧은 명사"],"tags":["#태그","#태그","#태그"],"reasons":[{"n":번호,"why":"꿈 장면과 엮은 1~2문장"}]}
+{"care":false,"notDream":false,"title":"꿈을 한 줄로 부르는 제목(20자 안쪽)","grade":"대길|길|평|흉 속 길 중 하나","summary":"꿈의 맥락을 읽은 해몽 3~4문장","symbols":["핵심 상징 1~4개, 짧은 명사"],"tags":["#태그","#태그","#태그"],"reasons":[{"n":번호,"why":"꿈 장면과 엮은 짧은 한 문장"}]}
 reasons는 주어진 번호마다 하나씩, 주어진 순서대로 씁니다.`;
 const FORMAT_REASONS = `[출력 형식]
 반드시 아래 모양의 JSON 하나만 답하세요. 앞뒤에 다른 글자를 쓰지 마세요.
-{"reasons":[{"n":번호,"why":"꿈 장면과 엮은 1~2문장"}]}
+{"reasons":[{"n":번호,"why":"꿈 장면과 엮은 짧은 한 문장"}]}
 주어진 번호마다 하나씩, 주어진 순서대로 씁니다.`;
 
 const hits = new Map(); // IP별 요청 시각 (함수 인스턴스마다 따로라 대략적인 제한입니다)
@@ -184,7 +184,7 @@ async function callGemini(key, userText, reasonsOnly) {
     maxOutputTokens: 4096,
   };
   if (GEMINI_MODEL.startsWith("gemini-2.5")) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-  else if (GEMINI_MODEL.startsWith("gemini-3")) generationConfig.thinkingConfig = { thinkingLevel: "low" }; // 생각 단계를 짧게
+  else if (GEMINI_MODEL.startsWith("gemini-3")) generationConfig.thinkingConfig = { thinkingLevel: "minimal" }; // 생각 단계를 최소로 (빠르게)
   const send = cfg => timedFetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -212,9 +212,20 @@ async function callGemini(key, userText, reasonsOnly) {
 
 /* ---------- 2) OpenRouter (DeepSeek, 중국 공식 서버 제외) ---------- */
 async function callOpenRouter(key, userText, reasonsOnly) {
-  const provider = { data_collection: "deny", allow_fallbacks: true };
-  if (OR_IGNORE.length) provider.ignore = OR_IGNORE;
-  const r = await timedFetch("https://openrouter.ai/api/v1/chat/completions", {
+  const base = {
+    model: OR_MODEL,
+    messages: [
+      { role: "system", content: SYSTEM + "\n\n" + (reasonsOnly ? FORMAT_REASONS : FORMAT_FULL) },
+      { role: "user", content: userText },
+    ],
+    temperature: 0.9,
+    max_tokens: 1400,
+    response_format: { type: "json_object" },
+    provider: { data_collection: "deny", allow_fallbacks: true, ...(OR_IGNORE.length ? { ignore: OR_IGNORE } : {}) },
+  };
+  // 빠르게: 생각 단계 끄기 + 가장 빠른 업체 먼저. 모델이나 업체가 이 설정을 거부하면(400) 빼고 다시 보냅니다
+  const fast = { ...base, reasoning: { effort: "none" }, provider: { ...base.provider, sort: "throughput" } };
+  const send = body => timedFetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -222,18 +233,10 @@ async function callOpenRouter(key, userText, reasonsOnly) {
       "HTTP-Referer": "https://www.kkumsu.com",
       "X-Title": "kkumsu",
     },
-    body: JSON.stringify({
-      model: OR_MODEL,
-      messages: [
-        { role: "system", content: SYSTEM + "\n\n" + (reasonsOnly ? FORMAT_REASONS : FORMAT_FULL) },
-        { role: "user", content: userText },
-      ],
-      temperature: 0.9,
-      max_tokens: 2000,
-      response_format: { type: "json_object" },
-      provider,
-    }),
+    body: JSON.stringify(body),
   }, 15000);
+  let r = await send(fast);
+  if (r.status === 400) { console.warn("openrouter fast 거부 → 기본 설정으로 재시도", (await r.text()).slice(0, 200)); r = await send(base); }
   if (!r.ok) throw httpErr(r.status, await r.text());
   const data = await r.json();
   const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
