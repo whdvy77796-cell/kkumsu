@@ -111,39 +111,7 @@
     </div>
     <h1 class="mt-3 leading-none"><button id="homeBtn" type="button" aria-label="처음 화면으로" class="font-brush text-6xl text-hanji leading-none rounded-sm active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass">꿈수 <span class="text-dan">신당</span></button></h1>
     <p class="mt-3 text-sm text-hanji/80 leading-6">간밤에 꾼 꿈을 들려주시게.<br>꿈에 담긴 뜻과 번호를 풀어 드리리다.</p>
-    <button id="openDiaryBtn" type="button"
-      class="mt-4 inline-flex items-center gap-1.5 rounded-sm border border-brass/60 bg-wood/70 px-4 py-2 text-sm text-hanji active:translate-y-0.5 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass">
-      <i data-lucide="book-open" class="w-4 h-4 text-brass"></i> 내 꿈 일기 <span id="diaryCount" class="text-brass"></span>
-    </button>
   </header>
-
-  <!-- 이번 주 당첨번호 -->
-  <section id="drawCard" class="hanji rounded-sm text-wood shadow-2xl shadow-black/50 overflow-hidden" aria-live="polite">
-    <div class="munsal h-3 opacity-60"></div>
-    <div class="p-5">
-      <div class="flex items-baseline justify-between gap-2">
-        <h2 id="drawTitle" class="font-brush text-3xl text-wood">이번 주 당첨번호</h2>
-        <span id="drawDate" class="text-xs text-wood/60"></span>
-      </div>
-
-      <div id="drawLoading" class="mt-4 flex gap-2">
-        <span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span>
-        <span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span>
-      </div>
-
-      <div id="drawError" class="mt-4 text-center" hidden>
-        <p class="text-sm text-wood/75">당첨번호를 불러오지 못했어요</p>
-        <button id="drawRetry" type="button" class="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-wood/40 px-3 py-1.5 text-sm text-wood active:bg-hanjiDeep">
-          <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> 다시 시도
-        </button>
-      </div>
-
-      <div id="drawBody" hidden>
-        <div id="drawBalls" class="mt-4 flex items-center justify-between gap-1"></div>
-        <div id="myMatch" class="mt-4"></div>
-      </div>
-    </div>
-  </section>
 
   <section id="inputCard" class="hanji rounded-sm text-wood p-5 shadow-2xl shadow-black/50 border-t-4 border-dan">
     <label for="dream" class="font-brush text-3xl flex items-center gap-2">
@@ -174,7 +142,7 @@
       <div class="dancheong"></div>
       <div class="p-5">
         <div class="flex items-center justify-between gap-2">
-          <span class="text-xs text-wood/60 tracking-widest">신령님 말씀</span>
+          <span class="text-xs text-wood/60 tracking-widest">신령님 말씀 <span id="aiBadge" class="ml-1 rounded-sm border border-wood/25 px-1.5 py-px text-[10px] tracking-normal"></span></span>
           <span id="grade" class="rounded-sm bg-dan px-2.5 py-0.5 text-xs font-bold text-hanji"></span>
         </div>
         <h2 id="title" class="mt-1 font-brush text-4xl text-wood leading-tight"></h2>
@@ -212,6 +180,41 @@
     </div>
     <button id="newBtn" type="button" class="text-sm text-hanji/70 underline underline-offset-4 py-1">다른 꿈 풀어보기</button>
   </section>
+
+  <!-- 이번 주 당첨번호 -->
+  <section id="drawCard" class="hanji rounded-sm text-wood shadow-2xl shadow-black/50 overflow-hidden" aria-live="polite">
+    <div class="munsal h-3 opacity-60"></div>
+    <div class="p-5">
+      <div class="flex items-baseline justify-between gap-2">
+        <h2 id="drawTitle" class="font-brush text-3xl text-wood">이번 주 당첨번호</h2>
+        <span id="drawDate" class="text-xs text-wood/60"></span>
+      </div>
+
+      <div id="drawLoading" class="mt-4 flex gap-2">
+        <span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span>
+        <span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span><span class="shimmer w-10 h-10 rounded-full"></span>
+      </div>
+
+      <div id="drawError" class="mt-4 text-center" hidden>
+        <p class="text-sm text-wood/75">당첨번호를 불러오지 못했어요</p>
+        <button id="drawRetry" type="button" class="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-wood/40 px-3 py-1.5 text-sm text-wood active:bg-hanjiDeep">
+          <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> 다시 시도
+        </button>
+      </div>
+
+      <div id="drawBody" hidden>
+        <div id="drawBalls" class="mt-4 flex items-center justify-between gap-1"></div>
+        <div id="myMatch" class="mt-4"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 내 꿈 일기 -->
+  <button id="openDiaryBtn" type="button"
+    class="w-full rounded-sm border border-brass/60 bg-wood/70 px-4 py-3.5 text-hanji flex items-center justify-between gap-2 active:translate-y-0.5 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass">
+    <span class="flex items-center gap-2"><i data-lucide="book-open" class="w-5 h-5 text-brass"></i><span class="font-brush text-2xl">내 꿈 일기</span> <span id="diaryCount" class="text-sm text-brass"></span></span>
+    <i data-lucide="chevron-right" class="w-5 h-5 text-hanji/60"></i>
+  </button>
 </div>
 
 <!-- ================= 내 꿈 일기: 목록 ================= -->
@@ -314,7 +317,11 @@
 /* =========================================================
    설정
    ========================================================= */
-const USE_MOCK = true;   // 실제 AI 해몽을 쓰려면 false 로 바꾸고 아래 callGemini() 주석을 풀어 연결하세요
+// AI 해몽(Gemini) 서버 함수 주소. Vercel에 배포하면 그대로 "/api/dream"
+//  - GitHub Pages에 index.html을 두고 함수만 Vercel에 올렸다면 전체 주소 (예: "https://kkumsu.vercel.app/api/dream")
+//  - "" 로 비우면 AI 없이 내장 해몽 사전만 씁니다
+//  AI가 응답하지 않으면(키 없음, 한도 초과, 네트워크 오류) 자동으로 내장 해몽 사전으로 풀어 줍니다
+const DREAM_API = "/api/dream";
 
 // 당첨번호 중계 API 주소
 //  - Vercel에 배포하면 그대로 "/api/lotto"
@@ -642,37 +649,30 @@ const CARE_RE=/(자살|자해|죽고\s?싶|살고\s?싶지\s?않|극단적\s?선
 const FALLBACK = {sym:"꿈속 장면",tag:["#신비한꿈","#변화운"],g:"길",t:"새 기운이 스며드는 꿈",
   s:"뚜렷한 상징은 없어도 꿈이 이렇게 선명하게 남았다는 건 마음에 새 기운이 들어왔다는 뜻이에요. 며칠 안에 생기는 작은 변화를 반갑게 맞아 보세요."};
 const EXAMPLES = ["황금 돼지가 대문으로 들어왔어요","돌아가신 할머니가 금반지를 주셨어요","대통령이랑 악수했어요","용이 바다에서 하늘로 올라갔어요","이가 빠지는 꿈"];
-const LOAD_MSGS = ["방울 흔들며 신령님을 부르는 중...","당산나무에 꿈 사연을 고하는 중...","조상님께 번호를 여쭙는 중...","오방기를 하나씩 뽑아 보는 중...","엽전을 던져 점괘를 보는 중..."];
+const LOAD_MSGS = ["방울 흔들며 신령님을 부르는 중...","당산나무에 꿈 사연을 고하는 중...","조상님께 번호를 여쭙는 중...","오방기를 하나씩 뽑아 보는 중...","엽전을 던져 점괘를 보는 중...","꿈속 장면을 하나하나 짚어 보는 중...","보살님이 꿈 이야기를 곱씹는 중...","번호마다 사연을 엮는 중..."];
+
+const CARE_MSG="마음이 많이 힘드신 것 같아요. 혼자 견디기 버거우면 자살예방상담전화 109(24시간)나 가까운 사람에게 이야기해 보세요. 이야기를 들어 줄 사람이 있어요.";
 
 /* =========================================================
-   실제 AI 연동 예시 (Gemini) — USE_MOCK = false 일 때
-   번호는 화면에서 무작위로 뽑고, AI는 해몽과 '번호마다 그럴듯한 풀이'만 씁니다.
-   ⚠ API 키를 브라우저에 두면 누구나 볼 수 있어요. 실제 서비스에서는
-   이 함수를 서버로 옮기고 브라우저는 내 서버(/api/dream)만 부르세요.
-   =========================================================
-async function callGemini(dream, nums){
-  const GEMINI_API_KEY = "여기에_Gemini_API_키";
-  const prompt = `당신은 한국 전통 해몽을 잘 아는 정겨운 무당입니다.
-1) 아래 꿈을 한국식 해몽으로 풀어 주세요. 기분 좋고 흥미롭게, 겁주지 말고, 당첨을 약속하지 마세요.
-2) 이미 뽑힌 로또 번호 ${nums.join(", ")} 각각에 대해, 꿈 속 장면·사물·행동과 연결지어
-   그 번호가 나온 이유를 한두 문장으로 그럴듯하게 풀어 주세요. (개수, 시간, 날짜, 걸음 수, 모양 등 자유롭게)
-사주·오행 이야기는 하지 마세요. 해요체로 쓰세요.
-JSON만 출력:
-{"title":"한 줄 제목","grade":"대길|길|평","summary":"3문장 해몽","tags":["#키워드","#키워드","#키워드"],
- "reasons":[{"n":번호,"why":"풀이"}, ... 6개]}
-꿈: ${dream}`;
-  const res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY,
-    {method:"POST", headers:{"Content-Type":"application/json"},
-     body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
-                          generationConfig:{responseMimeType:"application/json",temperature:1}})});
-  if(!res.ok) throw new Error("AI 응답 오류 " + res.status);
-  const r = JSON.parse((await res.json()).candidates[0].content.parts[0].text);
-  const map = Object.fromEntries((r.reasons||[]).map(x=>[+x.n, String(x.why)]));
-  return {t:r.title, g:r.grade, s:r.summary, tag:(r.tags||[]).slice(0,3),
-          picks: nums.map(n=>({n, why: map[n] || "꿈의 기운을 따라 함께 나온 번호예요."}))};
-}
+   AI 해몽 호출 — 키는 서버(api/dream.js)에만 있고, 화면은 서버만 부릅니다
    ========================================================= */
+async function callDreamAI(payload){
+  if(!DREAM_API) throw new Error("ai_off");
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),28000);
+  try{
+    const r=await fetch(DREAM_API,{method:"POST",signal:ctl.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    const j=await r.json().catch(()=>null);
+    if(!r.ok || !j) throw new Error("ai_"+r.status+(j&&j.error?"_"+j.error:""));
+    return j;
+  }finally{ clearTimeout(t); }
+}
+// AI 풀이를 화면용 모양으로 바꿉니다. 빠진 번호 풀이는 문장 틀로 채웁니다
+function fromAI(j, nums){
+  const syms=(j.symbols&&j.symbols.length)?j.symbols:[FALLBACK.sym];
+  const filler=explain(nums, syms);
+  return {t:j.title, g:j.grade, s:j.summary, tag:j.tags||[], syms, ai:true,
+          picks: nums.map((n,i)=>({n, why:(j.reasons&&j.reasons[i]&&j.reasons[i].n===n&&j.reasons[i].why) || filler[i].why}))};
+}
 
 const $ = id => document.getElementById(id);
 let current = null;   // {dream,t,g,s,tag,syms,picks:[{n,why}],round,createdAt,entryId}
@@ -896,6 +896,7 @@ function renderNumbers(picks){
 function renderResult(r){
   current=r;
   $("grade").textContent=r.g; $("grade").hidden=!r.g;
+  $("aiBadge").textContent = r.ai ? "신령 풀이" : "기본 풀이";
   $("title").textContent=r.t; $("summary").textContent=r.s;
   renderTags($("tags"), r.tag);
   $("resultRound").textContent=`제 ${r.round}회 추첨용`;
@@ -905,40 +906,42 @@ function renderResult(r){
   icons();
 }
 
-function playLoading(ms){
-  return new Promise(resolve=>{
-    $("loading").hidden=false;
-    const bar=$("bar"); bar.style.transitionDuration="0ms"; bar.style.width="0";
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{ bar.style.transitionDuration=ms+"ms"; bar.style.width="100%"; }));
-    const msgs=shuffle([...LOAD_MSGS]); let i=0;
-    const show=()=>{ const m=$("loadMsg"); m.classList.remove("fade"); void m.offsetWidth; m.classList.add("fade"); m.textContent=msgs[i++%msgs.length]; };
-    show(); const timer=setInterval(show,900);
-    setTimeout(()=>{ clearInterval(timer); $("loading").hidden=true; resolve(); },ms);
-  });
+function startLoading(){
+  $("loading").hidden=false;
+  const bar=$("bar"); bar.style.transitionDuration="0ms"; bar.style.width="0";
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ bar.style.transitionDuration="9000ms"; bar.style.width="90%"; }));
+  const msgs=shuffle([...LOAD_MSGS]); let i=0;
+  const show=()=>{ const m=$("loadMsg"); m.classList.remove("fade"); void m.offsetWidth; m.classList.add("fade"); m.textContent=msgs[i++%msgs.length]; };
+  show(); const timer=setInterval(show,1300);
+  return ()=>new Promise(res=>{ bar.style.transitionDuration="250ms"; bar.style.width="100%";
+    setTimeout(()=>{ clearInterval(timer); $("loading").hidden=true; res(); },300); });
 }
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
 
 async function run(){
   const dream=$("dream").value.trim();
   $("err").hidden=true;
   if(dream.length<3){ $("err").textContent="꿈 이야기를 조금만 더 들려주세요."; $("err").hidden=false; $("dream").focus(); return; }
-  if(CARE_RE.test(dream)){   // 힘든 마음이 담긴 글에는 해몽 대신 안부를 먼저 건넵니다
-    $("err").textContent="마음이 많이 힘드신 것 같아요. 혼자 견디기 버거우면 자살예방상담전화 109(24시간)나 가까운 사람에게 이야기해 보세요. 이야기를 들어 줄 사람이 있어요.";
-    $("err").hidden=false; return;
-  }
+  if(CARE_RE.test(dream)){ $("err").textContent=CARE_MSG; $("err").hidden=false; return; }   // 힘든 마음이 담긴 글에는 해몽 대신 안부를 먼저
   $("goBtn").disabled=true; $("inputCard").hidden=true; $("result").hidden=true;
   const nums=drawNumbers();
+  const stop=startLoading();
+  let r=null, stopped=false;
   try{
-    const [r]=await Promise.all([
-      USE_MOCK ? Promise.resolve(mockInterpret(dream)) : callGemini(dream, nums),
-      playLoading(2600)
-    ]);
-    const result={...r, dream, picks: r.picks || explain(nums, r.syms), createdAt: Date.now(), round: targetRound()};
+    const [j]=await Promise.all([ callDreamAI({dream, nums}).catch(e=>{ console.warn("AI 해몽 실패 → 내장 사전 사용:", e.message); return null; }), wait(2600) ]);
+    await stop(); stopped=true;
+    if(j && j.care){ $("inputCard").hidden=false; $("err").textContent=CARE_MSG; $("err").hidden=false; return; }
+    if(j && j.notDream){ $("inputCard").hidden=false; $("err").textContent="꿈 이야기로 읽히지 않아요. 꿈에서 본 장면을 조금 더 적어 주세요."; $("err").hidden=false; return; }
+    if(j && j.summary) r=fromAI(j, nums);
+    else { const m=mockInterpret(dream); r={...m, picks:explain(nums, m.syms), ai:false}; }
+    const result={...r, dream, createdAt: Date.now(), round: targetRound()};
     result.entryId = addEntry(result);          // 꿈 일기에 자동 저장
     renderResult(result);
     refreshDiaryCount(); renderMyMatch();
     $("result").scrollIntoView({behavior:"smooth",block:"start"});
   }catch(e){
     console.error(e);
+    if(!stopped) await stop();
     $("inputCard").hidden=false;
     $("err").textContent="풀이 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요."; $("err").hidden=false;
   }finally{ $("goBtn").disabled=false; }
@@ -1356,11 +1359,22 @@ EXAMPLES.forEach(x=>{
 $("goBtn").onclick=run;
 $("copyBtn").onclick=copyLink;
 $("imgBtn").onclick=e=>current && saveAsImage(resultCardData(), e.currentTarget);
-$("againBtn").onclick=()=>{
+$("againBtn").onclick=async e=>{
   if(!current) return;
-  current.picks=explain(drawNumbers(), current.syms||[FALLBACK.sym]);
+  const btn=e.currentTarget, label=btn.innerHTML;
+  btn.disabled=true; btn.textContent="번호 여쭙는 중…";
+  const nums=drawNumbers(), syms=current.syms||[FALLBACK.sym];
+  let picks=explain(nums, syms);
+  if(current.ai){
+    try{
+      const j=await callDreamAI({mode:"reasons", dream:current.dream, nums, title:current.t, summary:current.s});
+      picks=nums.map((n,i)=>({n, why:(j.reasons&&j.reasons[i]&&j.reasons[i].n===n&&j.reasons[i].why) || picks[i].why}));
+    }catch(err){ console.warn("AI 번호 풀이 실패 → 문장 틀 사용:", err.message); }
+  }
+  current.picks=picks;
   if(current.entryId) updateEntryPicks(current.entryId, current.picks);   // 일기에도 새 번호로 바꿔 둡니다
   renderNumbers(current.picks); renderMyMatch();
+  btn.disabled=false; btn.innerHTML=label; icons();
   toast("신령님이 새 번호를 점지하셨어요 🔔");
 };
 function resetToStart(focus=true){

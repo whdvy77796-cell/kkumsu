@@ -1,0 +1,8 @@
+{
+  "name": "kkumsu",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "꿈수 신당 - 한국식 꿈 해몽과 로또 번호",
+  "engines": { "node": ">=18" }
+}
