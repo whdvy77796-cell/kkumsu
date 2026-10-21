@@ -1,7 +1,1 @@
-{
-  "regions": ["icn1"],
-  "functions": {
-    "api/lotto.js": { "maxDuration": 15 },
-    "api/dream.js": { "maxDuration": 30 }
-  }
-}
+{}
