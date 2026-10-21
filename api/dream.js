@@ -107,20 +107,25 @@ export default async function handler(req, res) {
   list.push(now); hits.set(ip, list);
   if (hits.size > 5000) hits.clear();
 
-  const gKey = (process.env.GEMINI_API_KEY || "").trim();
-  const oKey = (process.env.OPENROUTER_API_KEY || "").trim();
+  const gKey = cleanKey(process.env.GEMINI_API_KEY);
+  const oKey = cleanKey(process.env.OPENROUTER_API_KEY);
 
   // 점검: /api/dream?test=1
   if (req.method === "GET") {
     const info = {
       server: "ok",
       gemini: { hasKey: !!gKey, model: GEMINI_MODEL },
-      openrouter: { hasKey: !!oKey, model: OR_MODEL, ignore: OR_IGNORE },
+      openrouter: { hasKey: !!oKey, keyLooksRight: oKey.startsWith("sk-or-"), keyLength: oKey.length, model: OR_MODEL, ignore: OR_IGNORE },
     };
     if (req.query && req.query.test === "1") {
       const ping = "<꿈>\n돼지가 집에 들어왔어요\n</꿈>\n\n뽑힌 번호: 1, 2, 3, 4, 5, 6";
-      if (gKey) { try { await callGemini(gKey, ping, false); info.gemini.ok = true; } catch (e) { info.gemini.ok = false; info.gemini.error = errText(e); } }
-      if (oKey) { try { await callOpenRouter(oKey, ping, false); info.openrouter.ok = true; } catch (e) { info.openrouter.ok = false; info.openrouter.error = errText(e); } }
+      const t0 = Date.now();
+      await Promise.all([
+        gKey && callGemini(gKey, ping, false).then(() => { info.gemini.ok = true; info.gemini.seconds = (Date.now() - t0) / 1000; })
+                 .catch(e => { info.gemini.ok = false; info.gemini.error = errText(e); }),
+        oKey && callOpenRouter(oKey, ping, false).then(() => { info.openrouter.ok = true; info.openrouter.seconds = (Date.now() - t0) / 1000; })
+                 .catch(e => { info.openrouter.ok = false; info.openrouter.error = errText(e); }),
+      ]);
     }
     return res.status(200).json(info);
   }
@@ -179,15 +184,23 @@ async function callGemini(key, userText, reasonsOnly) {
     maxOutputTokens: 4096,
   };
   if (GEMINI_MODEL.startsWith("gemini-2.5")) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-  const r = await timedFetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`, {
+  else if (GEMINI_MODEL.startsWith("gemini-3")) generationConfig.thinkingConfig = { thinkingLevel: "low" }; // 생각 단계를 짧게
+  const send = cfg => timedFetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM }] },
       contents: [{ role: "user", parts: [{ text: userText }] }],
-      generationConfig,
+      generationConfig: cfg,
     }),
-  }, 12000);
+  }, 16000);
+  let r = await send(generationConfig);
+  if (!r.ok && r.status === 400 && generationConfig.thinkingConfig) {
+    const t = await r.text();
+    if (!/thinking/i.test(t)) throw httpErr(400, t);
+    const { thinkingConfig, ...rest } = generationConfig;   // 이 모델이 생각 설정을 모르면 빼고 다시
+    r = await send(rest);
+  }
   if (!r.ok) throw httpErr(r.status, await r.text());
   const data = await r.json();
   const cand = data.candidates && data.candidates[0];
@@ -220,7 +233,7 @@ async function callOpenRouter(key, userText, reasonsOnly) {
       response_format: { type: "json_object" },
       provider,
     }),
-  }, 16000);
+  }, 12000);
   if (!r.ok) throw httpErr(r.status, await r.text());
   const data = await r.json();
   const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
@@ -238,6 +251,14 @@ async function timedFetch(url, opts, ms) {
 }
 function httpErr(status, text) { const e = new Error(String(text || "").replace(/\s+/g, " ").slice(0, 300)); e.status = status; return e; }
 function errText(e) { return (e && e.status ? e.status + " " : "") + (e && e.name === "AbortError" ? "timeout" : String(e && e.message || e)).slice(0, 300); }
+// 키 값에 실수로 들어간 따옴표, "Bearer ", "이름=", 빈칸·줄바꿈을 지웁니다
+function cleanKey(v) {
+  let k = String(v || "").trim();
+  k = k.replace(/^[A-Z_]+\s*=\s*/, "");          // OPENROUTER_API_KEY=sk-... 처럼 들어간 경우
+  k = k.replace(/^["'`]+|["'`]+$/g, "");           // "sk-..." 처럼 따옴표가 붙은 경우
+  k = k.replace(/^Bearer\s+/i, "");               // Bearer sk-... 처럼 들어간 경우
+  return k.replace(/\s+/g, "");
+}
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 function extractJson(text) {
   if (!text) return null;
