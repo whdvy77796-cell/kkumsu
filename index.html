@@ -694,7 +694,7 @@ const CARE_MSG="마음이 많이 힘드신 것 같아요. 혼자 견디기 버�
    ========================================================= */
 async function callDreamAI(payload){
   if(!DREAM_API) throw new Error("ai_off");
-  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),35000);
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),45000);
   try{
     const r=await fetch(DREAM_API,{method:"POST",signal:ctl.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
     const j=await r.json().catch(()=>null);
