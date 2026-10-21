@@ -77,10 +77,6 @@ export default async function handler(req, res) {
   }
   res.setHeader("Cache-Control", "no-store");
   if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
-
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return res.status(500).json({ error: "no_key" });
 
   // 사용량 제한
   const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "?").split(",")[0].trim();
@@ -89,6 +85,31 @@ export default async function handler(req, res) {
   if (list.length >= RATE) return res.status(429).json({ error: "rate_limited" });
   list.push(now); hits.set(ip, list);
   if (hits.size > 5000) hits.clear();
+
+  // 점검: 브라우저로 /api/dream?test=1 을 열면 키와 Gemini 연결 상태를 보여 줍니다 (키 값은 보여 주지 않음)
+  if (req.method === "GET") {
+    const k = process.env.GEMINI_API_KEY || "";
+    const info = { server: "ok", hasKey: !!k, keyStartsWithAIza: k.startsWith("AIza"), keyLength: k.length, model: MODEL };
+    if (req.query && req.query.test === "1" && k) {
+      try {
+        const cfg = { maxOutputTokens: 20 };
+        if (MODEL.startsWith("gemini-2.5")) cfg.thinkingConfig = { thinkingBudget: 0 };
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": k },
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "'안녕'이라고만 답하세요." }] }], generationConfig: cfg }),
+        });
+        info.geminiStatus = r.status;
+        const t = await r.text();
+        if (r.ok) info.geminiOk = true; else info.geminiError = t.replace(/\s+/g, " ").slice(0, 400);
+      } catch (e) { info.geminiError = String(e && e.message); }
+    }
+    return res.status(200).json(info);
+  }
+  if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
+
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return res.status(500).json({ error: "no_key" });
 
   // 입력 확인
   const body = typeof req.body === "string" ? safeParse(req.body) : (req.body || {});
