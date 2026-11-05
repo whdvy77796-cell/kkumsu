@@ -1,0 +1,30 @@
+{
+  "checkedAt": "2026-11-05T20:43:32.474Z",
+  "scope": "실제 Upstash Redis의 Lua·TTL·중복·복구 저장 동작. 실제 PG 승인이나 다중 클라이언트 부하 검증은 아님.",
+  "assertions": 619,
+  "cleanup": true,
+  "ok": true,
+  "passed": 16,
+  "registered": 65,
+  "remaining": 0,
+  "removed": 38,
+  "tests": [
+    "save-idempotence-onefree",
+    "create-owner-reuse-abandoned-30d",
+    "begin-owner-binding-fixed-seven-days",
+    "begin-replay-lock-release-cross-result",
+    "record-approval-actual-seven-days-five-years",
+    "record-idempotence-no-sliding-deadlines",
+    "refund-terminal-stale-done-cannot-regrant",
+    "delete-owner-paid-and-pending-protection",
+    "queue-bounded-claim-crash-reclaim",
+    "retry-counters-safe-code-fixed-retention",
+    "heartbeat-aggregates-success-failure",
+    "pending-expiry-support-visible-delete-unblocks",
+    "failed-payment-thirty-day-retention-delete",
+    "paid-missing-content-support-not-resurrection",
+    "support-unhealthy-empty-sweep-refund-resolution",
+    "verified-unpaid-replacement-late-old-confirm-blocked"
+  ],
+  "total": 16
+}

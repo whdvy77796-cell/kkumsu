@@ -1,0 +1,898 @@
+TAP version 13
+# Subtest: unpaid insufficient errors never expose model draft in missing
+ok 1 - unpaid insufficient errors never expose model draft in missing
+  ---
+  duration_ms: 4.6
+  type: 'test'
+  ...
+# Subtest: unpaid residual audit text never exposes hidden final prose
+ok 2 - unpaid residual audit text never exposes hidden final prose
+  ---
+  duration_ms: 8.8321
+  type: 'test'
+  ...
+# Subtest: public quality diagnostics use known criterion and prompt, not raw questions
+ok 3 - public quality diagnostics use known criterion and prompt, not raw questions
+  ---
+  duration_ms: 0.2354
+  type: 'test'
+  ...
+# Subtest: AI credentials can be unavailable while saved result discovery works
+ok 4 - AI credentials can be unavailable while saved result discovery works
+  ---
+  duration_ms: 3.8027
+  type: 'test'
+  ...
+# Subtest: content deletion works with storage/session but no AI credentials
+ok 5 - content deletion works with storage/session but no AI credentials
+  ---
+  duration_ms: 1.5897
+  type: 'test'
+  ...
+# Subtest: actual raw bytes checked even without declared Content-Length
+ok 6 - actual raw bytes checked even without declared Content-Length
+  ---
+  duration_ms: 1.0991
+  type: 'test'
+  ...
+# Subtest: cached generation is reprojected, never served from arbitrary cached full body
+ok 7 - cached generation is reprojected, never served from arbitrary cached full body
+  ---
+  duration_ms: 0.4059
+  type: 'test'
+  ...
+# Subtest: completed result remains available despite later budget settlement error
+ok 8 - completed result remains available despite later budget settlement error
+  ---
+  duration_ms: 1.196
+  type: 'test'
+  ...
+# Subtest: missing preview price disclosure is rejected before spending
+ok 9 - missing preview price disclosure is rejected before spending
+  ---
+  duration_ms: 0.2962
+  type: 'test'
+  ...
+# Subtest: streaming UTF-8 chunks preserve a Korean fact quote split within a character
+ok 10 - streaming UTF-8 chunks preserve a Korean fact quote split within a character
+  ---
+  duration_ms: 1.3917
+  type: 'test'
+  ...
+# Subtest: minimum capacity protects a fresh interview without changing actual budget caps
+ok 11 - minimum capacity protects a fresh interview without changing actual budget caps
+  ---
+  duration_ms: 0.4146
+  type: 'test'
+  ...
+# Subtest: low or unreadable AI capacity still permits existing result discovery
+ok 12 - low or unreadable AI capacity still permits existing result discovery
+  ---
+  duration_ms: 0.6289
+  type: 'test'
+  ...
+# Subtest: capacity checks daily and lifetime ledgers without mutating either
+ok 13 - capacity checks daily and lifetime ledgers without mutating either
+  ---
+  duration_ms: 19.2697
+  type: 'test'
+  ...
+# Subtest: corrupt counters cannot advertise available generation capacity
+ok 14 - corrupt counters cannot advertise available generation capacity
+  ---
+  duration_ms: 1.3052
+  type: 'test'
+  ...
+# Subtest: disabled payment reconciliation is an authenticated no-op without provider calls
+ok 15 - disabled payment reconciliation is an authenticated no-op without provider calls
+  ---
+  duration_ms: 0.293
+  type: 'test'
+  ...
+# Subtest: payment reconciliation is GET-only even with valid authentication
+ok 16 - payment reconciliation is GET-only even with valid authentication
+  ---
+  duration_ms: 0.1459
+  type: 'test'
+  ...
+# Subtest: cron authentication happens before disabled mode or any service access
+ok 17 - cron authentication happens before disabled mode or any service access
+  ---
+  duration_ms: 0.1844
+  type: 'test'
+  ...
+# Subtest: default disabled; production test and widget/mixed keys blocked; safe public status
+ok 18 - default disabled; production test and widget/mixed keys blocked; safe public status
+  ---
+  duration_ms: 0.6956
+  type: 'test'
+  ...
+# Subtest: save is idempotent, encrypted, free flag and latest atomic; preview fixed <=25%
+ok 19 - save is idempotent, encrypted, free flag and latest atomic; preview fixed <=25%
+  ---
+  duration_ms: 2.7619
+  type: 'test'
+  ...
+# Subtest: duplicate tabs get exactly one order and one immutable amount
+ok 20 - duplicate tabs get exactly one order and one immutable amount
+  ---
+  duration_ms: 0.8561
+  type: 'test'
+  ...
+# Subtest: reject provider totalAmount
+ok 21 - reject provider totalAmount
+  ---
+  duration_ms: 0.9631
+  type: 'test'
+  ...
+# Subtest: reject provider orderId
+ok 22 - reject provider orderId
+  ---
+  duration_ms: 0.6074
+  type: 'test'
+  ...
+# Subtest: reject provider currency
+ok 23 - reject provider currency
+  ---
+  duration_ms: 0.4229
+  type: 'test'
+  ...
+# Subtest: reject provider mId
+ok 24 - reject provider mId
+  ---
+  duration_ms: 0.4663
+  type: 'test'
+  ...
+# Subtest: reject provider type
+ok 25 - reject provider type
+  ---
+  duration_ms: 0.463
+  type: 'test'
+  ...
+# Subtest: reject provider paymentKey
+ok 26 - reject provider paymentKey
+  ---
+  duration_ms: 0.5738
+  type: 'test'
+  ...
+# Subtest: owner isolation, browser fake paid, amount strict type and no consent
+ok 27 - owner isolation, browser fake paid, amount strict type and no consent
+  ---
+  duration_ms: 1.4796
+  type: 'test'
+  ...
+# Subtest: confirm durably records, replays query not charge, cached generation still preview
+ok 28 - confirm durably records, replays query not charge, cached generation still preview
+  ---
+  duration_ms: 2.0249
+  type: 'test'
+  ...
+# Subtest: concurrent confirm cannot generate extra charge
+ok 29 - concurrent confirm cannot generate extra charge
+  ---
+  duration_ms: 1.1795
+  type: 'test'
+  ...
+# Subtest: Redis begin failure prevents provider charge; paid commit failure recovers by lookup
+ok 30 - Redis begin failure prevents provider charge; paid commit failure recovers by lookup
+  ---
+  duration_ms: 1.2761
+  type: 'test'
+  ...
+# Subtest: network failures fail closed and errors never include secrets
+ok 31 - network failures fail closed and errors never include secrets
+  ---
+  duration_ms: 0.6975
+  type: 'test'
+  ...
+# Subtest: refund/partial-refund terminal revocation even stale DONE arrives
+ok 32 - refund/partial-refund terminal revocation even stale DONE arrives
+  ---
+  duration_ms: 2.5957
+  type: 'test'
+  ...
+# Subtest: recovery is secret bearer, current sid bound, cookie append and delete revoke
+ok 33 - recovery is secret bearer, current sid bound, cookie append and delete revoke
+  ---
+  duration_ms: 2.0455
+  type: 'test'
+  ...
+# Subtest: unpaid expires 24h and paid expires approval+7days, read does not prolong
+ok 34 - unpaid expires 24h and paid expires approval+7days, read does not prolong
+  ---
+  duration_ms: 1.3144
+  type: 'test'
+  ...
+# Subtest: pending deletion rejected; bounded lease cannot be prolonged by retries
+ok 35 - pending deletion rejected; bounded lease cannot be prolonged by retries
+  ---
+  duration_ms: 1.5303
+  type: 'test'
+  ...
+# Subtest: forged webhook paid fields never trusted, real lookup used, unknown ignored
+ok 36 - forged webhook paid fields never trusted, real lookup used, unknown ignored
+  ---
+  duration_ms: 1.423
+  type: 'test'
+  ...
+# Subtest: API body type and limits; separate webhook CSRF policy
+ok 37 - API body type and limits; separate webhook CSRF policy
+  ---
+  duration_ms: 1.0912
+  type: 'test'
+  ...
+# Subtest: CARD window simple-pay accepted; unsupported method refused before charge
+ok 38 - CARD window simple-pay accepted; unsupported method refused before charge
+  ---
+  duration_ms: 1.7755
+  type: 'test'
+  ...
+# Subtest: payment-key replay and cross-result uniqueness fail closed
+ok 39 - payment-key replay and cross-result uniqueness fail closed
+  ---
+  duration_ms: 2.0874
+  type: 'test'
+  ...
+# Subtest: deleted unpaid result cannot charge; refund invalidates recovery
+ok 40 - deleted unpaid result cannot charge; refund invalidates recovery
+  ---
+  duration_ms: 1.4661
+  type: 'test'
+  ...
+# Subtest: a lost confirmation response recovers by lookup without another POST
+ok 41 - a lost confirmation response recovers by lookup without another POST
+  ---
+  duration_ms: 0.956
+  type: 'test'
+  ...
+# Subtest: authenticated BEGIN durably keeps ciphertext, latest and request for fixed seven days
+ok 42 - authenticated BEGIN durably keeps ciphertext, latest and request for fixed seven days
+  ---
+  duration_ms: 1.1719
+  type: 'test'
+  ...
+# Subtest: unverified callback does not extend retention or enter queue
+ok 43 - unverified callback does not extend retention or enter queue
+  ---
+  duration_ms: 0.5735
+  type: 'test'
+  ...
+# Subtest: GET-only worker records lost paid commit, preserves approval expiry and removes pending
+ok 44 - GET-only worker records lost paid commit, preserves approval expiry and removes pending
+  ---
+  duration_ms: 3.1431
+  type: 'test'
+  ...
+# Subtest: worker failures stay queued with safe counters, no provider texts; IN_PROGRESS retry is visible
+ok 45 - worker failures stay queued with safe counters, no provider texts; IN_PROGRESS retry is visible
+  ---
+  duration_ms: 1.3135
+  type: 'test'
+  ...
+# Subtest: pending lease exhaustion creates visible support case, not another charge
+ok 46 - pending lease exhaustion creates visible support case, not another charge
+  ---
+  duration_ms: 1.1973
+  type: 'test'
+  ...
+# Subtest: abandoned/failed ledger and uniqueness expire thirty days, paid five calendar years
+ok 47 - abandoned/failed ledger and uniqueness expire thirty days, paid five calendar years
+  ---
+  duration_ms: 1.2171
+  type: 'test'
+  ...
+# Subtest: live requires dedicated secret, support gate, recent healthy heartbeat and no support backlog
+ok 48 - live requires dedicated secret, support gate, recent healthy heartbeat and no support backlog
+  ---
+  duration_ms: 0.6415
+  type: 'test'
+  ...
+# Subtest: cron secret constant-time check; unauthenticated never touches provider; aggregate only
+ok 49 - cron secret constant-time check; unauthenticated never touches provider; aggregate only
+  ---
+  duration_ms: 0.2819
+  type: 'test'
+  ...
+# Subtest: preview keeps validated prompt metadata; sources appear only in authorized full
+ok 50 - preview keeps validated prompt metadata; sources appear only in authorized full
+  ---
+  duration_ms: 0.4868
+  type: 'test'
+  ...
+# Subtest: normal paid expiry is not a support incident; early ciphertext loss is
+ok 51 - normal paid expiry is not a support incident; early ciphertext loss is
+  ---
+  duration_ms: 2.1605
+  type: 'test'
+  ...
+# Subtest: reconciliation batches bounded and concurrent workers claim disjoint work
+ok 52 - reconciliation batches bounded and concurrent workers claim disjoint work
+  ---
+  duration_ms: 0.6333
+  type: 'test'
+  ...
+# Subtest: outstanding failure survives empty overlapping sweeps until successful requery
+ok 53 - outstanding failure survives empty overlapping sweeps until successful requery
+  ---
+  duration_ms: 1.2255
+  type: 'test'
+  ...
+# Subtest: paid missing content stays monitored and HTTP503 on empty sweep; full refund resolves
+ok 54 - paid missing content stays monitored and HTTP503 on empty sweep; full refund resolves
+  ---
+  duration_ms: 1.2039
+  type: 'test'
+  ...
+# Subtest: real ciphertext repair resolves support; partial refund alone does not
+ok 55 - real ciphertext repair resolves support; partial refund alone does not
+  ---
+  duration_ms: 1.8855
+  type: 'test'
+  ...
+# Subtest: verified ABORTED permits one atomic replacement, never late old confirmation
+ok 56 - verified ABORTED permits one atomic replacement, never late old confirmation
+  ---
+  duration_ms: 3.6707
+  type: 'test'
+  ...
+# Subtest: verified EXPIRED permits one atomic replacement, never late old confirmation
+ok 57 - verified EXPIRED permits one atomic replacement, never late old confirmation
+  ---
+  duration_ms: 1.9218
+  type: 'test'
+  ...
+# Subtest: ambiguous, approved, refunded and active-confirm orders cannot be replaced
+ok 58 - ambiguous, approved, refunded and active-confirm orders cannot be replaced
+  ---
+  duration_ms: 2.1292
+  type: 'test'
+  ...
+# Subtest: provider-unverified or previously approved terminal-looking record is not replaceable
+ok 59 - provider-unverified or previously approved terminal-looking record is not replaceable
+  ---
+  duration_ms: 1.3903
+  type: 'test'
+  ...
+# Subtest: live readiness checks persistent queues even before next heartbeat updates
+ok 60 - live readiness checks persistent queues even before next heartbeat updates
+  ---
+  duration_ms: 0.2749
+  type: 'test'
+  ...
+# Subtest: explicit Vercel Preview production build supports mocked standard-key sandbox roundtrip
+ok 61 - explicit Vercel Preview production build supports mocked standard-key sandbox roundtrip
+  ---
+  duration_ms: 0.9937
+  type: 'test'
+  ...
+# Subtest: TEST blocks actual production before provider access
+ok 62 - TEST blocks actual production before provider access
+  ---
+  duration_ms: 0.1924
+  type: 'test'
+  ...
+# Subtest: TEST blocks production marker even development build before provider access
+ok 63 - TEST blocks production marker even development build before provider access
+  ---
+  duration_ms: 0.1012
+  type: 'test'
+  ...
+# Subtest: TEST blocks unmarked production build before provider access
+ok 64 - TEST blocks unmarked production build before provider access
+  ---
+  duration_ms: 0.0854
+  type: 'test'
+  ...
+# Subtest: TEST blocks unknown deployment before provider access
+ok 65 - TEST blocks unknown deployment before provider access
+  ---
+  duration_ms: 0.0886
+  type: 'test'
+  ...
+# Subtest: TEST blocks unmarked Vercel deployment before provider access
+ok 66 - TEST blocks unmarked Vercel deployment before provider access
+  ---
+  duration_ms: 0.085
+  type: 'test'
+  ...
+# Subtest: TEST blocks deployment URL without explicit Preview before provider access
+ok 67 - TEST blocks deployment URL without explicit Preview before provider access
+  ---
+  duration_ms: 0.085
+  type: 'test'
+  ...
+# Subtest: Preview allowance does not bypass LIVE merchant/legal/worker gates
+ok 68 - Preview allowance does not bypass LIVE merchant/legal/worker gates
+  ---
+  duration_ms: 0.176
+  type: 'test'
+  ...
+# Subtest: grounded qualitative applicant passes in two calls with all validated full-only fields
+ok 69 - grounded qualitative applicant passes in two calls with all validated full-only fields
+  ---
+  duration_ms: 0.9389
+  type: 'test'
+  ...
+# Subtest: one independent repair removes hard prompt-relevance failure
+ok 70 - one independent repair removes hard prompt-relevance failure
+  ---
+  duration_ms: 0.4311
+  type: 'test'
+  ...
+# Subtest: hard problem after one repair blocks and asks the specific missing information
+ok 71 - hard problem after one repair blocks and asks the specific missing information
+  ---
+  duration_ms: 0.733
+  type: 'test'
+  ...
+# Subtest: missing metrics, thanks and customer emotions never turn optional improvement into a hard gap
+ok 72 - missing metrics, thanks and customer emotions never turn optional improvement into a hard gap
+  ---
+  duration_ms: 1.9928
+  type: 'test'
+  ...
+# Subtest: malformed independent review cannot masquerade as a passing audit
+ok 73 - malformed independent review cannot masquerade as a passing audit
+  ---
+  duration_ms: 0.4626
+  type: 'test'
+  ...
+# Subtest: all eight criteria, literal final quotes and cited fact IDs are validated
+ok 74 - all eight criteria, literal final quotes and cited fact IDs are validated
+  ---
+  duration_ms: 0.2584
+  type: 'test'
+  ...
+# Subtest: requirements and plans reject invented employer facts, foreign prompts and unselected evidence
+ok 75 - requirements and plans reject invented employer facts, foreign prompts and unselected evidence
+  ---
+  duration_ms: 1.004
+  type: 'test'
+  ...
+# Subtest: setup and interpretation sources cannot become personal-action evidence
+ok 76 - setup and interpretation sources cannot become personal-action evidence
+  ---
+  duration_ms: 0.1315
+  type: 'test'
+  ...
+# Subtest: employer numbers and role numbers cannot become personal achievements
+ok 77 - employer numbers and role numbers cannot become personal achievements
+  ---
+  duration_ms: 0.3614
+  type: 'test'
+  ...
+# Subtest: edited facts replace original numeric evidence; decimals are exact
+ok 78 - edited facts replace original numeric evidence; decimals are exact
+  ---
+  duration_ms: 0.1847
+  type: 'test'
+  ...
+# Subtest: structured strategy cannot promote posting targets to applicant numbers
+ok 79 - structured strategy cannot promote posting targets to applicant numbers
+  ---
+  duration_ms: 0.0841
+  type: 'test'
+  ...
+# Subtest: excluded literal material is blocked even when AI audit claims pass
+ok 80 - excluded literal material is blocked even when AI audit claims pass
+  ---
+  duration_ms: 1.132
+  type: 'test'
+  ...
+# Subtest: optional additions and qualitative outcomes survive while unknown raw scores are stripped
+ok 81 - optional additions and qualitative outcomes survive while unknown raw scores are stripped
+  ---
+  duration_ms: 0.8231
+  type: 'test'
+  ...
+# Subtest: reserve stays conservative over actual bytes and all three capped calls
+ok 82 - reserve stays conservative over actual bytes and all three capped calls
+  ---
+  duration_ms: 0.5247
+  type: 'test'
+  ...
+# Subtest: original question bank remains thirty; interview is anchored and asks one easy gap
+ok 83 - original question bank remains thirty; interview is anchored and asks one easy gap
+  ---
+  duration_ms: 0.3672
+  type: 'test'
+  ...
+# Subtest: unanchored followup rejected; 27-answer interview cap makes no extra AI call
+ok 84 - unanchored followup rejected; 27-answer interview cap makes no extra AI call
+  ---
+  duration_ms: 0.2279
+  type: 'test'
+  ...
+# Subtest: explicit required quantitative result remains hard after one repair
+ok 85 - explicit required quantitative result remains hard after one repair
+  ---
+  duration_ms: 0.5056
+  type: 'test'
+  ...
+# Subtest: explicit required customer reaction stays hard, optional thanks does not
+ok 86 - explicit required customer reaction stays hard, optional thanks does not
+  ---
+  duration_ms: 0.9275
+  type: 'test'
+  ...
+# Subtest: explicit additional scene or style requirements are not automatically downgraded
+ok 87 - explicit additional scene or style requirements are not automatically downgraded
+  ---
+  duration_ms: 0.448
+  type: 'test'
+  ...
+# Subtest: facts output removes setup facts and cannot report ready without a personal fact
+ok 88 - facts output removes setup facts and cannot report ready without a personal fact
+  ---
+  duration_ms: 0.3952
+  type: 'test'
+  ...
+# Subtest: all five setup-only source IDs fail generate validation; mixed personal input stays valid
+ok 89 - all five setup-only source IDs fail generate validation; mixed personal input stays valid
+  ---
+  duration_ms: 0.9575
+  type: 'test'
+  ...
+# Subtest: setup-only request fails before reservation or provider invocation
+ok 90 - setup-only request fails before reservation or provider invocation
+  ---
+  duration_ms: 0.5342
+  type: 'test'
+  ...
+# Subtest: exact 3M organization occurrence is allowed but does not authorize a personal 3
+ok 91 - exact 3M organization occurrence is allowed but does not authorize a personal 3
+  ---
+  duration_ms: 2.1024
+  type: 'test'
+  ...
+# Subtest: exact posting target with bounded attribution is allowed without authorizing personal achievement
+ok 92 - exact posting target with bounded attribution is allowed without authorizing personal achievement
+  ---
+  duration_ms: 1.0652
+  type: 'test'
+  ...
+# Subtest: an adjacent company statistic is not silently reclassified as a target
+ok 93 - an adjacent company statistic is not silently reclassified as a target
+  ---
+  duration_ms: 0.1286
+  type: 'test'
+  ...
+# Subtest: natural multi-sentence Korean exclusions preserve decimal and thousand tokens
+ok 94 - natural multi-sentence Korean exclusions preserve decimal and thousand tokens
+  ---
+  duration_ms: 0.1062
+  type: 'test'
+  ...
+# Subtest: long correction prose excludes the superseded number, not the corrected number
+ok 95 - long correction prose excludes the superseded number, not the corrected number
+  ---
+  duration_ms: 0.0581
+  type: 'test'
+  ...
+# Subtest: multi-sentence prose exclusion blocks output even when AI audit incorrectly passes
+ok 96 - multi-sentence prose exclusion blocks output even when AI audit incorrectly passes
+  ---
+  duration_ms: 1.575
+  type: 'test'
+  ...
+# Subtest: optional reaction in a different clause cannot downgrade mandatory metrics
+ok 97 - optional reaction in a different clause cannot downgrade mandatory metrics
+  ---
+  duration_ms: 0.1512
+  type: 'test'
+  ...
+# Subtest: decimal employer spans are exact; quantity-like organization text is not a loophole
+ok 98 - decimal employer spans are exact; quantity-like organization text is not a loophole
+  ---
+  duration_ms: 3.0457
+  type: 'test'
+  ...
+# Subtest: literal prompt requirement protects unfamiliar explicit wording and cannot be fabricated
+ok 99 - literal prompt requirement protects unfamiliar explicit wording and cannot be fabricated
+  ---
+  duration_ms: 0.2592
+  type: 'test'
+  ...
+# Subtest: Redis missing fails closed; paid blocked; same origin enforced
+ok 100 - Redis missing fails closed; paid blocked; same origin enforced
+  ---
+  duration_ms: 0.6777
+  type: 'test'
+  ...
+# Subtest: literal quote and count limits enforced
+ok 101 - literal quote and count limits enforced
+  ---
+  duration_ms: 0.3215
+  type: 'test'
+  ...
+# Subtest: AES cache requires matching session; no plaintext stored
+ok 102 - AES cache requires matching session; no plaintext stored
+  ---
+  duration_ms: 0.3387
+  type: 'test'
+  ...
+# Subtest: atomic reservation idempotency, busy lock, cache deletion retains used
+ok 103 - atomic reservation idempotency, busy lock, cache deletion retains used
+  ---
+  duration_ms: 1.2051
+  type: 'test'
+  ...
+# Subtest: budget fail closed
+ok 104 - budget fail closed
+  ---
+  duration_ms: 0.1945
+  type: 'test'
+  ...
+# Subtest: two distinct AI calls produce revised draft; source and char checks
+ok 105 - two distinct AI calls produce revised draft; source and char checks
+  ---
+  duration_ms: 0.8284
+  type: 'test'
+  ...
+# Subtest: provider error never leaks response or key
+ok 106 - provider error never leaks response or key
+  ---
+  duration_ms: 0.6127
+  type: 'test'
+  ...
+# Subtest: mock provider JSON response works without real keys
+ok 107 - mock provider JSON response works without real keys
+  ---
+  duration_ms: 0.3071
+  type: 'test'
+  ...
+# Subtest: successful measured usage reconciles atomically; failed reservation stays charged
+ok 108 - successful measured usage reconciles atomically; failed reservation stays charged
+  ---
+  duration_ms: 0.733
+  type: 'test'
+  ...
+# Subtest: provider complete usage uses conservative rates
+ok 109 - provider complete usage uses conservative rates
+  ---
+  duration_ms: 0.2209
+  type: 'test'
+  ...
+# Subtest: same signed session replays result without second provider call
+ok 110 - same signed session replays result without second provider call
+  ---
+  duration_ms: 1.2034
+  type: 'test'
+  ...
+# Subtest: 30 final answers accepted; 31 rejected
+ok 111 - 30 final answers accepted; 31 rejected
+  ---
+  duration_ms: 0.2564
+  type: 'test'
+  ...
+# Subtest: review rejects overlength, invented numeric and missing source IDs
+ok 112 - review rejects overlength, invented numeric and missing source IDs
+  ---
+  duration_ms: 1.0885
+  type: 'test'
+  ...
+# Subtest: unconfirmed university and reserved final questions rejected
+ok 113 - unconfirmed university and reserved final questions rejected
+  ---
+  duration_ms: 0.3616
+  type: 'test'
+  ...
+# Subtest: stale pending without lock can reserve again while failed remains explicit
+ok 114 - stale pending without lock can reserve again while failed remains explicit
+  ---
+  duration_ms: 0.3288
+  type: 'test'
+  ...
+# Subtest: generation sends only selected facts, respects edited fact and focus IDs
+ok 115 - generation sends only selected facts, respects edited fact and focus IDs
+  ---
+  duration_ms: 0.4887
+  type: 'test'
+  ...
+# Subtest: posting numbers cannot become personal achievements; decimal numeric tokens exact
+ok 116 - posting numbers cannot become personal achievements; decimal numeric tokens exact
+  ---
+  duration_ms: 0.8267
+  type: 'test'
+  ...
+# Subtest: measured underlength triggers one additional independent rewrite
+ok 117 - measured underlength triggers one additional independent rewrite
+  ---
+  duration_ms: 0.5136
+  type: 'test'
+  ...
+# Subtest: insufficient draft preserves additional questions and q28 summaries cannot be evidence
+ok 118 - insufficient draft preserves additional questions and q28 summaries cannot be evidence
+  ---
+  duration_ms: 0.3613
+  type: 'test'
+  ...
+# Subtest: streamed provider body stops at 150KB cap without parsing or exposing it
+ok 119 - streamed provider body stops at 150KB cap without parsing or exposing it
+  ---
+  duration_ms: 0.2345
+  type: 'test'
+  ...
+# Subtest: anthropic direct ID and known OpenRouter JSON capability
+ok 120 - anthropic direct ID and known OpenRouter JSON capability
+  ---
+  duration_ms: 0.2034
+  type: 'test'
+  ...
+# Subtest: 70 percent draft with optional missing passes review and preserves enhancement questions
+ok 121 - 70 percent draft with optional missing passes review and preserves enhancement questions
+  ---
+  duration_ms: 0.6731
+  type: 'test'
+  ...
+# Subtest: truly required missing still rejects even when sections exist
+ok 122 - truly required missing still rejects even when sections exist
+  ---
+  duration_ms: 0.2467
+  type: 'test'
+  ...
+# Subtest: completed provider usage is reported before invalid content JSON rejection
+ok 123 - completed provider usage is reported before invalid content JSON rejection
+  ---
+  duration_ms: 0.2347
+  type: 'test'
+  ...
+# Subtest: validation failure settles all completed calls and does not consume free generation
+ok 124 - validation failure settles all completed calls and does not consume free generation
+  ---
+  duration_ms: 2.1618
+  type: 'test'
+  ...
+# Subtest: network ambiguity or missing usage keeps full reservation after validation failure
+ok 125 - network ambiguity or missing usage keeps full reservation after validation failure
+  ---
+  duration_ms: 3.0022
+  type: 'test'
+  ...
+# Subtest: failed settlement cannot be applied twice or reset old charges
+ok 126 - failed settlement cannot be applied twice or reset old charges
+  ---
+  duration_ms: 0.4637
+  type: 'test'
+  ...
+# Subtest: interview hides internal IDs and drops setup answers from discoveries
+ok 127 - interview hides internal IDs and drops setup answers from discoveries
+  ---
+  duration_ms: 0.398
+  type: 'test'
+  ...
+# Subtest: facts material candidates exclude profile-only answer sources
+ok 128 - facts material candidates exclude profile-only answer sources
+  ---
+  duration_ms: 0.2762
+  type: 'test'
+  ...
+# Subtest: generation reserve bounds all three actually allowed calls with dynamic token and byte caps
+ok 129 - generation reserve bounds all three actually allowed calls with dynamic token and byte caps
+  ---
+  duration_ms: 3.1997
+  type: 'test'
+  ...
+# Subtest: oversized draft cannot trigger an unreserved future input call
+ok 130 - oversized draft cannot trigger an unreserved future input call
+  ---
+  duration_ms: 1.6183
+  type: 'test'
+  ...
+# Subtest: five prompts totaling 5000 characters enforce the same capped maxima across all calls
+ok 131 - five prompts totaling 5000 characters enforce the same capped maxima across all calls
+  ---
+  duration_ms: 2.1988
+  type: 'test'
+  ...
+# Subtest: interview uses 2400 tokens and matching reserve; only new answer discoveries survive
+ok 132 - interview uses 2400 tokens and matching reserve; only new answer discoveries survive
+  ---
+  duration_ms: 0.5258
+  type: 'test'
+  ...
+# Subtest: measured cost above reservation is fully recorded atomically and blocks new spending
+ok 133 - measured cost above reservation is fully recorded atomically and blocks new spending
+  ---
+  duration_ms: 1.3929
+  type: 'test'
+  ...
+# Subtest: provider truncation reports only safe stage and integer token diagnostics
+ok 134 - provider truncation reports only safe stage and integer token diagnostics
+  ---
+  duration_ms: 0.4648
+  type: 'test'
+  ...
+# Subtest: API error details allowlist excludes bodies, credentials and noninteger tokens
+ok 135 - API error details allowlist excludes bodies, credentials and noninteger tokens
+  ---
+  duration_ms: 0.3506
+  type: 'test'
+  ...
+# Subtest: API review truncation exposes safe stage diagnostics and still reconciles complete usage
+ok 136 - API review truncation exposes safe stage diagnostics and still reconciles complete usage
+  ---
+  duration_ms: 2.3346
+  type: 'test'
+  ...
+# Subtest: server stages identify interview, facts and draft without exposing input
+ok 137 - server stages identify interview, facts and draft without exposing input
+  ---
+  duration_ms: 1.7647
+  type: 'test'
+  ...
+# Subtest: 60 second default and 65 second maximum fit longer request locks
+ok 138 - 60 second default and 65 second maximum fit longer request locks
+  ---
+  duration_ms: 0.3239
+  type: 'test'
+  ...
+# Subtest: Sonnet 5.5 medium reasoning parameters stay scoped to documented providers
+ok 139 - Sonnet 5.5 medium reasoning parameters stay scoped to documented providers
+  ---
+  duration_ms: 0.8628
+  type: 'test'
+  ...
+# Subtest: observed 500/700-character 15-fact case repairs optional-detail rejection without new user facts
+ok 140 - observed 500/700-character 15-fact case repairs optional-detail rejection without new user facts
+  ---
+  duration_ms: 2.9914
+  type: 'test'
+  ...
+# Subtest: audit residuals and length violations share one repair call and remain strict afterwards
+ok 141 - audit residuals and length violations share one repair call and remain strict afterwards
+  ---
+  duration_ms: 1.4829
+  type: 'test'
+  ...
+# Subtest: problems found and already removed are warnings not residual audit failures
+ok 142 - problems found and already removed are warnings not residual audit failures
+  ---
+  duration_ms: 1.223
+  type: 'test'
+  ...
+# Subtest: final insufficient audit is returned with safe explanations and never silently passed
+ok 143 - final insufficient audit is returned with safe explanations and never silently passed
+  ---
+  duration_ms: 1.1723
+  type: 'test'
+  ...
+# Subtest: audit allowlist retains only short explanations and masks credential patterns
+ok 144 - audit allowlist retains only short explanations and masks credential patterns
+  ---
+  duration_ms: 0.8108
+  type: 'test'
+  ...
+# Subtest: API final audit failure returns sanitized residuals and measured lengths after exactly three calls
+ok 145 - API final audit failure returns sanitized residuals and measured lengths after exactly three calls
+  ---
+  duration_ms: 3.6337
+  type: 'test'
+  ...
+# Subtest: final warnings use numbered prompts and replace stale length estimates with server measurements
+ok 146 - final warnings use numbered prompts and replace stale length estimates with server measurements
+  ---
+  duration_ms: 2.8399
+  type: 'test'
+  ...
+# Subtest: unrelated factual and exclusion warnings remain unchanged after measurement cleanup
+ok 147 - unrelated factual and exclusion warnings remain unchanged after measurement cleanup
+  ---
+  duration_ms: 0.5876
+  type: 'test'
+  ...
+# Subtest: warning prompt references escape regex characters without altering section IDs
+ok 148 - warning prompt references escape regex characters without altering section IDs
+  ---
+  duration_ms: 1.0717
+  type: 'test'
+  ...
+1..148
+# tests 148
+# suites 0
+# pass 148
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 227.4539

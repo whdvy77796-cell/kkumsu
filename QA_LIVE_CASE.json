@@ -1,0 +1,96 @@
+{
+  "label": "공식 공고 업무를 활용한 가상 지원자 축약 검증",
+  "source": {
+    "url": "https://job.shinsegae.com/co-info/EE0/recruit/5211",
+    "checkedAt": "2026-11-05T20:20:21.613Z",
+    "excerpt": "음료 제조 및 판매, 고객 서비스, 매장 청결 및 운영 관리 등",
+    "scope": "공고의 주요 업무만 사용. 실제 지원·제출·합격 사례가 아님."
+  },
+  "request": {
+    "action": "generate",
+    "requestId": "b6263958-0a2a-42d3-9695-169e07ed1a5e",
+    "consent": true,
+    "product": "free",
+    "offerVersion": "v3-preview-3000",
+    "previewDisclosureAccepted": true,
+    "verified": true,
+    "profile": {
+      "purpose": "취업",
+      "organization": "스타벅스",
+      "role": "바리스타",
+      "posting": "주요 업무: 음료 제조 및 판매, 고객 서비스, 매장 청결 및 운영 관리 등",
+      "prompts": [
+        {
+          "id": "p1",
+          "heading": "고객 응대 경험에서 본인이 한 행동과 판단을 설명해주세요.",
+          "charLimit": 350
+        }
+      ]
+    },
+    "answers": [
+      {
+        "id": "q1",
+        "question": "용도",
+        "answer": "취업"
+      },
+      {
+        "id": "q2",
+        "question": "목표",
+        "answer": "스타벅스 바리스타"
+      },
+      {
+        "id": "q3",
+        "question": "업무",
+        "answer": "고객 서비스"
+      },
+      {
+        "id": "q4",
+        "question": "문항",
+        "answer": "본인이 한 행동과 판단 350자"
+      },
+      {
+        "id": "q5",
+        "question": "경험 범위",
+        "answer": "아르바이트"
+      },
+      {
+        "id": "q6",
+        "question": "상황과 행동",
+        "answer": "카페에서 음료가 다르다는 손님에게 메뉴를 다시 묻고 영수증과 컵 라벨을 비교했습니다."
+      },
+      {
+        "id": "q7",
+        "question": "판단과 역할",
+        "answer": "기억만으로 단정하지 않으려고 확인했고, 차이를 매니저에게 전달하는 역할을 했습니다."
+      },
+      {
+        "id": "q8",
+        "question": "실제 결과",
+        "answer": "담당 직원이 음료를 다시 만들었습니다. 저는 제조하지 않았고 수치로 기록한 성과는 없습니다."
+      }
+    ],
+    "facts": [
+      {
+        "id": "f1",
+        "kind": "fact",
+        "text": "음료가 다르다는 손님에게 메뉴를 다시 묻고 영수증과 컵 라벨을 비교했다.",
+        "quote": "카페에서 음료가 다르다는 손님에게 메뉴를 다시 묻고 영수증과 컵 라벨을 비교했습니다.",
+        "answerId": "q6"
+      },
+      {
+        "id": "f2",
+        "kind": "fact",
+        "text": "기억으로 단정하지 않으려 확인했고 차이를 매니저에게 전달했다.",
+        "quote": "기억만으로 단정하지 않으려고 확인했고, 차이를 매니저에게 전달하는 역할을 했습니다.",
+        "answerId": "q7"
+      },
+      {
+        "id": "f3",
+        "kind": "fact",
+        "text": "음료 재제조는 다른 직원이 했고 본인의 수치 성과는 없다.",
+        "quote": "담당 직원이 음료를 다시 만들었습니다. 저는 제조하지 않았고 수치로 기록한 성과는 없습니다.",
+        "answerId": "q8"
+      }
+    ]
+  }
+}

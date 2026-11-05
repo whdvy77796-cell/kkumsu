@@ -2,6 +2,18 @@
   "functions": {
     "api/insosoe.js": {
       "maxDuration": 240
+    },
+    "api/payment.js": {
+      "maxDuration": 90
+    },
+    "api/payment-webhook.js": {
+      "maxDuration": 60
+    },
+    "api/payment-reconcile.js": {
+      "maxDuration": 90
+    },
+    "api/qa-upgrade.js": {
+      "maxDuration": 240
     }
   },
   "headers": [
@@ -14,7 +26,7 @@
         },
         {
           "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
+          "value": "no-referrer"
         },
         {
           "key": "X-Frame-Options",
@@ -26,7 +38,11 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' https://js.tosspayments.com; style-src 'self'; img-src 'self' data: https://*.tosspayments.com; connect-src 'self' https://*.tosspayments.com; frame-src https://*.tosspayments.com; font-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://*.tosspayments.com"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
         }
       ]
     }
@@ -35,5 +51,22 @@
     "hnd1"
   ],
   "outputDirectory": "public",
-  "framework": null
+  "framework": null,
+  "crons": [
+    {
+      "path": "/api/payment-reconcile",
+      "schedule": "*/10 * * * *"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/payment/success",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/payment/fail",
+      "destination": "/index.html"
+    }
+  ],
+  "buildCommand": "npm test"
 }

@@ -1,13 +1,13 @@
 {
-  "name": "insosoe-v2",
-  "version": "2.0.0",
+  "name": "insosoe-v3",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": "22.x"
   },
   "scripts": {
-    "test": "node --test tests/server.test.mjs"
+    "test": "node --test"
   },
   "dependencies": {
     "@vercel/oidc": "4.0.6"
