@@ -1,0 +1,15 @@
+import {settings,ensureReady,headers,identity,hmac,validate,AppError,fail} from '../lib/core.mjs';
+import {Store} from '../lib/store.mjs';
+import {runPipeline,reserveCost} from '../lib/pipeline.mjs';
+export function createHandler(deps={}){return async function handler(req,res){let reservation,store,data;try{
+ const c=settings(deps.env||process.env);headers(req,res,c);const send=(code,body)=>{res.statusCode=code;res.end(JSON.stringify(body));};
+ if(!['GET','POST','DELETE'].includes(req.method)){res.setHeader('Allow','GET, POST, DELETE');return send(405,{error:'지원하지 않는 방식입니다.',code:'METHOD',retryable:false});}
+ if(req.method==='GET'){try{ensureReady(c);const sid=identity(req,res,c);store=deps.store||new Store(c,deps.fetcher);return send(200,{ready:true,provider:c.provider,model:c.model,freeAvailable:await store.free(sid),paymentReady:false});}catch(e){return send(200,{ready:false,provider:c.provider,model:c.model,freeAvailable:false,paymentReady:false,message:e instanceof AppError?e.message:'서비스 설정 중입니다.'});}}
+ ensureReady(c);const sid=identity(req,res,c);store=deps.store||new Store(c,deps.fetcher);
+ if(req.method==='DELETE'){await store.clear(sid);return send(200,{deleted:true,freeAvailable:await store.free(sid),message:'임시 결과 삭제. 무료 이용 기록은 유지됩니다.'});}
+ if(!(req.headers['content-type']||'').toLowerCase().startsWith('application/json'))fail('CONTENT_TYPE','JSON 형식으로 요청해주세요.',415);if(Number(req.headers['content-length']||0)>150000)fail('INPUT_TOO_LARGE','입력 분량을 줄여주세요.',413);
+ let body=req.body;if(typeof body==='string'||Buffer.isBuffer(body)){try{body=JSON.parse(body.toString());}catch{fail('INVALID_JSON','JSON 형식 오류입니다.');}}else if(body===undefined){let raw='',size=0;for await(const part of req){size+=Buffer.byteLength(part);if(size>150000)fail('INPUT_TOO_LARGE','입력 분량을 줄여주세요.',413);raw+=part;}try{body=JSON.parse(raw);}catch{fail('INVALID_JSON','JSON 형식 오류입니다.');}}
+ data=validate(body);const address=c.vercel?(req.headers['x-vercel-forwarded-for']||req.headers['x-forwarded-for']||'unknown'):req.socket?.remoteAddress||'local',ip=hmac(c.secret,'ip:'+String(address).split(',')[0].trim());reservation=await store.reserve(sid,ip,data,reserveCost(c,data));if(reservation.cached)return send(200,reservation.cached);
+ const usage=[];const result=await runPipeline(c,data,{...deps,onUsage:cost=>usage.push(cost)});const expectedCalls=data.action==='generate'?(result.quality.rewriteApplied?3:2):(data.action==='interview'&&data.answers.length>=27?0:1);const measuredCost=usage.length===expectedCalls?usage.reduce((sum,cost)=>sum+cost,0):undefined;await store.finish(reservation,'done',result,data.action,measuredCost);reservation=null;return send(200,result);
+ }catch(error){if(reservation&&!reservation.cached){try{await store.finish(reservation,'failed',null,data?.action);}catch{}}res.statusCode=error instanceof AppError?error.status:500;res.end(JSON.stringify({error:error instanceof AppError?error.message:'요청을 안전하게 완료하지 못했습니다.',code:error instanceof AppError?error.code:'INTERNAL',retryable:error instanceof AppError?error.retryable:false,...(error instanceof AppError?error.details:{})}));}};}
+export default createHandler();

@@ -1,8 +1,15 @@
 {
-  "name": "kkumsu",
+  "name": "insosoe-v2",
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "꿈수 신당 - 한국식 꿈 해몽과 로또 번호",
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "test": "node --test tests/server.test.mjs"
+  },
+  "dependencies": {
+    "@vercel/oidc": "4.0.6"
+  }
 }
