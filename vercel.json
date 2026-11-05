@@ -1,5 +1,39 @@
 {
   "functions": {
-    "api/dream.js": { "maxDuration": 60 }
-  }
+    "api/insosoe.js": {
+      "maxDuration": 240
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'"
+        }
+      ]
+    }
+  ],
+  "regions": [
+    "hnd1"
+  ],
+  "outputDirectory": "public",
+  "framework": null
 }
