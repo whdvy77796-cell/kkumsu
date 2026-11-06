@@ -1,0 +1,84 @@
+{
+  "version": "v4",
+  "previewBranch": "insosoe-v3",
+  "firstPreviewCommit": "68eef0e",
+  "recordedAt": "2026-11-06T08:09:32.088Z",
+  "productionDeployed": false,
+  "paymentsMode": "disabled",
+  "budgetRaised": false,
+  "localTests": {
+    "passed": 241,
+    "failed": 0,
+    "type": "unit and mocked integration"
+  },
+  "cloudFirstDeployment": {
+    "passed": 237,
+    "failed": 0,
+    "finalDeploymentPending": true
+  },
+  "actualModel": {
+    "case": "고정 가상 85자 초안",
+    "resultCharacters": 88,
+    "limit": 100,
+    "visibleCharacters": 21,
+    "repairAttempted": false,
+    "calls": 2,
+    "readFullVia": "read-only Vercel Redis Browser, local DPAPI secret in process memory only",
+    "checks": [
+      "동료 2명 유지",
+      "공고의 회사 목표 20%를 개인 성과에 사용하지 않음",
+      "공유 했습니다 → 공유했습니다",
+      "원문 근거 및 주장 검수 직접 대조"
+    ],
+    "limitations": [
+      "짧은 한 사례만 실제 호출",
+      "긴 글 두 요청은 예산 예약에서 차단",
+      "후속 프롬프트 변경은 실제 재호출하지 않고 저장한 원응답으로 회귀 재생"
+    ]
+  },
+  "actualStorage": {
+    "encrypted": true,
+    "unpaidRetentionMilliseconds": 3600000,
+    "deletionResponses": [
+      200,
+      200
+    ],
+    "subsequentGet": 410,
+    "redisExistsAfterDelete": 0,
+    "usageRecordsPreserved": true
+  },
+  "browser": {
+    "desktopWidth": 1440,
+    "mobileWidth": 390,
+    "horizontalOverflowObserved": false,
+    "policyKeyboard": [
+      "Tab moves to close",
+      "Shift+Tab wraps to last policy link",
+      "Escape closes and restores trigger focus"
+    ],
+    "mockOnly": [
+      "approved full-result rendering",
+      "first DELETE failure does not claim success",
+      "retry requires content and cache deletion success",
+      "full text remains in current page after deletion"
+    ],
+    "notRealPayment": true,
+    "copyAndDownloadOSIntegration": "not tested; payload checks planned"
+  },
+  "operationalLedger": {
+    "observedAt": "2026-11-06T07:50:00Z",
+    "lifetimeUsedMicroUSD": 1750626,
+    "utcDayUsedMicroUSD": 271785,
+    "note": "운영 장부 수치이며 OpenRouter 청구액/잔액으로 단정하지 않음"
+  },
+  "blocked": [
+    "실 PG 및 가맹점·법적/환불 운영 준비",
+    "긴 분량·다수 실제 AI 품질 검증: 잔여 운영 예약 한도 부족"
+  ],
+  "preserved": [
+    "Production 배포",
+    "기존 꿈수 백업",
+    "기존 30개 질문은행",
+    "기존 V3 결과 보관 약속"
+  ]
+}

@@ -1,0 +1,273 @@
+{
+  "case": {
+    "label": "기존 예산으로 검증하기 위한 최소 가상 사례. 실제 지원자 아님.",
+    "prompt": "본인이 직접 문제를 개선한 경험을 소개해주세요.",
+    "role": "",
+    "organization": "",
+    "posting": "검증용 공고: 처리 속도 20% 개선은 회사 목표이며 지원자의 성과가 아닙니다.",
+    "originalText": "컵과 뚜껑을 따로 찾느라 준비가 늦어져, 미리 함께 준비하고 동료 2명에게 순서를 공유 했습니다. 작은 준비도 나누는 것이 협력의 시작이라고 느꼈습니다.",
+    "limit": 100,
+    "lengthMode": "characters"
+  },
+  "result": {
+    "label": "고정 가상 사례의 실제 모델 결과. 관리자 경로 조회이며 실제 PG 승인/유료 전달이 아님.",
+    "observedAt": "2026-11-06T07:41:58.385Z",
+    "sections": [
+      {
+        "id": "p1",
+        "heading": "본인이 직접 문제를 개선한 경험을 소개해주세요.",
+        "text": "컵과 뚜껑을 따로 찾느라 준비가 늦어져, 미리 함께 준비해 두고 동료 2명에게 그 순서를 공유했습니다. 작은 준비도 나누는 것이 협력의 시작이라고 느꼈습니다.",
+        "charLimit": 100
+      }
+    ],
+    "quality": {
+      "checks": [
+        {
+          "key": "fit",
+          "label": "문항 응답성",
+          "status": "pass"
+        },
+        {
+          "key": "logic",
+          "label": "논리·본인 역할",
+          "status": "pass"
+        },
+        {
+          "key": "evidence",
+          "label": "원문·수치 근거",
+          "status": "pass"
+        },
+        {
+          "key": "wording",
+          "label": "자연스러운 문장",
+          "status": "pass"
+        },
+        {
+          "key": "spelling",
+          "label": "맞춤법",
+          "status": "pass"
+        },
+        {
+          "key": "length",
+          "label": "분량",
+          "status": "pass"
+        }
+      ],
+      "repairAttempted": false
+    },
+    "review": {
+      "version": "v4",
+      "scope": "source_alignment_not_truth_or_hiring_probability",
+      "candidateDigest": "c4e98a548eb0791878893051b32707347e255cc7aa4caa0c3fccc5fbf37726fd",
+      "checks": [
+        {
+          "key": "fit",
+          "status": "pass",
+          "reason": "문제를 직접 개선한 경험이라는 문항에 맞게 준비 지연 문제와 개선 행동을 담았다.",
+          "quote": "미리 함께 준비해 두고 동료 2명에게 그 순서를 공유했습니다",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "미리 함께 준비하고 동료 2명에게 순서를 공유 했습니다"
+            }
+          ]
+        },
+        {
+          "key": "evidence",
+          "status": "pass",
+          "reason": "후보의 모든 사실은 원문에 있는 내용이며 공고의 20% 목표는 쓰지 않았다.",
+          "quote": "컵과 뚜껑을 따로 찾느라 준비가 늦어져",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "컵과 뚜껑을 따로 찾느라 준비가 늦어져"
+            }
+          ]
+        },
+        {
+          "key": "agency",
+          "status": "pass",
+          "reason": "원문과 같이 본인이 준비하고 동료 2명에게 공유한 행동으로 유지되어 과장이 없다.",
+          "quote": "동료 2명에게 그 순서를 공유했습니다",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "동료 2명에게 순서를 공유 했습니다"
+            }
+          ]
+        },
+        {
+          "key": "causality",
+          "status": "pass",
+          "reason": "찾느라 늦어져 함께 준비했다는 원문의 원인과 대응 관계가 그대로 유지된다.",
+          "quote": "따로 찾느라 준비가 늦어져, 미리 함께 준비해 두고",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "따로 찾느라 준비가 늦어져, 미리 함께 준비하고"
+            }
+          ]
+        },
+        {
+          "key": "numbers",
+          "status": "pass",
+          "reason": "수치는 동료 2명뿐이며 원문과 같고 공고의 20%는 사용하지 않았다.",
+          "quote": "동료 2명에게",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "동료 2명에게"
+            }
+          ]
+        },
+        {
+          "key": "naturalness",
+          "status": "pass",
+          "reason": "문장이 자연스럽고 맞춤법과 띄어쓰기 오류가 없다.",
+          "quote": "작은 준비도 나누는 것이 협력의 시작이라고 느꼈습니다.",
+          "evidence": []
+        },
+        {
+          "key": "length",
+          "status": "pass",
+          "reason": "88자로 100자 제한 이내이다.",
+          "quote": "",
+          "evidence": []
+        }
+      ],
+      "claims": [
+        {
+          "quote": "컵과 뚜껑을 따로 찾느라 준비가 늦어져",
+          "status": "supported",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "컵과 뚜껑을 따로 찾느라 준비가 늦어져"
+            }
+          ],
+          "reason": "원문에 있는 문제 상황이다."
+        },
+        {
+          "quote": "미리 함께 준비해 두고",
+          "status": "supported",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "미리 함께 준비하고"
+            }
+          ],
+          "reason": "원문의 개선 행동과 일치한다."
+        },
+        {
+          "quote": "동료 2명에게 그 순서를 공유했습니다",
+          "status": "supported",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "동료 2명에게 순서를 공유 했습니다"
+            }
+          ],
+          "reason": "인원수와 공유 행동이 원문과 같다."
+        },
+        {
+          "quote": "작은 준비도 나누는 것이 협력의 시작이라고 느꼈습니다",
+          "status": "supported",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "작은 준비도 나누는 것이 협력의 시작이라고 느꼈습니다"
+            }
+          ],
+          "reason": "원문의 깨달음과 같다."
+        }
+      ]
+    },
+    "sources": [
+      {
+        "sourceId": "original",
+        "quote": "컵과 뚜껑을 따로 찾느라 준비가 늦어져"
+      },
+      {
+        "sourceId": "original",
+        "quote": "미리 함께 준비하고"
+      },
+      {
+        "sourceId": "original",
+        "quote": "동료 2명에게 순서를 공유 했습니다"
+      },
+      {
+        "sourceId": "original",
+        "quote": "작은 준비도 나누는 것이 협력의 시작이라고 느꼈습니다"
+      }
+    ],
+    "product": "revision",
+    "revision": {
+      "lengthMode": "characters",
+      "limit": 100,
+      "originalLength": 85,
+      "revisedLength": 88,
+      "changes": [
+        {
+          "category": "wording",
+          "before": "미리 함께 준비하고 동료 2명에게 순서를 공유 했습니다.",
+          "after": "미리 함께 준비해 두고 동료 2명에게 그 순서를 공유했습니다.",
+          "reason": "띄어쓰기 오류를 고치고 문장을 자연스럽게 다듬었습니다."
+        }
+      ],
+      "diagnosis": [
+        {
+          "category": "evidence",
+          "problem": "개선 전후의 변화나 결과가 원문에 없어 개선 효과가 드러나지 않습니다.",
+          "suggestion": "실제로 준비 시간이 어떻게 달라졌는지 사실이 있다면 한 줄 덧붙이세요."
+        },
+        {
+          "category": "length",
+          "problem": "공백 포함 100자 제한을 맞추려면 분량이 빠듯합니다.",
+          "suggestion": "제출 시 글자 수를 확인하고, 넘으면 '그 순서를'의 '그'를 빼는 등 줄이세요."
+        }
+      ],
+      "confirmedFacts": [
+        {
+          "text": "컵과 뚜껑을 따로 찾느라 준비가 늦어져",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "컵과 뚜껑을 따로 찾느라 준비가 늦어져"
+            }
+          ]
+        },
+        {
+          "text": "미리 함께 준비해 두고",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "미리 함께 준비하고"
+            }
+          ]
+        },
+        {
+          "text": "동료 2명에게 그 순서를 공유했습니다",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "동료 2명에게 순서를 공유 했습니다"
+            }
+          ]
+        },
+        {
+          "text": "작은 준비도 나누는 것이 협력의 시작이라고 느꼈습니다",
+          "evidence": [
+            {
+              "sourceId": "original",
+              "quote": "작은 준비도 나누는 것이 협력의 시작이라고 느꼈습니다"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "공고의 처리 속도 20% 개선은 회사 목표이므로 지원자의 성과로 쓰지 않았습니다.",
+        "원문·추가답변과의 대조이며 사실의 진실성이나 합격을 인증하지 않습니다."
+      ]
+    }
+  }
+}
