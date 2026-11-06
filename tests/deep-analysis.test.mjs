@@ -91,3 +91,5 @@ test('free analysis teaser is dropped when the problem text overlaps revised tex
 });
 
 test('good writing may have no fabricated improvement and whitespace-only quote differences map back to original',()=>{const d=validateRevision(req({originalText:'가상의 동아리\n   전시 행사에 참여해 팀원들과 안내 표지를 정리하고 방문객이 이동할 수 있도록 도왔습니다.'}));const x={overview:'수행한 일이 명확합니다.',strengths:[{quote:'동아리 전시 행사에 참여해',comment:'담당 업무가 드러납니다.'}],improvements:[],questions:[]};const out=validateDeepAnalysis(x,d);assert.equal(out.strengths[0].quote,'동아리\n   전시 행사에 참여해');assert.deepEqual(out.improvements,[]);});
+
+test('review gets a computed expected coverage count and equivalent numeric strings normalize safely',async()=>{const m=scripted([draft(),p=>{assert.equal(p.analysisReviewedExpected,1+p.candidate.deepAnalysis.strengths.length+p.candidate.deepAnalysis.improvements.length+p.candidate.deepAnalysis.questions.length);const r=review(p);r.analysis.reviewed=String(r.analysis.reviewed);return r;}]);const out=await runRevision(config,req(),{ai:m.ai});assert.equal(typeof out.review.analysis.reviewed,'number');assert.equal(m.calls.length,2);});
