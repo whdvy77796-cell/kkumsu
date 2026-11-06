@@ -6,6 +6,7 @@ import {validateRevision,revisionLimits,reserveRevisionCost,reserveRevisionStage
 import {minimumRevisionBudget,measuredRevisionCost} from '../lib/revision-api.mjs';
 import {RevisionStore} from '../lib/revision-store.mjs';
 import {PaymentService} from '../lib/payments.mjs';
+import {callAI} from '../lib/provider.mjs';
 import {settings} from '../lib/core.mjs';
 import {MockRedis} from './mock-redis.mjs';
 
@@ -89,4 +90,10 @@ test('mock approval unlocks the complete new essay and edit marks, never before 
  const service=new PaymentService(c,db,{now,fetcher,uuid:randomUUID}),f=stored(),preview=await service.saveGeneratedResult('mock-owner',randomUUID(),f);
  assert.equal(preview.access,'preview');assert.ok(!JSON.stringify(preview).includes(marker));const order=await service.createOrder('mock-owner',preview.resultId,{termsAccepted:true,immediateDeliveryAccepted:true});orderId=order.orderId;assert.equal(order.amount,3000);
  const full=await service.confirm('mock-owner',{orderId,paymentKey:'unit-payment-reference',amount:3000});assert.equal(full.access,'full');assert.equal(full.sections[0].text,f.sections[0].text);assert.deepEqual(full.revision.inlineEditRanges,f.revision.inlineEditRanges);assert.equal(full.revision.scoreCard.original.total,62);assert.equal(full.recoveryCode,undefined);
+});
+
+test('known provider cost is retained even when token counters are missing',async()=>{
+ const measured=[],c={provider:'openrouter',model:'anthropic/claude-sonnet-5.5',apiKey:'fake-unit-key',maxInputBytes:3000,inputRate:3,outputRate:15,timeout:1000};
+ await callAI(c,'시스템',{},100,{requireBilledCost:true,onUsage:n=>measured.push(n),fetcher:async()=>({ok:true,text:async()=>JSON.stringify({usage:{cost:1},choices:[{message:{content:'{}'},finish_reason:'stop'}]})})});
+ assert.equal(measured.length,1);assert.ok(measured[0]>=1100000);
 });
