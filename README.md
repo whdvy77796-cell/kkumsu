@@ -24,10 +24,18 @@ Node 22. npm install 후 npm test로 전체 검사를 실행합니다. Vercel �
 
 ## 검증 근거와 한계
 
-현재 전체 단위·모의 회귀 148개 통과 기록은 tests/last-run.txt에 있습니다. 실제 Upstash Redis에서 최신 11개 Lua export의 16개 묶음·619개 확인을 통과했고 격리 테스트 키 65개를 정리했습니다(QA_REDIS_LIVE.json). 이는 실제 PG 승인·다중 클라이언트 부하·장기 장애나 백업 복구를 증명하지 않습니다.
+현재 전체 단위·모의 회귀 149개 통과 기록은 tests/last-run.txt에 있습니다. 실제 Upstash Redis에서 최신 11개 Lua export의 16개 묶음·619개 확인을 통과했고 격리 테스트 키 65개를 정리했습니다(QA_REDIS_LIVE.json). 이는 실제 PG 승인·다중 클라이언트 부하·장기 장애나 백업 복구를 증명하지 않습니다.
 
-350자 실제 AI 검증 입력은 QA_LIVE_CASE.json이며 공식 채용공고와 가상 지원자 경험을 사용합니다. 실제 지원·합격 사례가 아닙니다. 500/700자 이전 버전 검증은 별도 구형 자료이며 이번 버전 결과로 취급하지 않습니다. 토스 일반 결제창의 계정 연계·실제 테스트 승인 왕복은 아직 확인되지 않았습니다.
+350자 제한의 실제 AI 검증은 초안·별도 검수 2회로 283자 결과를 반환했습니다(QA_V3_LIVE_RESULT.json, 최초 Preview d340922). 입력은 QA_LIVE_CASE.json이며 공식 채용공고와 가상 지원자 경험을 사용합니다. 이후 불필요한 자기부정·중복 보강질문 방지 지침을 추가했으나 추가 실호출은 하지 않았습니다. 실제 지원·합격 사례가 아닙니다. 500/700자 이전 버전 검증은 별도 구형 자료이며 이번 버전 결과로 취급하지 않습니다. 토스 일반 결제창의 계정 연계·실제 테스트 승인 왕복은 아직 확인되지 않았습니다.
 
 ## Preview 전용 임시 검증
 
-api/qa-upgrade.js는 VERCEL_ENV=preview와 별도 비밀 인증이 모두 필요하며, 고정된 가상 사례만 일반 비용·저장 흐름으로 실행합니다. 고객 임의 입력·임의 저장 결과를 읽는 경로가 아닙니다. 검증 후 이 경로와 vercel.json의 대응 함수 설정, Preview QA 비밀 환경변수를 제거하고 운영에 병합합니다.
+api/qa-upgrade.js는 VERCEL_ENV=preview와 별도 비밀 인증이 모두 필요합니다. 첫 검증은 일반 AI 비용·저장 흐름을 실행했고, 현재는 이미 생성된 고정 가상 결과만 0원 예약과 일반 저장·무료한도 처리로 재사용합니다. 추가 AI 호출은 없습니다. 고객 임의 입력·임의 저장 결과를 읽는 경로가 아닙니다. 검증 후 이 경로와 vercel.json의 대응 함수 설정, Preview QA 비밀 환경변수를 제거하고 운영에 병합합니다.
+
+## 로컬 화면 검증
+
+390px·360px 가상 데이터 file:// 화면에서 홈·문항 입력·사실 선택/정정·해석 제외·잠금 미리보기·정책 링크와 동의창의 키보드 순환/Escape/초점 복원/배경 inert를 확인했습니다. 실제 POST는 차단됩니다. 로컬 HTTP 접속은 환경 격리로 확인하지 못했으며 실기기·실제 PG 검증이 아닙니다. scripts/build-ui-qa.mjs의 ?qa=facts / ?qa=facts-corrected는 로컬 산출물에만 주입됩니다.
+
+APP_ORIGIN은 Production의 https://www.kkumsu.com 과 Preview의 https://kkumsu-git-insosoe-v3-kkkkkum.vercel.app 로 분리합니다. 주소 설정 없이 결과 복구 API를 쓸 수는 없습니다. Preview 검사는 고정 브랜치 주소에서 수행하며, 임의 배포 주소 사이의 브라우저 식별은 자동 공유되지 않습니다.
+
+제한된 Windows 샌드박스에서 테스트 파일 탐색이 막힐 경우 node --preserve-symlinks --preserve-symlinks-main scripts/run-local-tests.mjs 로 동일 테스트를 등록해 실행할 수 있습니다. CI는 npm test를 그대로 사용합니다.

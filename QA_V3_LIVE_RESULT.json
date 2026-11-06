@@ -1,0 +1,358 @@
+{
+  "scope": "FIXED_SYNTHETIC_CASE_NOT_REAL_APPLICANT",
+  "url": "https://kkumsu-3m94crw7x-kkkkkum.vercel.app",
+  "state": "finished",
+  "startedAt": "2026-11-06T00:03:47.260Z",
+  "status": 200,
+  "finishedAt": "2026-11-06T00:04:05.134Z",
+  "data": {
+    "scope": "FIXED_SYNTHETIC_CASE_ONLY",
+    "fixture": "공식 공고 업무를 활용한 가상 지원자 축약 검증",
+    "source": {
+      "url": "https://job.shinsegae.com/co-info/EE0/recruit/5211",
+      "checkedAt": "2026-11-05T20:20:21.613Z",
+      "excerpt": "음료 제조 및 판매, 고객 서비스, 매장 청결 및 운영 관리 등",
+      "scope": "공고의 주요 업무만 사용. 실제 지원·제출·합격 사례가 아님."
+    },
+    "publicResponse": {
+      "source": "ai",
+      "resultId": "f14a0de1-144f-4c40-a671-a0a8192f557a",
+      "access": "preview",
+      "sections": [
+        {
+          "id": "p1",
+          "heading": "고객 응대 경험에서 본인이 한 행동과 판단을 설명해주세요.",
+          "charLimit": 350,
+          "charCount": 283,
+          "segments": [
+            {
+              "kind": "visible",
+              "text": "저는 손님의 말을 기억만으로 단정하지 않고"
+            },
+            {
+              "kind": "locked",
+              "lines": 3
+            },
+            {
+              "kind": "visible",
+              "text": " 생길 수 있다고 보았기 때문입니다. 확인"
+            },
+            {
+              "kind": "locked",
+              "lines": 2
+            },
+            {
+              "kind": "visible",
+              "text": "일하면 음료 제조와 고객 서비스에서 주문 "
+            },
+            {
+              "kind": "locked",
+              "lines": 1
+            }
+          ]
+        }
+      ],
+      "quality": {
+        "checks": [
+          {
+            "label": "서버 작성·검수 절차",
+            "status": "completed"
+          },
+          {
+            "label": "제출 전 본인 사실 확인",
+            "status": "required"
+          }
+        ]
+      },
+      "note": "고정된 일부 문장만 공개됩니다. 전문 1건 열람은 3,000원이며 합격을 보장하지 않습니다.",
+      "freeAvailable": false,
+      "purchase": {
+        "amount": 3000,
+        "currency": "KRW",
+        "ready": false,
+        "mode": "disabled",
+        "disabledReason": "결제 설정·사업자·지원 체계·정산 확인 작업이 준비되지 않았습니다.",
+        "state": "available",
+        "canRetry": false,
+        "confirmationPending": false,
+        "pendingUntil": null,
+        "confirmationRetry": "same-order-only",
+        "expiresAt": "2026-11-07T00:04:05.800Z",
+        "orderName": "인소서 자기소개서 전문 1건"
+      }
+    },
+    "syntheticFullResult": {
+      "source": "ai",
+      "provider": "openrouter",
+      "model": "anthropic/claude-sonnet-5.5",
+      "sections": [
+        {
+          "id": "p1",
+          "heading": "고객 응대 경험에서 본인이 한 행동과 판단을 설명해주세요.",
+          "text": "저는 손님의 말을 기억만으로 단정하지 않고 자료로 확인한 뒤 응대했습니다. 카페에서 음료가 다르다는 손님께 먼저 주문한 메뉴를 다시 여쭈었고, 영수증과 컵 라벨을 비교해 차이를 확인했습니다. 기억만으로 판단하면 오해가 생길 수 있다고 보았기 때문입니다. 확인한 차이는 매니저에게 전달했고, 음료는 담당 직원이 다시 만들었습니다. 저는 제조하지 않았고 수치로 기록한 성과도 없습니다. 바리스타로 일하면 음료 제조와 고객 서비스에서 주문 내용을 확인하고 매장 안에 정확히 공유하는 데 이 경험을 활용하겠습니다.",
+          "charCount": 283,
+          "charLimit": 350,
+          "sourceFactIds": [
+            "f1",
+            "f2",
+            "f3"
+          ]
+        }
+      ],
+      "quality": {
+        "rewriteApplied": false,
+        "strategy": {
+          "version": "v3",
+          "requirements": [
+            {
+              "id": "r1",
+              "source": "prompt",
+              "promptId": "p1",
+              "quote": "고객 응대 경험에서 본인이 한 행동과 판단을 설명해주세요.",
+              "priority": "required"
+            },
+            {
+              "id": "r2",
+              "source": "posting",
+              "quote": "음료 제조 및 판매, 고객 서비스, 매장 청결 및 운영 관리 등",
+              "priority": "required"
+            }
+          ],
+          "plans": [
+            {
+              "id": "p1",
+              "requirementIds": [
+                "r1",
+                "r2"
+              ],
+              "claim": {
+                "text": "손님의 말을 기억으로 단정하지 않고 자료로 확인해 응대했다.",
+                "factIds": [
+                  "f1",
+                  "f2"
+                ]
+              },
+              "action": {
+                "text": "음료가 다르다는 손님에게 메뉴를 다시 묻고 영수증과 컵 라벨을 비교했으며, 확인한 차이를 매니저에게 전달했다.",
+                "factIds": [
+                  "f1",
+                  "f2"
+                ]
+              },
+              "judgment": {
+                "text": "기억만으로 단정하지 않기 위해 확인 과정을 거치는 쪽을 택했다.",
+                "factIds": [
+                  "f2"
+                ]
+              },
+              "outcome": null,
+              "roleConnection": {
+                "text": "확인한 주문 내용을 정확히 공유하는 방식을 고객 서비스 업무에 활용하겠다는 연결이다. 음료 재제조는 다른 직원이 했고 수치 성과는 없다.",
+                "factIds": [
+                  "f2",
+                  "f3"
+                ]
+              }
+            }
+          ]
+        },
+        "review": {
+          "version": "v3",
+          "scope": "submission_readiness_not_hiring_probability",
+          "sections": [
+            {
+              "id": "p1",
+              "criteria": [
+                {
+                  "key": "relevance",
+                  "status": "pass",
+                  "reason": "고객 응대에서의 행동과 판단을 직접 답함",
+                  "quote": "영수증과 컵 라벨을 비교해 차이를 확인했습니다",
+                  "factIds": [
+                    "f1"
+                  ],
+                  "missingKind": "none",
+                  "question": ""
+                },
+                {
+                  "key": "specificity",
+                  "status": "pass",
+                  "reason": "메뉴 재확인과 영수증·라벨 비교가 구체적임",
+                  "quote": "주문한 메뉴를 다시 여쭈었고",
+                  "factIds": [
+                    "f1"
+                  ],
+                  "missingKind": "none",
+                  "question": ""
+                },
+                {
+                  "key": "agency",
+                  "status": "pass",
+                  "reason": "확인과 전달이 본인 행동이며 제조는 분리됨",
+                  "quote": "확인한 차이는 매니저에게 전달했고",
+                  "factIds": [
+                    "f1",
+                    "f2",
+                    "f3"
+                  ],
+                  "missingKind": "none",
+                  "question": ""
+                },
+                {
+                  "key": "reasoning",
+                  "status": "pass",
+                  "reason": "기억만으로 단정하지 않은 판단 이유가 있음",
+                  "quote": "기억만으로 판단하면 오해가 생길 수 있다",
+                  "factIds": [
+                    "f2"
+                  ],
+                  "missingKind": "none",
+                  "question": ""
+                },
+                {
+                  "key": "roleFit",
+                  "status": "pass",
+                  "reason": "주문 확인과 공유를 고객 서비스 업무에 연결함",
+                  "quote": "주문 내용을 확인하고 매장 안에 정확히 공유하는",
+                  "factIds": [
+                    "f2"
+                  ],
+                  "missingKind": "none",
+                  "question": ""
+                },
+                {
+                  "key": "repetition",
+                  "status": "pass",
+                  "reason": "단일 문항이며 내용 중복이 없음",
+                  "quote": "",
+                  "factIds": [],
+                  "missingKind": "none",
+                  "question": ""
+                },
+                {
+                  "key": "cliches",
+                  "status": "pass",
+                  "reason": "상투적 표현 없이 실제 행동 중심임",
+                  "quote": "",
+                  "factIds": [],
+                  "missingKind": "none",
+                  "question": ""
+                },
+                {
+                  "key": "naturalness",
+                  "status": "warn",
+                  "reason": "손님 안내 장면이 없어 결과가 다소 담백함",
+                  "quote": "",
+                  "factIds": [],
+                  "missingKind": "extraScene",
+                  "question": "손님께 확인 결과를 어떻게 안내하셨나요?"
+                }
+              ]
+            }
+          ]
+        },
+        "additionalQuestions": [
+          "손님이 음료가 다르다고 말한 뒤 본인이 어떤 말로 응대했는지 알려주실 수 있나요?",
+          "확인 후 손님에게 어떻게 안내했고 손님의 반응은 어땠는지 기억나는 범위에서 알려주세요.",
+          "이 경험이 언제, 어떤 카페에서 있었는지와 본인의 당시 역할을 알려주시면 더 구체적으로 쓸 수 있습니다.",
+          "손님께 어떤 말로 응대하고 어떻게 안내했는지 기억나는 범위에서 알려주세요.",
+          "경험 시기와 당시 본인의 역할을 알려주시면 더 구체적으로 쓸 수 있습니다."
+        ],
+        "checks": [
+          {
+            "label": "문항 응답성",
+            "status": "pass",
+            "detail": "최종본의 근거와 제출 준비도를 별도 검수했습니다. 합격 가능성 평가는 아닙니다."
+          },
+          {
+            "label": "구체적인 행동",
+            "status": "pass",
+            "detail": "최종본의 근거와 제출 준비도를 별도 검수했습니다. 합격 가능성 평가는 아닙니다."
+          },
+          {
+            "label": "본인 기여",
+            "status": "pass",
+            "detail": "최종본의 근거와 제출 준비도를 별도 검수했습니다. 합격 가능성 평가는 아닙니다."
+          },
+          {
+            "label": "판단 이유",
+            "status": "pass",
+            "detail": "최종본의 근거와 제출 준비도를 별도 검수했습니다. 합격 가능성 평가는 아닙니다."
+          },
+          {
+            "label": "지원 직무 연결",
+            "status": "pass",
+            "detail": "최종본의 근거와 제출 준비도를 별도 검수했습니다. 합격 가능성 평가는 아닙니다."
+          },
+          {
+            "label": "소재·문장 중복",
+            "status": "pass",
+            "detail": "최종본의 근거와 제출 준비도를 별도 검수했습니다. 합격 가능성 평가는 아닙니다."
+          },
+          {
+            "label": "상투어",
+            "status": "pass",
+            "detail": "최종본의 근거와 제출 준비도를 별도 검수했습니다. 합격 가능성 평가는 아닙니다."
+          },
+          {
+            "label": "자연스러운 말투",
+            "status": "warn",
+            "detail": "최종본의 근거와 제출 준비도를 별도 검수했습니다. 합격 가능성 평가는 아닙니다."
+          },
+          {
+            "label": "별도 AI 사실·제외사항 검수",
+            "status": "pass",
+            "detail": "선택한 사실만 전달하여 별도 AI 호출에서 원문·사용자 정정 대조 후 개정했습니다."
+          },
+          {
+            "label": "문항별 글자 수",
+            "status": "warn",
+            "detail": "공백 포함 문자 수를 측정했습니다. 허용 범위는 문항 제한의 60~100%입니다."
+          },
+          {
+            "label": "최종 사용자 확인",
+            "status": "warn",
+            "detail": "AI 검수는 외부 사실 검증이나 완전한 오류 제거를 보장하지 않습니다."
+          }
+        ],
+        "warnings": [
+          "자연스러운 말투: 손님 안내 장면이 없어 결과가 다소 담백함",
+          "1번 문항은 목표 분량보다 짧지만 확인된 근거만 사용했습니다.",
+          "선택적 보강: 손님이 음료가 다르다고 말한 뒤 본인이 어떤 말로 응대했는지 알려주실 수 있나요?",
+          "선택적 보강: 확인 후 손님에게 어떻게 안내했고 손님의 반응은 어땠는지 기억나는 범위에서 알려주세요.",
+          "선택적 보강: 이 경험이 언제, 어떤 카페에서 있었는지와 본인의 당시 역할을 알려주시면 더 구체적으로 쓸 수 있습니다.",
+          "선택적 보강: 손님께 어떤 말로 응대하고 어떻게 안내했는지 기억나는 범위에서 알려주세요.",
+          "선택적 보강: 경험 시기와 당시 본인의 역할을 알려주시면 더 구체적으로 쓸 수 있습니다.",
+          "초안의 근거 없는 '나란히 비교', '정확히 연결하는 역할' 등 과장 표현을 정리했습니다.",
+          "글자수 초과(438자)를 의미 단위로 다시 써서 350자 이내로 줄였습니다.",
+          "손님에게 안내한 말과 반응은 사실에 없어 쓰지 않았습니다."
+        ]
+      },
+      "note": "외부 AI 제공자의 보관 정책이 적용될 수 있습니다. 무료 이용은 익명 브라우저 기준이며 개인당 1회 인증이 아닙니다.",
+      "freeAvailable": false,
+      "sources": [
+        {
+          "id": "f1",
+          "kind": "fact",
+          "text": "음료가 다르다는 손님에게 메뉴를 다시 묻고 영수증과 컵 라벨을 비교했다.",
+          "quote": "카페에서 음료가 다르다는 손님에게 메뉴를 다시 묻고 영수증과 컵 라벨을 비교했습니다.",
+          "answerId": "q6"
+        },
+        {
+          "id": "f2",
+          "kind": "fact",
+          "text": "기억으로 단정하지 않으려 확인했고 차이를 매니저에게 전달했다.",
+          "quote": "기억만으로 단정하지 않으려고 확인했고, 차이를 매니저에게 전달하는 역할을 했습니다.",
+          "answerId": "q7"
+        },
+        {
+          "id": "f3",
+          "kind": "fact",
+          "text": "음료 재제조는 다른 직원이 했고 본인의 수치 성과는 없다.",
+          "quote": "담당 직원이 음료를 다시 만들었습니다. 저는 제조하지 않았고 수치로 기록한 성과는 없습니다.",
+          "answerId": "q8"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "checkedAt": "2026-11-06T00:02:20.919Z",
+  "url": "https://kkumsu-3m94crw7x-kkkkkum.vercel.app",
+  "checks": [
+    {
+      "name": "health",
+      "status": 200,
+      "data": {
+        "ready": false,
+        "message": "새 자기소개서를 작성할 운영 한도가 부족해 현재 새 인터뷰를 시작할 수 없어요. 저장된 결과는 계속 확인할 수 있어요.",
+        "provider": "openrouter",
+        "model": "anthropic/claude-sonnet-5.5",
+        "freeAvailable": true,
+        "paymentReady": false,
+        "paymentMode": "disabled",
+        "paymentDisabledReason": "결제 설정·사업자·지원 체계·정산 확인 작업이 준비되지 않았습니다.",
+        "paymentLegal": {},
+        "offer": {
+          "version": "v3-preview-3000",
+          "amount": 3000,
+          "currency": "KRW",
+          "freePreviewLimit": 1
+        },
+        "latestResultId": null
+      }
+    },
+    {
+      "name": "qa-auth",
+      "status": 405,
+      "data": {
+        "code": "METHOD"
+      }
+    },
+    {
+      "name": "cron-auth",
+      "status": 200,
+      "data": {
+        "mode": "disabled",
+        "skipped": true
+      }
+    }
+  ]
+}

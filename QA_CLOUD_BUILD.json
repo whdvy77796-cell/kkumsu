@@ -1,0 +1,11 @@
+{
+  "checkedAt": "2026-11-05T23:59:57.956Z",
+  "commit": "d340922",
+  "deployment": "https://vercel.com/kkkkkum/kkumsu/CU6rLGWRFQHaRUWcSsmhH1BGxXG1",
+  "environment": "Preview",
+  "tests": 148,
+  "passed": 148,
+  "failed": 0,
+  "node": "22.x from package.json overrides project 24.x",
+  "scope": "Cloud build and unit/mock test execution only, not real gateway acceptance."
+}

@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-11-06T01:00:27.971Z",
+  "scope": "TWO_FIXED_SYNTHETIC_CASE_GENERATIONS_AT_2026_11_06_09_03_KST",
+  "provider": "OpenRouter",
+  "model": "Claude Sonnet 5.5",
+  "calls": [
+    {
+      "inputTokens": 1939,
+      "outputTokens": 1200,
+      "displayedCostUSD": 0.0159,
+      "finishReason": "stop"
+    },
+    {
+      "inputTokens": 4538,
+      "outputTokens": 1359,
+      "displayedCostUSD": 0.0227,
+      "finishReason": "stop"
+    }
+  ],
+  "displayedCostSumUSD": 0.0386,
+  "reservationBeforeCallMicros": 512495,
+  "note": "Sum of rounded per-request UI values, not an invoice or the full account total. Conservative application ledgers and caps were not reset or raised."
+}

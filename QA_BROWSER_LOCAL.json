@@ -1,0 +1,40 @@
+{
+  "checkedAt": "2026-11-06T00:53:18.179Z",
+  "scope": "FIXED_SYNTHETIC_FILE_URL_UI_ONLY",
+  "widths": [
+    390,
+    360
+  ],
+  "horizontalOverflow": false,
+  "dialog": {
+    "role": true,
+    "ariaModal": true,
+    "labelledBy": true,
+    "initialFocus": "heading",
+    "tabTrap": true,
+    "reverseTabTrap": true,
+    "escapeCloses": true,
+    "openerFocusRestored": true,
+    "backgroundInert": true
+  },
+  "views": [
+    "home",
+    "setup_questions_1_to_5",
+    "facts",
+    "facts_corrected",
+    "locked_preview",
+    "terms",
+    "privacy"
+  ],
+  "realNonGETNetworkCalls": 0,
+  "unverified": [
+    "local HTTP serving",
+    "real devices",
+    "real PG acceptance"
+  ],
+  "qaAccessGuards": {
+    "mockChecks": 5,
+    "passed": 5,
+    "modelCalls": 0
+  }
+}
