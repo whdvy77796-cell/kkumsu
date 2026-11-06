@@ -21,3 +21,7 @@ import '../tests/legacy-recovery-ui.test.mjs';
 import '../tests/deep-analysis.test.mjs';
 import '../tests/overhaul-edge.test.mjs';
 import '../tests/analysis-ui.test.mjs';
+
+import '../tests/long-request.test.mjs';
+
+import '../tests/staged-budget.test.mjs';

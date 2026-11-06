@@ -35,6 +35,14 @@ test('invalid or non-source quote in draft fails before any review call',async()
  await assert.rejects(()=>runRevision(config,req(),{ai:m.ai}),{code:'ANALYSIS_QUOTE'});assert.equal(m.calls.length,1);
 });
 
+test('v3 discards only unverified optional change annotations and still requires review',async()=>{
+ const bad={category:'logic',before:'원문에 전혀 없는 인용',after:'수정문에 없는 인용',reason:'가상 메모'};
+ const m=scripted([draft({changes:[bad,...draft().changes]}),review]);const out=await runRevision(config,req(),{ai:m.ai});
+ assert.equal(m.calls.length,2);assert.equal(out.revision.changes.length,1);assert(!JSON.stringify(out.revision.changes).includes('원문에 전혀 없는 인용'));
+ const wrongEvidence=p=>review(p,{claims:[{quote:'안내 표지를 만들고',status:'supported',evidence:[{sourceId:'original',quote:'원문에 없는 근거'}],reason:'x'}]});
+ await assert.rejects(()=>runRevision(config,req(),{ai:scripted([draft({changes:[bad]}),wrongEvidence]).ai}),{code:'FACT_QUOTE'});
+});
+
 test('reviewer receives analysis; unsupported analysis triggers one repair and matching second review (<=4 calls)',async()=>{
  const fixed=analysis({overview:'수정된 개요입니다.'});
  const m=scripted([draft(),p=>review(p,{analysis:{status:'unsupported',reviewed:1+1+2+1,issues:[{ref:'overview',reason:'원문에 없는 주장'}]}}),draft({deepAnalysis:fixed}),review]);
@@ -60,7 +68,7 @@ test('limits: v3 budget is higher, reservation precedes calls, old versions unch
  const v3=validateRevision(req()),v2=validateRevision(req({clientVersion:'simple-v2'}));
  const l3=revisionLimits(config,v3),l2=revisionLimits(config,v2);assert.equal(l3.maxCalls,4);assert.equal(l3.calls.length,4);
  assert.ok(l3.calls[1].inputCap>l2.calls[1].inputCap);assert.ok(l3.calls[0].maxOutputTokens>l2.calls[0].maxOutputTokens);assert.ok(reserveRevisionCost(config,v3)>reserveRevisionCost(config,v2));
- assert.ok(minimumRevisionBudget(config,'simple-v3')>minimumRevisionBudget(config));
+ assert.ok(minimumRevisionBudget(config,'simple-v3')>0);assert.ok(minimumRevisionBudget(config,'simple-v3')<reserveRevisionCost(config,v3));
  assert.equal(l2.calls[2].maxOutputBytes,42000);
  assert.throws(()=>revisionLimits({...config,maxInputBytes:20000},validateRevision(req({originalText:'가'.repeat(2500)}))),{code:'INPUT_TOO_LARGE'});
 });
