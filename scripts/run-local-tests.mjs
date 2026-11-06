@@ -16,3 +16,8 @@ import '../tests/notebook-ui.test.mjs';
 import '../tests/simple-engine.test.mjs';
 import '../tests/consent-v2.test.mjs';
 import '../tests/legacy-recovery-ui.test.mjs';
+
+// File-reader tests patch global browser APIs, so run those in a separate process.
+import '../tests/deep-analysis.test.mjs';
+import '../tests/overhaul-edge.test.mjs';
+import '../tests/analysis-ui.test.mjs';
