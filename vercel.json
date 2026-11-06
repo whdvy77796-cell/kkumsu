@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/insosoe.js": {
-      "maxDuration": 240
+      "maxDuration": 540
     },
     "api/payment.js": {
       "maxDuration": 90
