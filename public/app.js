@@ -280,12 +280,18 @@ function revisedDocument(section,r,full){
  const excerpts=legacy?correctionPairs(r.previewDetails).map(x=>x.after).filter(Boolean):[];
  return el('article',{class:'result-paper continuous-paper'},el('div',{class:'document-heading'},el('div',{},p(full?'전체 수정본':'무료로 보는 수정본','eyebrow'),el('h2',{},'다듬은 자기소개서')),el('span',{class:'document-badge'},full?'전체 보기':r.previewLayout==='continuous-v2'?'앞 70% 무료':'이전 미리보기')),p(legacy?'이전에 공개된 수정본의 일부입니다.':'빨간색은 원문과 비교해 달라진 부분이에요. 삭제된 원문은 수정본에 표시되지 않습니다.','edit-legend'),full?el('div',{class:'essay-full'},...inlineEditNodes(section.text,marks)):el('div',{class:'preview-body'},...excerpts.map(x=>el('p',{class:'legacy-excerpt'},x)),...section.segments.map(seg=>seg.kind==='visible'?el('div',{class:'essay-full'},...inlineEditNodes(seg.text,seg.marks)):lockedDocument(seg.lines))));
 }
+function legacyPreviewDetails(r){
+ if(r?.access!=='preview'||r.previewLayout==='continuous-v2'||!r.previewDetails)return null;
+ const d=r.previewDetails,pairs=correctionPairs(d),highlights=Array.isArray(d.highlights)?d.highlights:[];
+ if(!pairs.length&&!highlights.length&&!d.analysisPreview&&!d.note)return null;
+ return el('details',{class:'legacy-details'},el('summary',{},'이전 결과에서 제공된 분석 내용'),d.analysisPreview?p(d.analysisPreview.problem,'legacy-excerpt'):null,...highlights.map(h=>el('p',{class:'legacy-excerpt'},el('strong',{},h.label||labels[h.category]||'살펴본 내용'),': ',h.text)),...pairs.map((x,i)=>el('div',{class:'legacy-original'},p('이전 원문 발췌 '+(i+1),'eyebrow'),p(x.before,'legacy-excerpt'),p('이전 수정문 발췌 '+(i+1),'eyebrow'),p(x.after,'legacy-excerpt'))),d.note?p(d.note,'fineprint'):null);
+}
 function resultPage(){
  const r=S.result;if(!r)return paymentPage();if(!isDeletionRevision(r))return legacyResultPage();const full=r.access==='full';
  const continuous=full?r.revision?.previewVersion==='continuous-v2':r.previewLayout==='continuous-v2';
  // Already-paid older results keep their original deliverables and terms.
  if(full&&!continuous)return legacyResultPage();
- return main(el('section',{class:'workspace result-workspace'},title(full?'자소서 첨삭 완료':'첫 자소서 무료 미리보기',full?'다듬은 자기소개서를 확인하세요.':'자기소개서가 더 선명해졌어요.',full?'제출 전에 경험과 사실관계를 직접 확인한 뒤 복사하거나 저장해 주세요.':continuous?'수정본 앞 70%는 무료로 확인하고, 나머지 30%는 잠금 처리됩니다.':'이전에 만들어진 결과에는 당시의 미리보기 조건이 적용됩니다.'),S.error?note('아직 확인하지 못했어요',S.error,'warning'):null,full?deletionNotice():null,scorePanel(full?r.revision?.scoreCard:r.scoreCard),...r.sections.map(section=>revisedDocument(section,r,full)),!full?purchasePanel():null,full?el('div',{class:'result-actions'},btn('수정본 복사',copyFull),btn('수정본 TXT 저장',downloadFull,'button secondary'),btn('내 입력 지우기',eraseDialog,'text-button danger',S.deletion.state==='working'||S.paymentBusy)):el('div',{class:'button-row'},btn('결제 상태 다시 확인',restore,'button secondary',S.paymentBusy),btn('결과·입력 삭제',eraseDialog,'text-button danger',S.paymentBusy)),p(retentionText(r),'fineprint')));
+ return main(el('section',{class:'workspace result-workspace'},title(full?'자소서 첨삭 완료':'첫 자소서 무료 미리보기',full?'다듬은 자기소개서를 확인하세요.':'자기소개서가 더 선명해졌어요.',full?'제출 전에 경험과 사실관계를 직접 확인한 뒤 복사하거나 저장해 주세요.':continuous?'수정본 앞 70%는 무료로 확인하고, 나머지 30%는 잠금 처리됩니다.':'이전에 만들어진 결과에는 당시의 미리보기 조건이 적용됩니다.'),S.error?note('아직 확인하지 못했어요',S.error,'warning'):null,full?deletionNotice():null,scorePanel(full?r.revision?.scoreCard:r.scoreCard),...r.sections.map(section=>revisedDocument(section,r,full)),legacyPreviewDetails(r),!full?purchasePanel():null,full?el('div',{class:'result-actions'},btn('수정본 복사',copyFull),btn('수정본 TXT 저장',downloadFull,'button secondary'),btn('내 입력 지우기',eraseDialog,'text-button danger',S.deletion.state==='working'||S.paymentBusy)):el('div',{class:'button-row'},btn('결제 상태 다시 확인',restore,'button secondary',S.paymentBusy),btn('결과·입력 삭제',eraseDialog,'text-button danger',S.paymentBusy)),p(retentionText(r),'fineprint')));
 }
 function fullAnalysis(r){
  const a=r.revision?.deepAnalysis;if(!a||typeof a.overview!=='string')return null;
