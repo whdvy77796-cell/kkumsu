@@ -25,3 +25,6 @@ import '../tests/analysis-ui.test.mjs';
 import '../tests/long-request.test.mjs';
 
 import '../tests/staged-budget.test.mjs';
+
+import "../tests/continuous-v4.test.mjs";
+import "../tests/continuous-ui.test.mjs";
