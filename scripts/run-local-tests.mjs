@@ -10,6 +10,9 @@ import '../tests/revision-v4.test.mjs';
 import '../tests/integration-v4.test.mjs';
 
 import '../tests/simple-payment.test.mjs';
+import '../tests/notebook-payment.test.mjs';
+import '../tests/notebook-diff.test.mjs';
+import '../tests/notebook-ui.test.mjs';
 import '../tests/simple-engine.test.mjs';
 import '../tests/consent-v2.test.mjs';
 import '../tests/legacy-recovery-ui.test.mjs';
