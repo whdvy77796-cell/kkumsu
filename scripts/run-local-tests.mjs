@@ -8,3 +8,6 @@ import '../tests/ops-v3.test.mjs';
 
 import '../tests/revision-v4.test.mjs';
 import '../tests/integration-v4.test.mjs';
+
+import '../tests/simple-payment.test.mjs';
+import '../tests/simple-engine.test.mjs';
