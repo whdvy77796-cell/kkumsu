@@ -1,0 +1,136 @@
+{
+  "checkedAt": "2026-11-06T01:30:11.292Z",
+  "commit": "8ec4375",
+  "url": "https://kkumsu-git-insosoe-v3-kkkkkum.vercel.app",
+  "appMatchesLocal": true,
+  "originConfigured": true,
+  "headers": {
+    "content-security-policy": "default-src 'self'; script-src 'self' https://js.tosspayments.com; style-src 'self'; img-src 'self' data: https://*.tosspayments.com; connect-src 'self' https://*.tosspayments.com; frame-src https://*.tosspayments.com; font-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://*.tosspayments.com",
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "no-referrer",
+    "permissions-policy": "camera=(), microphone=(), geolocation=()"
+  },
+  "scope": "Reused earlier fixed fictional AI result; no new model call",
+  "replay": {
+    "status": 200,
+    "data": {
+      "scope": "FIXED_SYNTHETIC_REPLAY_NO_NEW_AI",
+      "result": {
+        "source": "ai",
+        "resultId": "64a3ea06-20eb-48be-8210-20a55a4db5cd",
+        "access": "preview",
+        "sections": [
+          {
+            "id": "p1",
+            "heading": "고객 응대 경험에서 본인이 한 행동과 판단을 설명해주세요.",
+            "charLimit": 350,
+            "charCount": 283,
+            "segments": [
+              {
+                "kind": "visible",
+                "text": "저는 손님의 말을 기억만으로 단정하지 않고"
+              },
+              {
+                "kind": "locked",
+                "lines": 3
+              },
+              {
+                "kind": "visible",
+                "text": " 생길 수 있다고 보았기 때문입니다. 확인"
+              },
+              {
+                "kind": "locked",
+                "lines": 2
+              },
+              {
+                "kind": "visible",
+                "text": "일하면 음료 제조와 고객 서비스에서 주문 "
+              },
+              {
+                "kind": "locked",
+                "lines": 1
+              }
+            ]
+          }
+        ],
+        "quality": {
+          "checks": [
+            {
+              "label": "서버 작성·검수 절차",
+              "status": "completed"
+            },
+            {
+              "label": "제출 전 본인 사실 확인",
+              "status": "required"
+            }
+          ]
+        },
+        "note": "고정된 일부 문장만 공개됩니다. 전문 1건 열람은 3,000원이며 합격을 보장하지 않습니다.",
+        "freeAvailable": false,
+        "purchase": {
+          "amount": 3000,
+          "currency": "KRW",
+          "ready": false,
+          "mode": "disabled",
+          "disabledReason": "결제 설정·사업자·지원 체계·정산 확인 작업이 준비되지 않았습니다.",
+          "state": "available",
+          "canRetry": false,
+          "confirmationPending": false,
+          "pendingUntil": null,
+          "confirmationRetry": "same-order-only",
+          "expiresAt": "2026-11-07T01:30:11.699Z",
+          "orderName": "인소서 자기소개서 전문 1건"
+        }
+      },
+      "additionalModelCalls": 0,
+      "reservedCostMicros": 0
+    }
+  },
+  "ordinaryRead": {
+    "status": 200,
+    "access": "preview",
+    "hasFullSectionText": false,
+    "hasSources": false,
+    "hasPrivateReview": false,
+    "visibleChars": [
+      69
+    ],
+    "charCounts": [
+      283
+    ],
+    "purchase": {
+      "amount": 3000,
+      "currency": "KRW",
+      "ready": false,
+      "mode": "disabled",
+      "disabledReason": "결제 설정·사업자·지원 체계·정산 확인 작업이 준비되지 않았습니다.",
+      "state": "available",
+      "canRetry": false,
+      "confirmationPending": false,
+      "pendingUntil": null,
+      "confirmationRetry": "same-order-only",
+      "expiresAt": "2026-11-07T01:30:11.699Z",
+      "orderName": "인소서 자기소개서 전문 1건"
+    }
+  },
+  "browser": {
+    "ordinaryRestoreButton": true,
+    "copyDisabled": true,
+    "saveDisabled": true,
+    "purchaseDisabled": true,
+    "termsPage": "https://kkumsu-git-insosoe-v3-kkkkkum.vercel.app/terms.html",
+    "privacyPage": "https://kkumsu-git-insosoe-v3-kkkkkum.vercel.app/privacy.html",
+    "legalFieldsNotReady": true
+  },
+  "staticReview": {
+    "scope": [
+      "lib/payments.mjs",
+      "lib/payment-store.mjs",
+      "api/payment.js"
+    ],
+    "criticalFinding": false,
+    "limits": "Static review only; no provider invocation, tests or whole-project security audit."
+  }
+}

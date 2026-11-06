@@ -11,9 +11,6 @@
     },
     "api/payment-reconcile.js": {
       "maxDuration": 90
-    },
-    "api/qa-upgrade.js": {
-      "maxDuration": 240
     }
   },
   "headers": [
