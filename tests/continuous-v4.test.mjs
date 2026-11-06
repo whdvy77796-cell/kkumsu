@@ -6,6 +6,7 @@ import {validateRevision,revisionLimits,reserveRevisionCost,reserveRevisionStage
 import {minimumRevisionBudget,measuredRevisionCost} from '../lib/revision-api.mjs';
 import {RevisionStore} from '../lib/revision-store.mjs';
 import {PaymentService} from '../lib/payments.mjs';
+import {settings} from '../lib/core.mjs';
 import {MockRedis} from './mock-redis.mjs';
 
 // Every example in this file is fictional. No live AI, payment or user text is used.
@@ -80,4 +81,12 @@ test('v4 safely discards unrequested model notes before independently reviewing 
  const bad={...draft(),changes:[{category:'not-a-real-category',before:'fictional'}],diagnosis:[{category:'not-a-real-category',problem:'fictional',suggestion:'fictional'}],warnings:{unexpected:'untrusted'}};
  const m=scripted([bad,review]),out=await runRevision(config,req(),{ai:m.ai});
  assert.equal(m.calls.length,2);assert.equal(out.sections[0].text,rewritten);assert.deepEqual(out.revision.changes,[]);assert.deepEqual(out.revision.diagnosis,[]);assert.ok(!JSON.stringify(out).includes('not-a-real-category'));
+});
+
+test('mock approval unlocks the complete new essay and edit marks, never before approval',async()=>{
+ const now=()=>Date.parse('2026-11-06T08:00:00Z'),db=new MockRedis(now),env={OPENROUTER_API_KEY:'fake-unit-key',SESSION_SECRET:'fake-session-secret-at-least-32-chars',UPSTASH_REDIS_REST_URL:'https://redis.test',UPSTASH_REDIS_REST_TOKEN:'mock',APP_ORIGIN:'https://site.test',PAYMENT_MODE:'test',PAYMENT_READY:'true',TOSS_CLIENT_KEY:'test_ck_fakeunitkey',TOSS_SECRET_KEY:'test_sk_fakeunitkey',TOSS_MERCHANT_ID:'unitmid',NODE_ENV:'development'};
+ const c=settings(env);let state='IN_PROGRESS',orderId;const fetcher=async(url)=>{if(url.endsWith('/confirm'))state='DONE';return new Response(JSON.stringify({mId:'unitmid',orderId,paymentKey:'unit-payment-reference',totalAmount:3000,balanceAmount:3000,currency:'KRW',type:'NORMAL',method:'카드',status:state,approvedAt:state==='DONE'?new Date(now()).toISOString():null}));};
+ const service=new PaymentService(c,db,{now,fetcher,uuid:randomUUID}),f=stored(),preview=await service.saveGeneratedResult('mock-owner',randomUUID(),f);
+ assert.equal(preview.access,'preview');assert.ok(!JSON.stringify(preview).includes(marker));const order=await service.createOrder('mock-owner',preview.resultId,{termsAccepted:true,immediateDeliveryAccepted:true});orderId=order.orderId;assert.equal(order.amount,3000);
+ const full=await service.confirm('mock-owner',{orderId,paymentKey:'unit-payment-reference',amount:3000});assert.equal(full.access,'full');assert.equal(full.sections[0].text,f.sections[0].text);assert.deepEqual(full.revision.inlineEditRanges,f.revision.inlineEditRanges);assert.equal(full.revision.scoreCard.original.total,62);assert.equal(full.recoveryCode,undefined);
 });
