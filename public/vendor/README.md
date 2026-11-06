@@ -3,16 +3,18 @@
 모두 npm 공식 레지스트리의 공식 tarball 에서 가져왔고, tarball 의 SHA-1(npm `shasum`)을 레지스트리 값과 대조했다.
 런타임에 외부 URL을 요청하지 않는다(CDN/원격 워커 없음).
 
-## PDF.js (pdfjs-dist) 6.5.438 : Apache-2.0
-- 출처: https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-6.5.438.tgz (소스 저장소 https://github.com/mozilla/pdf.js)
-- tarball sha1   : e7f8986ec4ea04057b5d9d2f0e5b63ea94d2303f
-- tarball sha512 : sha512-vg8Pw1x+AFKy4AMDvhuWl5cOYV8d698UoEANoFFhc79hqXDnZQqnOXoxw3HG907WHOg1JYOvLhP756boddFxpA==
-- 포함 파일(package/build/ 및 package/cmaps/ 에서 복사):
-  - pdfjs/pdf.min.mjs            sha256 3a88402882cfa3e7e72c2c9b5149f52f0f88baf1c5b62aa11a41abdbc2072440 (474,284 B)
-  - pdfjs/pdf.worker.min.mjs     sha256 1e64c8240e54735ec5913b37acd5134747799cb8c6bb3777c70adbc01232d2aa (1,271,915 B)
-  - pdfjs/cmaps/                 한국어 관련 CMap 만(KSC*, UniKS*, Adobe-Korea1*) + cmaps/LICENSE (Adobe CMap 라이선스)
+## PDF.js (pdfjs-dist) 5.4.530 : Apache-2.0
+- 출처: https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-5.4.530.tgz (소스 저장소 https://github.com/mozilla/pdf.js)
+- tarball sha1   : 9dedae2a9fa61cfe804af6bc06e7a7d1f05126ba
+- tarball sha512 : sha512-r1hWsSIGGmyYUAHR26zSXkxYWLXLMd6AwqcaFYG9YUZ0GBf5GvcjJSeo512tabM4GYFhxhl5pMCmPr7Q72Rq2Q==  (npm integrity, 레지스트리 값과 일치 확인)
+- 선택 이유(2026-11-06): 6.5.438 은 번들 안에서 Promise.try 를 폴리필 없이 호출해 Node 22(V8 12.4)에서 "Promise.try is not a function" 으로 실패했다. 5.4.530 의 main/worker 는 `typeof Promise.try`·`Math.sumPrecise`·`Uint8Array.fromBase64/toBase64` 를 가드·폴리필한다(5.4.394~5.4.530 에서 확인, 5.4.624 부터 Promise.try 폴리필 제거). CVE-2024-4367 수정(4.2.67)보다 새 버전이다. engines: node >=20.16.0 || >=22.3.0.
+- 포함 파일(package/build/ 및 package/cmaps/ 에서 복사. main 과 worker 는 같은 버전):
+  - pdfjs/pdf.min.mjs            sha256 9bf7819e37acc02ddff252e0253e1839e3a7b8085e9e36f85186d067c004e8ae (426,619 B)
+  - pdfjs/pdf.worker.min.mjs     sha256 e833e0e7445b975c6f678c1294f2a8dfd47c0bb16634582945e0280b1f1c544a (1,072,841 B)
+  - pdfjs/cmaps/                 한국어 관련 CMap 만(KSC*, UniKS*, Adobe-Korea1*) + cmaps/LICENSE (Adobe CMap 라이선스, sha256 aa92ab5a472974865a96fd4a4e9c13bb41bf6fe1b309cb6b8da48bc9e19839a2)
   - pdfjs/LICENSE (Apache-2.0)   sha256 0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594
   - pdfjs/package.json (버전·라이선스 표기용)
+- 주의: Node 에서 비-legacy 빌드는 로드 시 DOMMatrix 를 참조한다(브라우저는 문제 없음). 테스트(tests/file-reader.test.mjs)는 자리표시자를 둔다. 브라우저 전용 모듈이므로 앱 코드는 영향 없음.
 
 ## mammoth 1.13.0 : BSD-2-Clause
 - 출처: https://registry.npmjs.org/mammoth/-/mammoth-1.13.0.tgz (소스 저장소 https://github.com/mwilliamson/mammoth.js)

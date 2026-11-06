@@ -14,6 +14,10 @@ globalThis.fetch = (...a) => { netCalls.push(['fetch', String(a[0])]); return Pr
 globalThis.XMLHttpRequest = class { constructor() { netCalls.push(['xhr']); } };
 globalThis.WebSocket = class { constructor() { netCalls.push(['ws']); } };
 
+// pdfjs-dist 5.x 의 비-legacy 빌드는 로드 시점에 DOMMatrix 를 참조한다(브라우저에는 있음).
+// 텍스트 추출에는 렌더링이 필요 없으므로 Node 시험에서만 자리표시자로 둔다.
+globalThis.DOMMatrix ??= class DOMMatrix {};
+
 // Node 에는 브라우저 <script> 가 없으므로 같은 vendor 번들을 직접 평가한다(브라우저에서는 script 태그로 로드).
 globalThis.self = globalThis;
 vm.runInThisContext(fs.readFileSync(path.join(root, 'public/vendor/mammoth/mammoth.browser.min.js'), 'utf8'));

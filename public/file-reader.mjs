@@ -8,7 +8,7 @@
 // 거부: 구형 HWP/DOC, 스캔(텍스트 없음) PDF, 암호화, 손상 파일, 너무 큰 파일, ZIP 폭탄 의심 파일
 //
 // 라이브러리(모두 이 폴더 아래 same-origin 자체 호스팅, 원격 CDN/워커 없음):
-//   ./vendor/pdfjs/    PDF.js 6.5.438 (Apache-2.0)
+//   ./vendor/pdfjs/    PDF.js 5.4.530 (Apache-2.0)
 //   ./vendor/mammoth/  mammoth 1.13.0 (BSD-2-Clause)
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
