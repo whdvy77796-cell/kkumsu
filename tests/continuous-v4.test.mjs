@@ -75,3 +75,9 @@ test('score projections only expose validated numbers and omit arbitrary fields'
  const p=service(),f=stored();f.revision.scoreCard.original.secret=marker;f.revision.scoreCard.revised.breakdown.extra=marker;
  const out=await p.saveGeneratedResult('sid-two',randomUUID(),f);assert.ok(!JSON.stringify(out).includes(marker));assert.equal(out.scoreCard.original.secret,undefined);assert.equal(out.scoreCard.revised.breakdown.extra,undefined);
 });
+
+test('v4 safely discards unrequested model notes before independently reviewing the full text',async()=>{
+ const bad={...draft(),changes:[{category:'not-a-real-category',before:'fictional'}],diagnosis:[{category:'not-a-real-category',problem:'fictional',suggestion:'fictional'}],warnings:{unexpected:'untrusted'}};
+ const m=scripted([bad,review]),out=await runRevision(config,req(),{ai:m.ai});
+ assert.equal(m.calls.length,2);assert.equal(out.sections[0].text,rewritten);assert.deepEqual(out.revision.changes,[]);assert.deepEqual(out.revision.diagnosis,[]);assert.ok(!JSON.stringify(out).includes('not-a-real-category'));
+});
