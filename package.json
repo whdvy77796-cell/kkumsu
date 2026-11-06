@@ -1,6 +1,6 @@
 {
-  "name": "insosoe-v3",
-  "version": "3.0.0",
+  "name": "insosoe-revision",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "engines": {
