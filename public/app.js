@@ -276,8 +276,9 @@ function inlineEditNodes(value,ranges){
 }
 function lockedDocument(lines){return el('div',{class:'document-locked'},el('div',{class:'locked-fade','aria-hidden':'true'},...Array.from({length:Math.max(2,Math.min(6,Number(lines)||3))},(_,i)=>el('div',{class:'locked-fake-line'+(i===2?' short':'')}))),el('div',{class:'locked-message'},el('strong',{},'나머지 수정본은 잠겨 있어요'),p('잠긴 글은 미리보기로 전송되지 않습니다.','fineprint')));}
 function revisedDocument(section,r,full){
- const marks=full?r.revision?.inlineEditRanges:null;
- return el('article',{class:'result-paper continuous-paper'},el('div',{class:'document-heading'},el('div',{},p(full?'전체 수정본':'무료로 보는 수정본','eyebrow'),el('h2',{},'다듬은 자기소개서')),el('span',{class:'document-badge'},full?'전체 보기':r.previewLayout==='continuous-v2'?'앞 70% 무료':'이전 미리보기')),p('빨간색은 원문과 비교해 달라진 부분이에요. 삭제된 원문은 수정본에 표시되지 않습니다.','edit-legend'),full?el('div',{class:'essay-full'},...inlineEditNodes(section.text,marks)):el('div',{class:'preview-body'},...section.segments.map(seg=>seg.kind==='visible'?el('div',{class:'essay-full'},...inlineEditNodes(seg.text,seg.marks)):lockedDocument(seg.lines))));
+ const marks=full?r.revision?.inlineEditRanges:null,legacy=!full&&r.previewLayout!=='continuous-v2';
+ const excerpts=legacy?correctionPairs(r.previewDetails).map(x=>x.after).filter(Boolean):[];
+ return el('article',{class:'result-paper continuous-paper'},el('div',{class:'document-heading'},el('div',{},p(full?'전체 수정본':'무료로 보는 수정본','eyebrow'),el('h2',{},'다듬은 자기소개서')),el('span',{class:'document-badge'},full?'전체 보기':r.previewLayout==='continuous-v2'?'앞 70% 무료':'이전 미리보기')),p(legacy?'이전에 공개된 수정본의 일부입니다.':'빨간색은 원문과 비교해 달라진 부분이에요. 삭제된 원문은 수정본에 표시되지 않습니다.','edit-legend'),full?el('div',{class:'essay-full'},...inlineEditNodes(section.text,marks)):el('div',{class:'preview-body'},...excerpts.map(x=>el('p',{class:'legacy-excerpt'},x)),...section.segments.map(seg=>seg.kind==='visible'?el('div',{class:'essay-full'},...inlineEditNodes(seg.text,seg.marks)):lockedDocument(seg.lines))));
 }
 function resultPage(){
  const r=S.result;if(!r)return paymentPage();if(!isDeletionRevision(r))return legacyResultPage();const full=r.access==='full';
