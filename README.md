@@ -19,3 +19,6 @@ Production: https://www.kkumsu.com/ (승인 전 변경 금지)
 테스트: node --test 또는 제한된 로컬 환경에서 scripts/run-local-tests.mjs를 절대 file URL로 import합니다.
 
 V4_CONTRACT.md, UPGRADE_CONTRACT.md 및 tests/last-run-v4.txt는 과거 버전 기록입니다.
+
+## Claude·삭제 안내와 동의 개편
+현재 Preview 설정은 OpenRouter를 통해 Claude 모델을 사용합니다. 모델·중계업체는 서버 상태를 기준으로 표시하며, 실제 하위 처리업체·국외 처리 조건은 출시 전 확인이 필요합니다. 전문 표시 후 서비스 DB 콘텐츠·재시도 캐시 삭제 요청과 확인을 안내하고, 외부 AI·백업·로그·거래기록은 별개입니다. 새 화면에서는 AI 전송 동의만 체크하고 나머지는 신청 전 표시합니다. 결제 전 별도 법정 고지와 동의는 유지합니다.
