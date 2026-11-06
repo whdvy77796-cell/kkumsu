@@ -32,7 +32,7 @@ test('v4 expert prompt rewrites one complete essay and ignores unprovided contex
  const d=validateRevision(req({organization:'가상회사',role:'가상직무',prompt:'가상의 별도 문항입니다',limit:300,clarificationRound:1,clarifications:[{question:'q',answer:'a'}]}));
  assert.equal(d.prompt,'');assert.equal(d.organization,'');assert.equal(d.role,'');assert.equal(d.limit,null);assert.deepEqual(d.clarifications,[]);
  const m=scripted([draft(),review]),out=await runRevision(config,req(),{ai:m.ai});assert.equal(m.calls.length,2);
- for(const phrase of ['당신은 취업 자기소개서 첨삭 전문가입니다','추가 질문 없이 제공된 내용만으로','원문에 없는 경험, 성과, 숫자, 자격증'])assert.ok(m.calls[0].system.includes(phrase));
+ for(const phrase of ['당신은 취업 자기소개서 첨삭 전문가입니다','추가 질문 없이 제공된 내용만으로','원문에 없는 경험, 성과, 숫자, 자격증','숫자와 단위는 쉼표·소수점·기호까지 원문 표기대로 보존'])assert.ok(m.calls[0].system.includes(phrase));
  assert.equal(m.calls[0].payload.prompt,undefined);assert.equal(out.sections[0].text,rewritten);assert.equal(out.revision.previewVersion,'continuous-v2');
  assert.equal(out.revision.scoreCard.original.total,62);assert.equal(out.revision.scoreCard.revised.total,66);assert.ok(out.revision.inlineEditRanges.length>0);
 });
