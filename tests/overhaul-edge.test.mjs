@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {validateRevision,revisionLimits,reserveRevisionCost,runRevision} from '../lib/revision.mjs';
+const cfg={maxInputBytes:80000,inputRate:3,outputRate:15,provider:'mock-provider',model:'mock-model'};
+const common={action:'revise',requestId:'12345678-1234-4234-8234-123456789abc',product:'free',consent:true,offerVersion:'v4-revision-3000',clientVersion:'simple-v3',consentProvider:'mock-provider',consentModel:'mock-model'};
+const sample='저는 가상의 학급 행사를 기획하고 홍보했습니다. 판매 수량은 OOO건이며 [수치]의 성과를 기록했습니다.';
+const quote='행사를 기획하고 홍보했습니다';
+const a={overview:'행사의 역할은 보이지만 결과의 수치는 확인이 필요합니다.',strengths:[{quote,comment:'본인이 한 일이 드러납니다.'}],improvements:[{priority:'high',quote:'OOO건',problem:'구체적인 수치가 비어 있어 확인이 필요합니다.',suggestion:'실제 자료를 확인한 뒤 작성해 주세요.'}],questions:[{quote:'OOO건',question:'실제 수량을 확인해 주세요.'}]};
+function responder(newPlaceholder=false){let n=0;return {get calls(){return n},ai:async(_s,p)=>{n++;if(n%2){return {status:'ready',text:newPlaceholder?sample.replace('OOO건','[회사명]'):sample,changes:[],diagnosis:[],warnings:[],deepAnalysis:a};}const e=[{sourceId:'original',quote}];return {candidateDigest:createHash('sha256').update(JSON.stringify([p.candidate.text,p.candidate.deepAnalysis])).digest('hex'),checks:['fit','evidence','agency','causality','numbers','naturalness','length'].map(key=>({key,status:'pass',reason:'원문과 대조했습니다.',quote,evidence:e})),claims:[{quote,status:'supported',evidence:e,reason:'원문에 있습니다.'}],analysis:{status:'supported',reviewed:4,issues:[]}};}};}
+test('advertised 6000-character Korean and emoji originals pass preflight under the configured 80KB cap',()=>{for(const s of ['가'.repeat(6000),'😀'.repeat(6000)]){const d=validateRevision({...common,originalText:s});assert.equal(revisionLimits(cfg,d).maxCalls,4);assert.ok(reserveRevisionCost(cfg,d)>0);}});
+test('original redactions remain unfilled and prompt a user confirmation warning',async()=>{const m=responder();const r=await runRevision(cfg,{...common,originalText:sample},{ai:m.ai});assert.ok(r.sections[0].text.includes('OOO건'));assert.ok(r.sections[0].text.includes('[수치]'));assert.ok(r.revision.warnings.some(x=>x.includes('비워 둔 표시')));assert.equal(m.calls,2);});
+test('new placeholders not in the source are rejected after repair',async()=>{const m=responder(true);await assert.rejects(()=>runRevision(cfg,{...common,originalText:sample},{ai:m.ai}),{code:'REVISION_UNSAFE'});assert.equal(m.calls,4);});
+
+test('cancellation before an AI call prevents all model calls',async()=>{const m=responder();await assert.rejects(()=>runRevision(cfg,{...common,originalText:sample},{ai:m.ai,beforeCall:()=>{throw Object.assign(new Error('cancelled'),{code:'REQUEST_CANCELLED'});}}),{code:'REQUEST_CANCELLED'});assert.equal(m.calls,0);});
+
+test('cancel after first draft avoids the second AI call',async()=>{const m=responder();let checks=0;await assert.rejects(()=>runRevision(cfg,{...common,originalText:sample},{ai:m.ai,beforeCall:()=>{if(++checks===2)throw Object.assign(new Error('cancelled'),{code:'REQUEST_CANCELLED'});}}),{code:'REQUEST_CANCELLED'});assert.equal(m.calls,1);});
+test('free teaser is omitted when the issue repeats a hidden original-only span',async()=>{const m=responder();const old=m.ai;m.ai=async(s,p)=>{const out=await old(s,p);if(out.status==='ready'){out.text=sample.replace('가상의 학급 ','');out.deepAnalysis={...a,improvements:[{priority:'high',quote:'OOO건',problem:'가상의 학급 행사를 기획한 부분의 결과가 모호합니다.',suggestion:'실제 자료를 확인해 주세요.'}]};}return out;};const result=await runRevision(cfg,{...common,originalText:sample},{ai:m.ai});assert.equal(result.revision.publicTeaser,undefined);});
