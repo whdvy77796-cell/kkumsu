@@ -1,0 +1,4 @@
+data/
+tests/.tmp-data-*/
+node_modules/
+dist/
