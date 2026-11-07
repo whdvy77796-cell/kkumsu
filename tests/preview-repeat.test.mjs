@@ -7,6 +7,7 @@ import {RESERVE} from '../lib/store.mjs';
 import {SAVE_RESULT} from '../lib/payment-store.mjs';
 import {PaymentService} from '../lib/payments.mjs';
 import {MockRedis} from './mock-redis.mjs';
+import {validateRevision,revisionLimits,runRevision} from '../lib/revision.mjs';
 
 // Synthetic data only: no user essay, live AI, real payment, or remote datastore.
 const origin='https://kkumsu-git-insosoe-staged-safety-20261107-kkkkkum.vercel.app';
@@ -40,4 +41,12 @@ test('normal and production environments continue rejecting a second successful 
  for(const cfg of [config({env:{...safeEnv,VERCEL_ENV:'production'}}),config({env:{...safeEnv,VERCEL_GIT_COMMIT_REF:'insosoe-analysis-qa-20261106'}}),config({env:{...safeEnv,PAYMENT_MODE:'test'}})]){
   const {pay}=service(cfg),owner='fake-owner';await pay.saveGeneratedResult(owner,randomUUID(),full());await assert.rejects(()=>pay.saveGeneratedResult(owner,randomUUID(),full()),e=>e.code==='FREE_ALREADY_USED');
  }
+});
+
+test('V4 review cap safely bounds escaped characters and supplementary Unicode',async()=>{
+ const cfg={maxInputBytes:80000,inputRate:3,outputRate:15,provider:'mock',model:'mock'},source='가상 안내문을 만들었습니다. '+('😀"\\\n\t가'.repeat(680));
+ const body={action:'revise',requestId:randomUUID(),product:'free',consent:true,consentProvider:'mock',consentModel:'mock',offerVersion:'v4-revision-3000',clientVersion:'simple-v4',originalText:source};
+ const d=validateRevision(body),limits=revisionLimits(cfg,d),quote='가상 안내문',evidence=[{sourceId:'original',quote}];let calls=0;
+ const ai=async(system,payload)=>{calls++;assert.ok(Buffer.byteLength(system+JSON.stringify(payload))<=limits.calls[calls-1].inputCap);if(calls===1)return {status:'ready',text:source,changes:[],diagnosis:[],warnings:[]};return {candidateDigest:payload.candidateDigest,checks:['fit','evidence','agency','causality','numbers','naturalness','length'].map(key=>({key,status:'pass',reason:'원문과 대조했습니다.',quote,evidence})),claims:[{quote,status:'supported',reason:'원문에 있습니다.',evidence}]};};
+ const out=await runRevision(cfg,body,{ai});assert.equal(calls,2);assert.equal(out.sections[0].text,source);
 });
