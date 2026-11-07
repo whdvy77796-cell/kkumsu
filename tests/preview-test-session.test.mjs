@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {isolatedPreviewTestSid} from '../lib/preview-test-session.mjs';
+const origin='https://kkumsu-git-insosoe-staged-safety-20261107-kkkkkum.vercel.app';
+const token=(Date.now()+600000)+'.12345678-1234-4234-8234-123456789abc';
+const env={VERCEL:'1',VERCEL_ENV:'preview',VERCEL_GIT_PROVIDER:'github',VERCEL_GIT_REPO_OWNER:'whdvy77796-cell',VERCEL_GIT_REPO_SLUG:'kkumsu',VERCEL_GIT_COMMIT_REF:'insosoe-staged-safety-20261107',PAYMENT_MODE:'disabled',INSOSOE_PREVIEW_UNLIMITED_BUDGET:'1',INSOSOE_PREVIEW_TEST_TOKEN:token};
+const config=(e=env,o=origin)=>({env:e,origin:o,secret:'only-a-synthetic-test-secret-at-least-32-chars'});
+test('isolated preview test has a stable separate synthetic identity',()=>{const req={headers:{'x-insosoe-preview-test':token}},one=isolatedPreviewTestSid(req,config());assert.equal(one,isolatedPreviewTestSid(req,config()));assert.match(one,/^[a-f0-9]{64}$/);assert.ok(!one.includes(token));assert.equal(isolatedPreviewTestSid({headers:{}},config()),null);});
+test('invalid, expired and out-of-scope test headers fail closed',()=>{const req=v=>({headers:{'x-insosoe-preview-test':v}});for(const [v,e,o] of [[token+'x',env,origin],[token,{...env,VERCEL_ENV:'production'},origin],[token,{...env,VERCEL_GIT_COMMIT_REF:'main'},origin],[token,{...env,PAYMENT_MODE:'live'},origin],[token,{...env,INSOSOE_PREVIEW_UNLIMITED_BUDGET:undefined},origin],[token,{...env,INSOSOE_PREVIEW_TEST_TOKEN:undefined},origin],[token,env,'https://www.kkumsu.com']])assert.throws(()=>isolatedPreviewTestSid(req(v),config(e,o)),{code:'TEST_SESSION_DENIED'});const expired=(Date.now()-1)+'.12345678-1234-4234-8234-123456789abc';assert.throws(()=>isolatedPreviewTestSid(req(expired),config({...env,INSOSOE_PREVIEW_TEST_TOKEN:expired})),{code:'TEST_SESSION_DENIED'});});
