@@ -2,7 +2,7 @@
 //
 // 계약:  const { text, warnings } = await readEssayFile(file)
 //   - file: File/Blob. 이름·내용은 어디로도 전송하지 않는다 (네트워크 API 사용 없음).
-//   - 반환: { text: string, warnings: string[] }  (text 는 절대 6000자에서 자르지 않는다)
+//   - 반환: { text: string, warnings: string[] }  (text 는 절대 100000자에서 자르지 않는다)
 //   - 실패: FileReaderError(message 는 사용자에게 바로 보여줄 수 있는 한국어) 를 throw
 // 지원: TXT(UTF-8/UTF-16 BOM/검증된 EUC-KR), 텍스트 층이 있는 PDF, DOCX, HWPX(제한적)
 // 거부: 구형 HWP/DOC, 스캔(텍스트 없음) PDF, 암호화, 손상 파일, 너무 큰 파일, ZIP 폭탄 의심 파일
@@ -11,19 +11,19 @@
 //   ./vendor/pdfjs/    PDF.js 5.4.530 (Apache-2.0)
 //   ./vendor/mammoth/  mammoth 1.13.0 (BSD-2-Clause)
 
-export const MAX_FILE_BYTES = 5 * 1024 * 1024;
-export const MAX_ESSAY_CHARS = 6000; // 앱의 입력 한도. 넘어도 자르지 않고 경고만 한다.
+export const MAX_FILE_BYTES = 50 * 1024 * 1024;
+export const MAX_ESSAY_CHARS = 100000; // 앱의 입력 한도. 넘어도 자르지 않고 경고만 한다.
 export const LIMITS = Object.freeze({
   maxFileBytes: MAX_FILE_BYTES,
-  maxExtractedChars: 100000, // 이보다 길면 에세이가 아니라고 보고 거부
-  maxPdfPages: 20,
+  maxExtractedChars: 100000, // 코드포인트 기준. 초과 시 자동으로 자르지 않고 안내
+  maxPdfPages: 100,
   maxZipEntries: 200,
-  maxZipEntryBytes: 20 * 1024 * 1024,
-  maxZipTotalBytes: 30 * 1024 * 1024,
+  maxZipEntryBytes: 50 * 1024 * 1024,
+  maxZipTotalBytes: 100 * 1024 * 1024,
   maxZipRatio: 200, // 1MB 초과 항목의 압축비 상한
-  maxXmlPartBytes: 8 * 1024 * 1024,
-  maxHwpxSections: 50,
-  timeoutMs: 20000,
+  maxXmlPartBytes: 20 * 1024 * 1024,
+  maxHwpxSections: 100,
+  timeoutMs: 60000,
 });
 
 export class FileReaderError extends Error {
@@ -37,7 +37,7 @@ const fail = (code, message) => new FileReaderError(message, code);
 
 const MSG = {
   empty: '파일이 비어 있어요.',
-  tooBig: '파일이 너무 커요. 5MB 이하 파일만 읽을 수 있어요.',
+  tooBig: '파일이 너무 커요. 50MB 이하 파일만 읽을 수 있어요.',
   hwp: '구형 한글(.hwp) 파일은 읽을 수 없어요. 한글에서 "다른 이름으로 저장"으로 .hwpx 또는 .docx, .txt로 저장하거나, 내용을 복사해 붙여넣어 주세요.',
   doc: '구형 워드(.doc) 파일은 읽을 수 없어요. .docx 또는 .txt로 다시 저장하거나, 내용을 복사해 붙여넣어 주세요.',
   encrypted: '암호가 걸린 파일은 읽을 수 없어요. 암호를 해제한 파일을 올리거나, 내용을 복사해 붙여넣어 주세요.',
@@ -47,7 +47,7 @@ const MSG = {
   scanned: '이 PDF에서 글자를 찾지 못했어요. 스캔본이나 이미지로 된 PDF일 수 있어요. 이 도구는 이미지 속 글자를 인식(OCR)하지 않으니, 글자를 복사해 붙여넣어 주세요.',
   noText: '파일에서 읽을 수 있는 글자를 찾지 못했어요.',
   timeout: '파일을 읽는 데 너무 오래 걸려 중단했어요. 더 작거나 단순한 파일로 시도해 주세요.',
-  tooLong: '파일의 글자 수가 너무 많아요. 자기소개서 한 문항 분량의 파일을 올려 주세요.',
+  tooLong: '파일에서 읽은 글이 100,000자를 넘어요. 내용을 자르지 않았으며, 나눠서 이용해 주세요.',
   tooManyPages: (n, max) => `PDF가 ${n}쪽이라 너무 길어요. ${max}쪽 이하의 PDF만 읽을 수 있어요. (일부만 읽지 않도록 전체를 거부해요.)`,
   encoding: 'TXT 파일의 글자 인코딩을 확실하게 확인하지 못했어요. UTF-8 또는 EUC-KR(한글 윈도우 메모장 ANSI) 형식으로 저장해 다시 올리거나, 내용을 복사해 붙여넣어 주세요.',
   copyBlocked: '이 PDF는 작성자가 내용 복사를 제한해 두어서 읽지 않았어요. 내용을 직접 붙여넣어 주세요.',
@@ -88,17 +88,17 @@ function normalizeText(raw) {
     .replace(/[\u2028\u2029]/g, '\n')
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
     .replace(/[\u200B\u200C\u200D\u2060\uFEFF\u00AD]/g, '')
-    .replace(/[ \t\u00A0]+\n/g, '\n')
+    .replace(/[ \t\u00A0]+/g, (spaces, offset, value) => value[offset + spaces.length] === '\n' ? '' : spaces)
     .replace(/\n{3,}/g, '\n\n');
   return t.trim();
 }
 
-// 최종 출력 공통 처리: 길이 검증·경고. 6000자를 넘어도 자르지 않는다.
+// 최종 출력 공통 처리: 길이 검증·경고. 100000자를 넘어도 자르지 않는다.
 function finish(rawText, warnings) {
   const text = normalizeText(rawText);
   if (!text) throw fail('empty_text', MSG.noText);
-  if (text.length > LIMITS.maxExtractedChars) throw fail('too_long', MSG.tooLong);
   const n = countChars(text);
+  if (n > LIMITS.maxExtractedChars) throw fail('too_long', MSG.tooLong);
   const out = [...warnings];
   if (n > MAX_ESSAY_CHARS) {
     out.push(`읽은 글이 ${n.toLocaleString('ko-KR')}자로 ${MAX_ESSAY_CHARS.toLocaleString('ko-KR')}자 제한을 넘어요. 자동으로 자르지 않았으니 직접 줄여 주세요.`);
@@ -126,7 +126,7 @@ function parseZip(data) {
   const cdSize = u32(data, eocd + 12);
   const cdOff = u32(data, eocd + 16);
   if (disk !== 0 || cdDisk !== 0 || countDisk !== count) throw fail('corrupt', MSG.corrupt);
-  if (count === 0xffff || cdSize === 0xffffffff || cdOff === 0xffffffff) throw fail('zip_bomb', MSG.zipBomb); // ZIP64 는 5MB 파일에 불필요
+  if (count === 0xffff || cdSize === 0xffffffff || cdOff === 0xffffffff) throw fail('zip_bomb', MSG.zipBomb); // ZIP64 는 50MB 파일에 불필요
   if (count === 0 || count > LIMITS.maxZipEntries) throw fail('zip_bomb', MSG.zipBomb);
   if (cdOff + cdSize > eocd) throw fail('corrupt', MSG.corrupt);
 
