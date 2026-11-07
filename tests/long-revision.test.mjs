@@ -101,7 +101,7 @@ test('failure waits all active chunks and billing, stops new work, never leaks p
  gates[2].resolve();assert.equal(await observed,failure);assert.equal(usage.length,2);assert.deepEqual(Object.keys(failure),[]);
 });
 test('invalid chunk cards fail closed; missing checks cannot become passes',async()=>{
- await assert.rejects(runLongRevision(config,input('가'.repeat(100)),{runChunk:async(c,d)=>{const r=result(d);r.revision.deepAnalysis.strengths[0].quote='원문에 없는 발췌';return r;}}),{code:'ANALYSIS_QUOTE'});
+ await assert.rejects(runLongRevision(config,input('가'.repeat(100)),{runChunk:async(c,d)=>{const r=result(d);r.revision.deepAnalysis.strengths[0].quote='원문에 없는 발췌';return r;}}),{code:'REVISION_UNSAFE'});
  const out=await runLongRevision(config,input('가'.repeat(100)),{runChunk:async(c,d)=>{const r=result(d);r.quality.checks=[];return r;}});
  assert(out.quality.checks.every(x=>x.status==='attention'));
 });
@@ -140,4 +140,84 @@ test('failed sibling blocks subsequent calls by in-flight workers without replac
  }});
  const observed=pending.catch(e=>e);await tick();failGate.resolve();await tick();gate.resolve();
  assert.equal(await observed,first);assert.equal(after,0);assert.equal(billed,2);
+});
+
+
+const safeCodes=['REVISION_UNSAFE','FACT_QUOTE','ANALYSIS_QUOTE','ANALYSIS_REVIEW','AI_FORMAT','REVIEW_TARGET','AI_TRUNCATED'];
+const codedError=(code,message='rejected synthetic AI marker')=>Object.assign(new Error(message),{code});
+
+test('mixed safe failures preserve exact source, exclude rejected AI and retain global offsets',async()=>{
+ const source=' \t'+('가😀e\u0301 문장.\r\n').repeat(2300)+' \r\n',d=input(source),parts=planLongRevision(config,d).parts;
+ assert(parts.length>=4);let calls=0;const failed=new Set([1,parts.length-2]);
+ const out=await runLongRevision(config,d,{longChunk:false,runChunk:async(c,chunk,callbacks)=>{
+  assert.equal(callbacks.longChunk,true);const i=calls++;
+  if(failed.has(i)){const e=codedError('REVISION_UNSAFE');e.candidate={text:'REJECTED_TEXT_MARKER',deepAnalysis:{overview:'REJECTED_REPORT_MARKER'}};e.details={issueKeys:['coverage'],secret:'REJECTED_DETAILS_MARKER'};throw e;}
+  const r=result(chunk,'수정😀'+chunk.originalText.trim());r.revision.inlineEditRanges=[[0,3]];r.revision.deepAnalysis.strengths[0].comment='통과 구간 '+i;return r;
+ }});
+ const texts=parts.map((p,i)=>failed.has(i)?p.text:p.text.match(/^\s*/u)[0]+'수정😀'+p.text.trim()+p.text.match(/\s*$/u)[0]);
+ assert.equal(out.sections[0].text,texts.join(''));assert.equal(calls,parts.length);
+ let offset=0;const expectedRanges=[];for(let i=0;i<parts.length;i++){const leading=cp(parts[i].text.match(/^\s*/u)[0]);if(!failed.has(i))expectedRanges.push([offset+leading,offset+leading+3]);else assert.deepEqual(Buffer.from(Array.from(out.sections[0].text).slice(offset,offset+cp(parts[i].text)).join('')),Buffer.from(parts[i].text));offset+=cp(texts[i]);}
+ assert.deepEqual(out.revision.inlineEditRanges,expectedRanges);
+ const cutoff=Math.floor(cp(out.sections[0].text)*.7);
+ assert.deepEqual(clippedRanges(expectedRanges,cutoff,cp(out.sections[0].text)),expectedRanges.filter(([a])=>a<cutoff).map(([a,b])=>[a,Math.min(b,cutoff)]));
+ assert.equal(out.revision.preservedChunks,failed.size);assert.equal(out.revision.analysisSanitized,true);
+ assert.match(out.revision.deepAnalysis.overview,/2개 구간/);assert.match(out.revision.deepAnalysis.overview,/원문을 그대로/);assert.match(out.revision.deepAnalysis.overview,/첨삭 완료가 아니/);
+ assert(out.quality.checks.every(x=>x.status==='attention'&&x.reason.includes('2개 구간')));
+ assert(out.revision.warnings.some(x=>x.includes('2개 구간')));
+ assert.deepEqual(out.revision.deepAnalysis.strengths.map(x=>x.comment),parts.flatMap((p,i)=>failed.has(i)?[]:['통과 구간 '+i]));
+ assert(!JSON.stringify(out).includes('REJECTED_'));assert(!JSON.stringify(out).includes('rejected synthetic AI marker'));
+});
+
+for(const code of safeCodes)test('only safe content error preserves a failed chunk: '+code,async()=>{
+ let calls=0;const d=input('가'.repeat(10000)),parts=planLongRevision(config,d).parts;
+ const out=await runLongRevision(config,d,{runChunk:async(c,chunk)=>{if(calls++===0)throw codedError(code);return result(chunk);}});
+ assert.equal(out.sections[0].text,d.originalText);assert.equal(out.revision.preservedChunks,1);assert.equal(calls,parts.length);
+ assert.deepEqual(out.revision.inlineEditRanges,[]);assert.equal(out.revision.deepAnalysis.strengths.length,parts.length-1);
+});
+
+test('invalid candidate cards are discarded with all AI report fields and edit marks',async()=>{
+ const d=input('가'.repeat(10000));let calls=0;
+ const out=await runLongRevision(config,d,{runChunk:async(c,chunk)=>{
+  const r=result(chunk);if(calls++===1){r.sections[0].text='REJECTED_TEXT_MARKER';r.revision.inlineEditRanges=[[0,20]];r.revision.deepAnalysis.overview='REJECTED_OVERVIEW_MARKER';r.revision.deepAnalysis.strengths=[{quote:'NOT_IN_ORIGINAL_MARKER',comment:'REJECTED_CARD_MARKER'}];r.revision.warnings=['REJECTED_WARNING_MARKER'];}return r;
+ }});
+ assert.equal(out.sections[0].text,d.originalText);assert.equal(out.revision.preservedChunks,1);assert.equal(out.revision.analysisSanitized,true);assert.deepEqual(out.revision.inlineEditRanges,[]);assert(!JSON.stringify(out).includes('MARKER'));
+});
+
+for(const code of safeCodes)test('all meaningful chunks fail closed even with whitespace-only chunks: '+code,async()=>{
+ const d=input(' '.repeat(14000)+'가'.repeat(7000)),parts=planLongRevision(config,d).parts;assert(parts.some(p=>!p.process));let calls=0;
+ await assert.rejects(runLongRevision(config,d,{runChunk:async()=>{calls++;throw codedError(code);}}),e=>{assert.equal(e.code,'REVISION_UNSAFE');assert.match(e.message,/모든 구간/);assert(!JSON.stringify(e).includes('rejected synthetic'));assert.equal(e.details.preservedChunks,parts.filter(p=>p.process).length);return true;});
+ assert.equal(calls,parts.filter(p=>p.process).length);
+});
+
+for(const code of ['PROVIDER_TIMEOUT','PROVIDER_ERROR','REQUEST_CANCELLED','REQUEST_EXPIRED','DAILY_BUDGET','TOTAL_BUDGET','BUDGET_UNCERTAIN','CALL_LIMIT','INTERNAL',undefined])test('non-content failures abort after settling active usage: '+String(code),async()=>{
+ const gates=[deferred(),deferred(),deferred()],failure=codedError(code);let calls=0,settled=false,billed=0;
+ const pending=runLongRevision(config,input('가'.repeat(30000)),{onUsage:()=>billed++,runChunk:async(c,d,callbacks)=>{const i=calls++;await gates[i].promise;callbacks.onUsage(7);return result(d);}});
+ const observed=pending.then(()=>{settled=true;assert.fail('fatal error returned a result');},e=>{settled=true;return e;});
+ await tick();gates[0].reject(failure);await tick();assert.equal(settled,false);gates[1].resolve();gates[2].resolve();assert.equal(await observed,failure);assert.equal(calls,3);assert.equal(billed,2);
+});
+
+test('cancellation callback still aborts after a sibling safely preserves its chunk',async()=>{
+ const gate=deferred(),failure=codedError('REQUEST_CANCELLED');let started=0,calls=0;
+ const pending=runLongRevision(config,input('가'.repeat(30000)),{beforeCall:info=>{if(info.stage==='review')throw failure;},onCallStarted:()=>started++,runChunk:async(c,d,callbacks)=>{const i=calls++;await callbacks.beforeCall({stage:'draft',callIndex:0});callbacks.onCallStarted();if(i===0)throw codedError('REVISION_UNSAFE');await gate.promise;await callbacks.beforeCall({stage:'review',callIndex:1});return result(d);}});
+ const observed=pending.catch(e=>e);await tick();gate.resolve();assert.equal(await observed,failure);assert.equal(started,calls);assert(calls<=4);
+});
+
+test('successful runs expose a zero preserved count without sanitization',async()=>{
+ const out=await runLongRevision(config,input('가'.repeat(7000)),{runChunk:async(c,d)=>result(d)});assert.equal(out.revision.preservedChunks,0);assert.equal(out.revision.analysisSanitized,false);assert(!out.revision.deepAnalysis.overview.includes('원문을 그대로'));
+});
+
+
+for(const allFail of [false,true])test('real synthetic pipeline repairs coverage within reserved calls; allFail='+allFail,async()=>{
+ const d=input('가'.repeat(4500)+'나'.repeat(4500)),plan=planLongRevision(config,d),calls=new Map(),stages=new Map(),usage=[];let started=0;
+ const pending=runLongRevision(config,d,{beforeCall:info=>{calls.set(info.chunkIndex,(calls.get(info.chunkIndex)||0)+1);const list=stages.get(info.chunkIndex)||[];list.push(info.stage);stages.set(info.chunkIndex,list);assert(info.callIndex<plan.parts[info.chunkIndex].limits.maxCalls);},onCallStarted:()=>started++,onUsage:(i,cost)=>usage.push([i,cost]),ai:async(system,payload,tokens,options)=>{
+  options.onCallStarted?.();options.onUsage?.(10);
+  if(options.stage==='draft')return {status:'ready',text:allFail||payload.originalText.startsWith('가')?'REJECTED_CANDIDATE_MARKER'+payload.originalText[0].repeat(100):payload.originalText,deepAnalysis:{overview:'이 구간의 내용을 검토했습니다.',strengths:[],improvements:[],questions:[]}};
+  const quote=Array.from(payload.candidate.text.trim()).slice(0,20).join(''),evidence=[{sourceId:'original',quote:Array.from(payload.originalText.trim()).slice(0,20).join('')}];
+  return {candidateDigest:payload.candidateDigest,checks:['fit','evidence','agency','causality','numbers','naturalness','length'].map(key=>({key,status:'pass',reason:'구간 원문을 확인했습니다.',quote,evidence})),claims:[{quote,status:'supported',reason:'원문을 확인했습니다.',evidence}],analysis:{status:'supported',reviewed:1,issues:[]}};
+ }});
+ if(allFail)await assert.rejects(pending,{code:'REVISION_UNSAFE'});
+ else {const out=await pending;assert.equal(out.sections[0].text,d.originalText);assert.equal(out.revision.preservedChunks,1);assert(!JSON.stringify(out).includes('REJECTED_'));}
+ assert.deepEqual([...calls.values()],allFail?[4,4]:[4,2]);assert.deepEqual(stages.get(0),['draft','review','draft','review']);
+ assert.equal(started,[...calls.values()].reduce((sum,n)=>sum+n,0));assert.equal(usage.length,started);
+ assert(started<=plan.parts.reduce((sum,p)=>sum+(p.limits?.maxCalls||0),0));
 });
