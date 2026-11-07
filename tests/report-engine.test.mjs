@@ -90,3 +90,26 @@ test('legacy v3 and v4 protocols are unchanged by v5 notes',async()=>{
  const m4=fake([{status:'ready',text:revised,changes:[goodNote()],diagnosis:[],warnings:[]},p=>({candidateDigest:sha(p.candidate.text),checks:KEYS.map(key=>({key,status:'pass',reason:'확인',quote:q,evidence:ev})),claims:[{quote:q,status:'supported',reason:'확인',evidence:ev}]})]);
  const r4=await runRevision(cfg,req({clientVersion:'simple-v4'}),{ai:m4.ai});assert.deepEqual(r4.revision.changes,[]);
 });
+
+// Synthetic regression: a rewrite must not silently drop the author's explicit
+// statement that an outcome or effect was not measured or verified.
+const qualifier='다만 방문객의 만족도나 질문 건수의 변화를 조사하지는 않았으므로 그 효과를 수치로 말할 수는 없습니다.';
+test('an omitted unmeasured-outcome qualification triggers repair and is preserved',async()=>{
+ const source=original+' '+qualifier,good=revised+' '+qualifier;
+ const m=fake([draft([],revised),review(),draft([],good),review()]);
+ const r=await runRevision(cfg,req({originalText:source}),{ai:m.ai});
+ assert.equal(m.calls.length,4);assert(m.calls[2].payload.repair.issues.some(x=>x.key==='coverage'));assert(r.sections[0].text.includes(qualifier));
+});
+test('repeated omission of explicit outcome qualification fails closed even when lengths are similar',async()=>{
+ const source=original+' '+qualifier,m=fake([draft([],revised),review(),draft([],revised),review()]);
+ await assert.rejects(()=>runRevision(cfg,req({originalText:source}),{ai:m.ai}),e=>e.code==='REVISION_UNSAFE'&&e.details.issueKeys.includes('coverage'));
+});
+test('source qualification survives harmless whitespace changes without a retry',async()=>{
+ const source=original+' '+qualifier,good=revised+' '+qualifier.replaceAll(' ','  ');
+ const m=fake([draft([],good),review()]);await runRevision(cfg,req({originalText:source}),{ai:m.ai});assert.equal(m.calls.length,2);
+});
+test('another explicit unmeasured effect qualification is protected',async()=>{
+ const src='모든 활동에서 결과를 수치로 측정한 것은 아닙니다.',source=original+' '+src;
+ const m=fake([draft([],revised),review(),draft([],revised),review()]);
+ await assert.rejects(()=>runRevision(cfg,req({originalText:source}),{ai:m.ai}),{code:'REVISION_UNSAFE'});
+});
