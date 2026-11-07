@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {previewRepeat} from '../lib/preview-repeat.mjs';
+import {settings} from '../lib/core.mjs';
+import {Store} from '../lib/store.mjs';
+import {RESERVE_REVISION_STEPWISE,EXTEND_BASE_REVIEW,EXTEND_REVISION_STAGED} from '../lib/revision-store.mjs';
 import {RevisionStore} from '../lib/revision-store.mjs';
 import {RESERVE} from '../lib/store.mjs';
 import {SAVE_RESULT} from '../lib/payment-store.mjs';
@@ -52,3 +55,16 @@ test('V4 review cap safely bounds escaped characters and supplementary Unicode',
 });
 
 test('minimal V5 branch cannot enable repeat without explicit approval',()=>{const o='https://kkumsu-git-insosoe-minimal-v5-20261107-kkkkkum.vercel.app',e={...safeEnv,VERCEL_GIT_COMMIT_REF:'insosoe-minimal-v5-20261107'};assert.equal(previewRepeat(config({origin:o,env:e})),false);assert.equal(previewRepeat(config({origin,env:e})),false);assert.equal(previewRepeat(config({origin:o,env:{...e,VERCEL_ENV:'production'}})),false);assert.equal(previewRepeat(config({origin:o,env:{...e,PAYMENT_MODE:'live'}})),false);});
+
+
+test('unlimited budget requires explicit flag and exact approved preview, while all other limits remain',async()=>{
+ const base={...safeEnv,APP_ORIGIN:origin,INSOSOE_PREVIEW_UNLIMITED_BUDGET:'1',AI_DAILY_BUDGET_USD:'0.1',AI_TOTAL_BUDGET_USD:'0.2'};
+ const approved=settings(base);assert.equal(approved.dailyBudget,-1);assert.equal(approved.totalBudget,-1);assert.equal(approved.ipLimit,100);assert.equal(approved.sessionLimit,60);
+ const rejected=[{INSOSOE_PREVIEW_UNLIMITED_BUDGET:undefined},{INSOSOE_PREVIEW_UNLIMITED_BUDGET:'true'},{VERCEL:'0'},{VERCEL_ENV:'production'},{VERCEL_ENV:'development'},{VERCEL_GIT_PROVIDER:'other'},{VERCEL_GIT_REPO_OWNER:'other'},{VERCEL_GIT_REPO_SLUG:'other'},{VERCEL_GIT_COMMIT_REF:'main'},{VERCEL_GIT_COMMIT_REF:'insosoe-minimal-v5-20261107'},{APP_ORIGIN:'https://www.kkumsu.com'},{PAYMENT_MODE:'test'},{PAYMENT_MODE:'live'}];
+ for(const diff of rejected){const c=settings({...base,...diff});assert.equal(c.dailyBudget,100000,JSON.stringify(diff));assert.equal(c.totalBudget,200000,JSON.stringify(diff));}
+ assert.throws(()=>settings({...base,VERCEL_ENV:'production',AI_TOTAL_BUDGET_USD:'-1'}),{code:'CONFIG'});
+ const get=async()=>new Response(JSON.stringify({result:['9000000','9000000']}));assert.equal(await new Store(approved,get).canStart(10000),true);assert.equal(await new Store(settings({...base,INSOSOE_PREVIEW_UNLIMITED_BUDGET:undefined}),get).canStart(10000),false);
+});
+test('unlimited sentinel only bypasses monetary limits while preserving accounting and quotas',()=>{
+ for(const [script,patterns] of [[RESERVE,["tonumber(ARGV[3])~=-1","tonumber(ARGV[7])~=-1","INCRBY',KEYS[2],cost","INCRBY',KEYS[8],cost","KEYS[3]) or '0')>=tonumber(ARGV[4])","KEYS[4]) or '0')>=tonumber(ARGV[5])"]],[RESERVE_REVISION_STEPWISE,["tonumber(ARGV[3])~=-1","tonumber(ARGV[7])~=-1",'current+floor>','+floor>']],[EXTEND_BASE_REVIEW,["tonumber(ARGV[5])~=-1","tonumber(ARGV[6])~=-1","INCRBY',KEYS[3],delta","INCRBY',KEYS[4],delta"]],[EXTEND_REVISION_STAGED,["tonumber(ARGV[5])~=-1","tonumber(ARGV[6])~=-1","INCRBY',KEYS[3],delta","INCRBY',KEYS[4],delta"]]])for(const p of patterns)assert.ok(script.includes(p),p);
+});
