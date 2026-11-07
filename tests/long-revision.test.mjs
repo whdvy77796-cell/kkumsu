@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {LONG_MAX_CHARS,CHUNK_TARGET_CHARS,splitLongRevision,planLongRevision,runLongRevision} from '../lib/long-revision.mjs';
 import {revisionLimits,reserveRevisionCost} from '../lib/revision.mjs';
 import {clippedRanges} from '../lib/inline-diff.mjs';
+import {reportPlan} from '../lib/report-synthesis.mjs';
 
 const config={maxInputBytes:100000,inputRate:3,outputRate:15};
 const cp=s=>Array.from(s).length;
@@ -221,3 +222,8 @@ for(const allFail of [false,true])test('real synthetic pipeline repairs coverage
  assert.equal(started,[...calls.values()].reduce((sum,n)=>sum+n,0));assert.equal(usage.length,started);
  assert(started<=plan.parts.reduce((sum,p)=>sum+(p.limits?.maxCalls||0),0));
 });
+
+test('long revision carries only valid exact grounded edit notes from completed chunks',async()=>{const d=input('가상의 기록과 확인된 행동입니다. '.repeat(400));const out=await runLongRevision(config,d,{runChunk:async(_c,part)=>{const r=result(part,part.originalText.replace('가상의 기록','가상의 활동 기록'));r.revision.changes=[{category:'logic',before:'가상의 기록',after:'가상의 활동 기록',reason:'핵심 장면을 분명하게 했어요.'},{category:'logic',before:'원문에 없는 내용',after:'가상의 기록',reason:'잘못된 원문.'},{category:'wording',before:'가상의 기록',after:'수정문에 없는 내용',reason:'잘못된 수정.'}];return r;}});assert(out.revision.changes.length>=1);assert(out.revision.changes.every(x=>x.before==='가상의 기록'&&x.after==='가상의 활동 기록'&&x.reason.includes('핵심')));});
+
+test('long report reserves two synthesis calls up front only when opted in',()=>{const d=input('가상 문장입니다. '.repeat(800)),base=planLongRevision(config,d),p=planLongRevision(config,d,{withReport:true}),report=reportPlan(config);assert.equal(p.maxCost,base.maxCost+report.maxCost);assert.equal(p.parts.length,base.parts.length);assert.equal(p.report.maxCalls,2);});
+test('long synthesis is invoked after chunks, carries scope and charges callbacks',async()=>{const d=input('가상의 기록과 확인된 행동입니다. '.repeat(400)),events=[],before=[],usage=[];let reportCalls=0;const out=await runLongRevision(config,d,{synthesizeReport:true,runChunk:async(_c,part)=>{events.push('chunk');return result(part);},beforeCall:x=>before.push(x),onCallStarted:i=>events.push('start:'+i),onUsage:(i,n)=>usage.push([i,n]),runReport:async(_c,params,h)=>{reportCalls++;assert.equal(params.parts.map(x=>x.text).join(''),d.originalText);assert(params.parts.every(x=>x.deepAnalysis));assert.equal(h.chunkIndex,params.parts.length);await h.beforeCall({stage:'report-synthesis',chunkIndex:h.chunkIndex});h.onCallStarted(h.chunkIndex);h.onUsage(h.chunkIndex,42);return {deepAnalysis:{overview:'구간 분석을 함께 살폈습니다.',strengths:[],improvements:[],questions:[]},scope:{method:'chunk_analysis_synthesis',partial:false,fullDocumentReread:false,crossChunkConsistencyChecked:false,notice:'가상의 종합 범위'},sanitized:false};}});assert.equal(reportCalls,1);assert.equal(out.revision.deepAnalysis.overview,'구간 분석을 함께 살폈습니다.');assert.equal(out.revision.reportScope.fullDocumentReread,false);assert.deepEqual(usage,[[before[0].chunkIndex,42]]);assert(events.at(-1).startsWith('start:'));});
