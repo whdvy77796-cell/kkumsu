@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {createRevisionHandler} from '../lib/revision-api.mjs';
+import {createRevisionHandler,safeRevisionError} from '../lib/revision-api.mjs';
 import {RevisionStore,RESERVE_REVISION_LONG,RESERVE_REVISION_STEPWISE} from '../lib/revision-store.mjs';
-import {settings} from '../lib/core.mjs';
+import {settings,AppError} from '../lib/core.mjs';
 import {PaymentService} from '../lib/payments.mjs';
 import {MockRedis} from './mock-redis.mjs';
 const env={OPENROUTER_API_KEY:'test-only-key',SESSION_SECRET:'fake-test-secret-at-least-thirty-two-chars',UPSTASH_REDIS_REST_URL:'https://redis.test',UPSTASH_REDIS_REST_TOKEN:'mock-token',APP_ORIGIN:'https://site.test',PAYMENT_MODE:'disabled'};
@@ -29,3 +29,5 @@ test('long encrypted result projects one global 70% prefix, withholds suffix and
  full.sections[0].text+=' '+marker;full.revision.originalLength=50000;full.revision.revisedLength=Array.from(full.sections[0].text).length;full.revision.deepAnalysis.strengths=Array.from({length:7},(_,i)=>({quote:'안전한 가상 인용',comment:'내용 구성 검토 '+String.fromCharCode(65+i)}));full.revision.deepAnalysis.questions=[{quote:marker,question:marker}];
  const out=await pay.saveGeneratedResult('test-owner',randomUUID(),full),pfx=Math.floor(Array.from(full.sections[0].text).length*0.7);assert.equal(out.sections.length,1);assert.equal(out.sections[0].segments[0].text,Array.from(full.sections[0].text).slice(0,pfx).join(''));assert(!JSON.stringify(out).includes(marker));assert.equal(out.revisionSummary.originalLength,50000);assert.equal(out.revisionSummary.revisedLength,full.revision.revisedLength);assert.equal(out.analysisReport.strengths.length,7);assert.equal(out.analysisReport.questions.length,0);assert.equal(out.purchase.ready,false);
 });
+
+test('all preserved chunks explain incomplete result without exposing input',()=>{const e=new AppError('REVISION_UNSAFE','PRIVATE SOURCE SHOULD NOT APPEAR',422,true,{preservedChunks:2});const r=safeRevisionError(e);assert.match(r.error,/모든 구간/);assert(!JSON.stringify(r).includes('PRIVATE SOURCE'));});
