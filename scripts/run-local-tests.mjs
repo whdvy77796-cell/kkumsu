@@ -28,3 +28,4 @@ import '../tests/staged-budget.test.mjs';
 
 import "../tests/continuous-v4.test.mjs";
 import "../tests/continuous-ui.test.mjs";
+import "../tests/preview-repeat.test.mjs";
