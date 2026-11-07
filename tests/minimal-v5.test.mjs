@@ -37,3 +37,8 @@ test('v5 report is projected without hidden revision text, arbitrary fields or s
 test('short hidden suffix also cannot reappear in an analysis field',async()=>{
  const p=service(),data={source:'ai',product:'revision',sections:[{id:'p1',heading:'x',text:'abcdefXYZ'}],quality:{checks:[]},revision:{previewVersion:'continuous-v3',lengthMode:'characters',limit:null,originalLength:9,revisedLength:9,inlineEditRanges:[],changes:[],diagnosis:[],deepAnalysis:{overview:'XYZ',strengths:[],improvements:[],questions:[]}}};const out=await p.saveGeneratedResult('synthetic-short',randomUUID(),data);assert.ok(!JSON.stringify(out).includes('XYZ'));
 });
+
+test('hidden short sentence stays private when report changes punctuation',async()=>{
+ const p=service(),hidden='숨겨진상세내용이충분히있습니다.성과를 냈습니다.',data={source:'ai',product:'revision',sections:[{id:'p1',heading:'x',text:'공'.repeat(90)+hidden}],quality:{checks:[]},revision:{previewVersion:'continuous-v3',lengthMode:'characters',limit:null,originalLength:110,revisedLength:110,inlineEditRanges:[],changes:[],diagnosis:[],deepAnalysis:{overview:'성과를 냈습니다!',strengths:[],improvements:[],questions:[]}}};
+ const out=await p.saveGeneratedResult('synthetic-punctuation',randomUUID(),data);assert.equal(out.analysisReport.overview,'');assert.ok(!JSON.stringify(out).replace(/[\s\p{P}\p{S}]/gu,'').includes('성과를냈습니다'));
+});
