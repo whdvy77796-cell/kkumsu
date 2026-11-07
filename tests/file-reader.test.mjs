@@ -59,12 +59,20 @@ test('TXT: 검증된 EUC-KR 만 허용하고 경고', async () => {
   await rejects(Buffer.from([0x41, 0x00, 0x42, 0x00, 0x00]), 'nul.txt', 'unsupported');
 });
 
-test('6000자 초과는 자르지 않고 경고', async () => {
-  const long = '가'.repeat(MAX_ESSAY_CHARS + 123);
+test('6000자 이상도 자르지 않고 읽고, 분석 가능 한도를 넘으면 명확히 거부', async () => {
+  const long = '가'.repeat(6123);
   const r = await ok(Buffer.from(long), 'long.txt');
-  assert.equal(r.text.length, MAX_ESSAY_CHARS + 123);
-  assert.ok(r.warnings.some((w) => w.includes('자르지 않았')));
+  assert.equal(r.text, long);
+  assert.equal(MAX_ESSAY_CHARS,100000);
   await rejects(Buffer.from('가'.repeat(LIMITS.maxExtractedChars + 1)), 'huge.txt', 'too_long');
+});
+
+test('5MB가 넘는 파일도 50MB 이하면 안전하게 읽는다', async () => {
+  const prefix=Buffer.from('가상의 활동 내용을 정리한 테스트 파일입니다.');
+  const big=Buffer.concat([prefix,Buffer.alloc(6*1024*1024-prefix.length,0x20)]);
+  const r=await ok(big,'large-safe.txt');
+  assert.equal(r.text,'가상의 활동 내용을 정리한 테스트 파일입니다.');
+  assert.equal(LIMITS.maxFileBytes,50*1024*1024);
 });
 
 test('크기·빈 파일·확장자·서명', async () => {

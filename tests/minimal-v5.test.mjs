@@ -24,7 +24,7 @@ test('v5 uses one essay, grounded report, independent review and no score',async
  const m=fakeAI([draft(),review]),r=await runRevision(cfg,req(),{ai:m.ai});assert.equal(m.calls.length,2);assert.equal(r.revision.previewVersion,'continuous-v3');assert.ok(r.revision.deepAnalysis.improvements.length);assert.ok(r.revision.inlineEditRanges.length);assert.equal(r.revision.scoreCard,undefined);assert.equal(r.review.scoreCard,undefined);assert.ok(!m.calls[1].system.includes('scoreCard:'));assert.ok(m.calls[1].system.includes('점수, 등급, 합격 가능성을 만들지 않는다'));
 });
 test('v5 rejects unsupported report quotations and checks bounds before review',async()=>{
- const d=draft();d.deepAnalysis.strengths[0].quote='원문에 없는 문구입니다';const m=fakeAI([d]);await assert.rejects(()=>runRevision(cfg,req(),{ai:m.ai}),{code:'ANALYSIS_QUOTE'});assert.equal(m.calls.length,1);
+ const d=draft();d.deepAnalysis.strengths[0].quote='원문에 없는 문구입니다';const m=fakeAI([d,d]);await assert.rejects(()=>runRevision(cfg,req(),{ai:m.ai}),{code:'ANALYSIS_QUOTE'});assert.equal(m.calls.length,2);
 });
 test('v5 preserves staged budget and strong consent checks',()=>{
  const d=validateRevision(req());assert.equal(new RevisionStore(cfg).reservationScript(d),RESERVE_REVISION_STEPWISE);assert.equal(revisionLimits(cfg,d).calls.length,4);assert.ok(reserveRevisionStages(cfg,d,0,1)>0);assert.ok(minimumRevisionBudget(cfg,'simple-v5')>0);assert.throws(()=>validateRevision(req({consent:false})),{code:'CONSENT_REQUIRED'});
@@ -42,3 +42,27 @@ test('hidden short sentence stays private when report changes punctuation',async
  const p=service(),hidden='숨겨진상세내용이충분히있습니다.성과를 냈습니다.',data={source:'ai',product:'revision',sections:[{id:'p1',heading:'x',text:'공'.repeat(90)+hidden}],quality:{checks:[]},revision:{previewVersion:'continuous-v3',lengthMode:'characters',limit:null,originalLength:110,revisedLength:110,inlineEditRanges:[],changes:[],diagnosis:[],deepAnalysis:{overview:'성과를 냈습니다!',strengths:[],improvements:[],questions:[]}}};
  const out=await p.saveGeneratedResult('synthetic-punctuation',randomUUID(),data);assert.equal(out.analysisReport.overview,'');assert.ok(!JSON.stringify(out).replace(/[\s\p{P}\p{S}]/gu,'').includes('성과를냈습니다'));
 });
+
+
+test('v5 review restores only whitespace differences to actual source and revision spans',async()=>{
+ const o=original.replace('안내 표지를','안내  \n표지를'),d=draft();d.text=revised.replace('안내 표지를','안내  \n표지를');
+ const m=fakeAI([d,review]),r=await runRevision(cfg,req({originalText:o}),{ai:m.ai});
+ const claim=r.review.claims[0];assert.equal(claim.quote,'안내  \n표지를 만들고');assert.equal(claim.evidence[0].quote,'안내  \n표지를 만들고');
+});
+test('v5 retries a malformed reviewer quote once without exposing or accepting the bad quote',async()=>{
+ const bad=p=>{const r=review(p);r.claims[0].evidence[0]={sourceId:'original',quote:'원문에 존재하지 않는 문장'};return r;};
+ const m=fakeAI([draft(),bad,review]),r=await runRevision(cfg,req(),{ai:m.ai});assert.equal(m.calls.length,3);assert.equal(r.source,'ai');assert.ok(!JSON.stringify(r).includes('원문에 존재하지 않는 문장'));
+});
+test('v5 still rejects repeated fabricated reviewer evidence',async()=>{
+ const bad=p=>{const r=review(p);r.claims[0].evidence[0]={sourceId:'original',quote:'없는 문장'};return r;};const m=fakeAI([draft(),bad,bad]);await assert.rejects(()=>runRevision(cfg,req(),{ai:m.ai}),{code:'FACT_QUOTE'});assert.equal(m.calls.length,3);
+});
+test('v5 removes only unverified analysis cards when revised text passed independent review',async()=>{
+ const flagged=p=>{const r=review(p);r.analysis={status:'unsupported',reviewed:r.analysis.reviewed,issues:[{ref:'improvements[0]',reason:'개선 설명의 근거가 부족합니다.'}]};return r;};
+ const m=fakeAI([draft(),flagged,draft(),flagged]),r=await runRevision(cfg,req(),{ai:m.ai});assert.equal(m.calls.length,4);assert.equal(r.sections[0].text,revised);assert.equal(r.revision.analysisSanitized,true);assert.equal(r.revision.deepAnalysis.improvements.length,0);assert.equal(r.revision.deepAnalysis.strengths.length,1);assert.ok(r.review.reviewedCandidateDigest);assert.notEqual(r.review.reviewedCandidateDigest,r.review.candidateDigest);
+});
+test('v5 never publishes a revision with unsupported facts even when analysis is also flagged',async()=>{
+ const flagged=p=>{const r=review(p);r.analysis={status:'unsupported',reviewed:r.analysis.reviewed,issues:[{ref:'improvements[0]',reason:'근거 부족'}]};r.claims[0].status='unsupported';return r;};const m=fakeAI([draft(),flagged,draft(),flagged]);await assert.rejects(()=>runRevision(cfg,req(),{ai:m.ai}),{code:'REVISION_UNSAFE'});
+});
+
+test('v5 retries one malformed draft and independently reviews the replacement',async()=>{const bad=draft();bad.deepAnalysis.strengths[0].quote='없는 인용';const m=fakeAI([bad,draft(),review]);const r=await runRevision(cfg,req(),{ai:m.ai});assert.equal(m.calls.length,3);assert.equal(r.source,'ai');assert.equal(r.revision.deepAnalysis.strengths[0].quote,'안내 표지를 만들고');});
+test('v5 rejects a repeatedly fabricated draft quote before any review',async()=>{const bad=draft();bad.deepAnalysis.strengths[0].quote='없는 인용';const m=fakeAI([bad,bad]);await assert.rejects(()=>runRevision(cfg,req(),{ai:m.ai}),{code:'ANALYSIS_QUOTE'});assert.equal(m.calls.length,2);});
