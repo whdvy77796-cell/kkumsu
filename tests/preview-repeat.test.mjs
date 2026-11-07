@@ -58,7 +58,7 @@ test('minimal V5 branch cannot enable repeat without explicit approval',()=>{con
 
 
 test('unlimited budget requires explicit flag and exact approved preview, while all other limits remain',async()=>{
- const base={...safeEnv,APP_ORIGIN:origin,INSOSOE_PREVIEW_UNLIMITED_BUDGET:'1',AI_DAILY_BUDGET_USD:'0.1',AI_TOTAL_BUDGET_USD:'0.2'};
+ const base={...safeEnv,APP_ORIGIN:origin,INSOSOE_PREVIEW_UNLIMITED_BUDGET:'1',AI_DAILY_BUDGET_USD:'0.1',AI_TOTAL_BUDGET_USD:'0.2',UPSTASH_REDIS_REST_URL:'https://redis.test',UPSTASH_REDIS_REST_TOKEN:'mock'};
  const approved=settings(base);assert.equal(approved.dailyBudget,-1);assert.equal(approved.totalBudget,-1);assert.equal(approved.ipLimit,100);assert.equal(approved.sessionLimit,60);
  const rejected=[{INSOSOE_PREVIEW_UNLIMITED_BUDGET:undefined},{INSOSOE_PREVIEW_UNLIMITED_BUDGET:'true'},{VERCEL:'0'},{VERCEL_ENV:'production'},{VERCEL_ENV:'development'},{VERCEL_GIT_PROVIDER:'other'},{VERCEL_GIT_REPO_OWNER:'other'},{VERCEL_GIT_REPO_SLUG:'other'},{VERCEL_GIT_COMMIT_REF:'main'},{VERCEL_GIT_COMMIT_REF:'insosoe-minimal-v5-20261107'},{APP_ORIGIN:'https://www.kkumsu.com'},{PAYMENT_MODE:'test'},{PAYMENT_MODE:'live'}];
  for(const diff of rejected){const c=settings({...base,...diff});assert.equal(c.dailyBudget,100000,JSON.stringify(diff));assert.equal(c.totalBudget,200000,JSON.stringify(diff));}
@@ -67,4 +67,13 @@ test('unlimited budget requires explicit flag and exact approved preview, while 
 });
 test('unlimited sentinel only bypasses monetary limits while preserving accounting and quotas',()=>{
  for(const [script,patterns] of [[RESERVE,["tonumber(ARGV[3])~=-1","tonumber(ARGV[7])~=-1","INCRBY',KEYS[2],cost","INCRBY',KEYS[8],cost","KEYS[3]) or '0')>=tonumber(ARGV[4])","KEYS[4]) or '0')>=tonumber(ARGV[5])"]],[RESERVE_REVISION_STEPWISE,["tonumber(ARGV[3])~=-1","tonumber(ARGV[7])~=-1",'current+floor>','+floor>']],[EXTEND_BASE_REVIEW,["tonumber(ARGV[5])~=-1","tonumber(ARGV[6])~=-1","INCRBY',KEYS[3],delta","INCRBY',KEYS[4],delta"]],[EXTEND_REVISION_STAGED,["tonumber(ARGV[5])~=-1","tonumber(ARGV[6])~=-1","INCRBY',KEYS[3],delta","INCRBY',KEYS[4],delta"]]])for(const p of patterns)assert.ok(script.includes(p),p);
+});
+
+test('unlimited preview separates budgets and request counters but preserves entitlement and lock keys',async()=>{
+ const base={...safeEnv,APP_ORIGIN:origin,INSOSOE_PREVIEW_UNLIMITED_BUDGET:'1',UPSTASH_REDIS_REST_URL:'https://redis.test',UPSTASH_REDIS_REST_TOKEN:'mock'};const special=settings(base),normal=settings({...base,VERCEL_ENV:'production'});
+ const s=new Store(special),p=new Store(normal),a=s.keys('synthetic-sid','synthetic-ip','synthetic-id'),b=p.keys('synthetic-sid','synthetic-ip','synthetic-id');
+ for(const i of [1,2,3,7]){assert.ok(a[i].startsWith('insosoe:preview-unlimited:staged-safety-20261107:'),a[i]);assert.ok(b[i].startsWith('insosoe:v2:'),b[i]);assert.notEqual(a[i],b[i]);}
+ for(const i of [0,4,5,6])assert.equal(a[i],b[i]);
+ let cmd;const fake=async(u,opt)=>{cmd=JSON.parse(opt.body);return new Response(JSON.stringify({result:['0','0']}));};assert.equal(await new Store(special,fake).canStart(10),true);assert.ok(cmd[1].startsWith('insosoe:preview-unlimited:staged-safety-20261107:budget:'));assert.equal(cmd[2],'insosoe:preview-unlimited:staged-safety-20261107:budget:total');
+ assert.throws(()=>new Store({...normal,dailyBudget:-1,totalBudget:-1}).keys('s','i','r'),{code:'BUDGET_CONFIG'});
 });
