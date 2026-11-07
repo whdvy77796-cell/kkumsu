@@ -12,7 +12,7 @@ const sample = {
 };
 const emptyInput = () => ({prompt:'',originalText:'',organization:'',role:'',posting:'',lengthMode:'characters',limit:null});
 let S = {view:'home',input:emptyInput(),checks:{},questions:[],answers:[],round:0,busy:false,error:'',result:null,sample:false,pending:null,deletion:{state:'idle',payment:false,cache:false},paymentBusy:false,callback:null,leaving:false};
-let server = {loading:true,ready:false,freeAvailable:true,paymentReady:false,paymentMode:'disabled'};
+let server = {loading:true,ready:false,freeAvailable:true,paymentReady:false,paymentMode:'disabled',previewRepeat:false};
 let statusConfirmed = false;
 let consentTarget = null;
 let fileReading=false, fileReadVersion=0, fileMessage='';
@@ -144,7 +144,7 @@ function inputPage(){
  el('p',{id:'payment-availability',class:'fineprint payment-status'},server.paymentReady===true?'전문 열람은 별도 결제 승인 후 제공됩니다.':'전문 결제는 준비 중이에요.'),
  el('button',{type:'submit',class:'button primary main-cta',id:'submit-revision',disabled:!!unavailable()||S.busy,'aria-describedby':'offer-disclosure payment-availability'},'내 자소서 분석하기'),
  el('div',{class:'input-links'},btn('가상 예시 보기',showSample,'text-button'),el('button',{type:'button',id:'refresh-status',class:'text-button',onclick:checkStatus,disabled:server.loading},'연결 상태 다시 확인'),btn('입력·첨삭 결과 삭제',eraseDialog,'text-button danger',S.busy||S.paymentBusy)),
- p('무료 이용은 익명 브라우저 기준 1건이며 개인당 1회 인증이 아닙니다. 삭제해도 무료 이용 기록은 초기화되지 않아요.','fineprint'));
+ el('p',{id:'preview-repeat-info',class:'fineprint',hidden:server.previewRepeat!==true},'운영자 테스트 페이지: 여러 번 다시 시도할 수 있어요. AI 비용과 기존 운영 한도는 그대로 적용됩니다.'),el('p',{id:'customer-free-info',class:'fineprint',hidden:server.previewRepeat===true},'무료 이용은 익명 브라우저 기준 1건이며 개인당 1회 인증이 아닙니다. 삭제해도 무료 이용 기록은 초기화되지 않아요.'));
  return main(el('section',{class:'workspace simple-workspace'},title('AI 자소서 분석 · 인소서','자소서 하나로, 더 깊이 있게.','붙여넣거나 파일을 불러오세요. 내 경험은 그대로, 자기소개서 전체를 자연스럽게 다듬어 드려요.'),el('div',{class:'service-highlights'},el('strong',{id:'ai-brand',class:'ai-brand'},aiLabels().brand),p('전문 제공 후 서비스 서버의 자소서 콘텐츠·재시도 캐시 삭제 요청','deletion-promise'),p('삭제 성공은 서버 응답으로 확인한 뒤 안내해요.','deletion-caveat')),el('div',{class:'usage-notes'},p('취업·인턴 지원용'),p('원문 밖 사실을 추가하지 않도록 대조')),el('section',{class:'work-card input-card'},form),el('details',{class:'storage-details'},el('summary',{},'처리·보관·삭제와 무료 이용 안내'),p('입력 전 내용은 이 페이지 메모리에만 남습니다. 전송 후 서비스 서버와 외부 AI 처리업체가 처리합니다. 미결제 결과는 최대 1시간, 결제 확인 대기·미수신 승인 결과는 최대 24시간 보관합니다. 전문 수신 후 서버 삭제를 요청하며 성공 여부를 표시합니다.'),p('신규 첨삭은 복구코드를 발급하지 않습니다. 전문 수신 후에는 새로고침·닫기 전에 따로 저장해주세요. 기존 상품·쿠폰·복구는 기존 이용 조건이 적용됩니다. 거래기록·로그·백업·외부 AI 보관 정책은 별개입니다.'),link('개인정보처리방침','/privacy.html'),el('span',{},' · '),link('이용약관·환불 안내','/terms.html'))));
 }
 function updateCounts(){
@@ -175,7 +175,7 @@ function acceptResult(data){
   if(r.sections.some(s=>typeof s.heading!=='string'||!Array.isArray(s.segments)||s.segments.some(seg=>!['visible','locked'].includes(seg.kind)||(seg.kind==='visible'&&typeof seg.text!=='string'))))throw new Error('미리보기 형식이 올바르지 않아요.');
   S.result={product:r.product,resultId:r.resultId,access:'preview',sections:r.sections.map(s=>({id:s.id,heading:s.heading,charCount:s.charCount,charLimit:s.charLimit,segments:s.segments.map(x=>x.kind==='visible'?{kind:'visible',text:x.text,...(Array.isArray(x.marks)?{marks:x.marks}:{})}:{kind:'locked',lines:Math.max(1,Math.min(8,Number(x.lines)||3))})})),previewLayout:r.previewLayout==='continuous-v2'?'continuous-v2':'legacy',scoreCard:safeScoreCard(r.scoreCard),quality:{checks:(r.quality?.checks||[]).map(c=>({key:c.key,label:c.label,status:c.status}))},revisionSummary:r.revisionSummary,previewDetails:previewDetailsData(r.previewDetails),purchase:r.purchase,privacy:r.privacy};
  }else{if(r.sections.some(s=>typeof s.text!=='string'))throw new Error('전문 형식이 올바르지 않아요.');S.result=r;}
- S.sample=false;S.deletion={state:'idle',payment:false,cache:false};server.freeAvailable=false;server.latestResultId=r.resultId;
+ S.sample=false;S.deletion={state:'idle',payment:false,cache:false};server.freeAvailable=server.previewRepeat===true&&r.freeAvailable===true;server.latestResultId=r.resultId;
 }
 function showSample(){if(S.busy||S.paymentBusy||S.deletion.state==='working')return;S.sample=true;go('sample');}
 function samplePage(){
@@ -291,7 +291,7 @@ function resultPage(){
  const continuous=full?r.revision?.previewVersion==='continuous-v2':r.previewLayout==='continuous-v2';
  // Already-paid older results keep their original deliverables and terms.
  if(full&&!continuous)return legacyResultPage();
- return main(el('section',{class:'workspace result-workspace'},title(full?'자소서 첨삭 완료':'첫 자소서 무료 미리보기',full?'다듬은 자기소개서를 확인하세요.':'자기소개서가 더 선명해졌어요.',full?'제출 전에 경험과 사실관계를 직접 확인한 뒤 복사하거나 저장해 주세요.':continuous?'수정본 앞 70%는 무료로 확인하고, 나머지 30%는 잠금 처리됩니다.':'이전에 만들어진 결과에는 당시의 미리보기 조건이 적용됩니다.'),S.error?note('아직 확인하지 못했어요',S.error,'warning'):null,full?deletionNotice():null,scorePanel(full?r.revision?.scoreCard:r.scoreCard),...r.sections.map(section=>revisedDocument(section,r,full)),legacyPreviewDetails(r),!full?purchasePanel():null,full?el('div',{class:'result-actions'},btn('수정본 복사',copyFull),btn('수정본 TXT 저장',downloadFull,'button secondary'),btn('내 입력 지우기',eraseDialog,'text-button danger',S.deletion.state==='working'||S.paymentBusy)):el('div',{class:'button-row'},btn('결제 상태 다시 확인',restore,'button secondary',S.paymentBusy),btn('결과·입력 삭제',eraseDialog,'text-button danger',S.paymentBusy)),p(retentionText(r),'fineprint')));
+ return main(el('section',{class:'workspace result-workspace'},title(full?'자소서 첨삭 완료':'첫 자소서 무료 미리보기',full?'다듬은 자기소개서를 확인하세요.':'자기소개서가 더 선명해졌어요.',full?'제출 전에 경험과 사실관계를 직접 확인한 뒤 복사하거나 저장해 주세요.':continuous?'수정본 앞 70%는 무료로 확인하고, 나머지 30%는 잠금 처리됩니다.':'이전에 만들어진 결과에는 당시의 미리보기 조건이 적용됩니다.'),S.error?note('아직 확인하지 못했어요',S.error,'warning'):null,full?deletionNotice():null,scorePanel(full?r.revision?.scoreCard:r.scoreCard),...r.sections.map(section=>revisedDocument(section,r,full)),legacyPreviewDetails(r),!full?purchasePanel():null,full?el('div',{class:'result-actions'},btn('수정본 복사',copyFull),btn('수정본 TXT 저장',downloadFull,'button secondary'),btn('내 입력 지우기',eraseDialog,'text-button danger',S.deletion.state==='working'||S.paymentBusy)):el('div',{class:'button-row'},server.previewRepeat===true?btn('이 글 다시 테스트하기',()=>go('input'),'button secondary',S.paymentBusy):null,btn('결제 상태 다시 확인',restore,'button secondary',S.paymentBusy),btn('결과·입력 삭제',eraseDialog,'text-button danger',S.paymentBusy)),p(retentionText(r),'fineprint')));
 }
 function fullAnalysis(r){
  const a=r.revision?.deepAnalysis;if(!a||typeof a.overview!=='string')return null;
@@ -347,13 +347,14 @@ async function checkStatus(){
   const retry=$('#refresh-status');if(retry)retry.disabled=server.loading;
   const availability=$('#availability');if(availability){availability.textContent=unavailable();availability.className=unavailable()?'notice warning':'';$('#submit-revision').disabled=!!unavailable()||S.busy||fileReading;}
   const payment=$('#payment-availability');if(payment)payment.textContent=server.paymentReady===true?'전문 열람은 별도 결제 승인 후 제공됩니다.':'전문 결제는 준비 중이에요.';
+  const testInfo=$('#preview-repeat-info');if(testInfo)testInfo.hidden=server.previewRepeat!==true;const customerInfo=$('#customer-free-info');if(customerInfo)customerInfo.hidden=server.previewRepeat===true;
   const labels=aiLabels();const brand=$('#ai-brand');if(brand)brand.textContent=labels.brand;
   const label=$('#consent-label');if(label)label.textContent=labels.consent;
   const consent=$('#consent');if(consent){consent.checked=S.checks.consent===true;consent.disabled=!statusConfirmed;}
  };
  refresh();
  try{server={...await request('/api/insosoe',{timeout:10000}),loading:false};statusConfirmed=typeof server.provider==='string'&&!!server.provider.trim()&&typeof server.model==='string'&&!!server.model.trim();if(!statusConfirmed){server.ready=false;server.message='AI 전송 대상을 확인하지 못해 생성할 수 없어요. 연결 상태를 다시 확인해주세요.';}}
- catch{server={...server,loading:false,ready:false,paymentReady:false,message:'서버 연결을 확인하지 못했어요. 입력은 유지됩니다. 연결 상태를 다시 확인하거나 가상 예시를 이용해주세요.'};statusConfirmed=false;}
+ catch{server={...server,loading:false,ready:false,paymentReady:false,previewRepeat:false,message:'서버 연결을 확인하지 못했어요. 입력은 유지됩니다. 연결 상태를 다시 확인하거나 가상 예시를 이용해주세요.'};statusConfirmed=false;}
  const changed=statusConfirmed && previousIdentity!==null && previousIdentity!==modelIdentity();
  if(changed){S.checks.consent=false;consentTarget=null;S.pending=null;}
  const consentStatus=$('#consent-status');if(consentStatus)consentStatus.textContent=!statusConfirmed?'연결 상태 확인 후 전송 대상에 동의할 수 있어요.':changed?'AI 전송 대상이 변경되었거나 다시 확인이 필요해요. 내용을 읽고 다시 동의해주세요.':'';
