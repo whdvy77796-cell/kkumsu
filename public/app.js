@@ -183,7 +183,7 @@ async function submitRevision(clarify=false){
 }
 function safeAnalysisReport(raw){
  if(!raw||typeof raw!=='object')return null;const valid=(s,n)=>typeof s==='string'&&Array.from(s).length<=n,quote=x=>valid(x?.quote,180)?{quote:x.quote}:{};
- return {overview:valid(raw.overview,300)?raw.overview:'',strengths:(Array.isArray(raw.strengths)?raw.strengths:[]).slice(0,200).filter(x=>valid(x?.comment,240)).map(x=>({...quote(x),comment:x.comment})),improvements:(Array.isArray(raw.improvements)?raw.improvements:[]).slice(0,200).filter(x=>['high','medium','low'].includes(x?.priority)&&valid(x?.problem,240)&&valid(x?.suggestion,240)).map(x=>({...quote(x),priority:x.priority,problem:x.problem,suggestion:x.suggestion})),questions:(Array.isArray(raw.questions)?raw.questions:[]).slice(0,200).filter(x=>valid(x?.question,200)).map(x=>({...quote(x),question:x.question})),filtered:raw.filtered===true,sanitized:raw.sanitized===true};
+ return {overview:valid(raw.overview,300)?raw.overview:'',strengths:(Array.isArray(raw.strengths)?raw.strengths:[]).slice(0,200).filter(x=>valid(x?.comment,240)).map(x=>({...quote(x),comment:x.comment})),improvements:(Array.isArray(raw.improvements)?raw.improvements:[]).slice(0,200).filter(x=>['high','medium','low'].includes(x?.priority)&&valid(x?.problem,240)&&valid(x?.suggestion,240)).map(x=>({...quote(x),priority:x.priority,problem:x.problem,suggestion:x.suggestion})),questions:(Array.isArray(raw.questions)?raw.questions:[]).slice(0,200).filter(x=>valid(x?.question,200)).map(x=>({...quote(x),question:x.question})),filtered:raw.filtered===true,sanitized:raw.sanitized===true,preservedChunks:Number.isSafeInteger(raw.preservedChunks)&&raw.preservedChunks>0&&raw.preservedChunks<=200?raw.preservedChunks:0};
 }
 function acceptResult(data){
  const r=data?.result||data;if(!r?.resultId||!['preview','full'].includes(r.access)||!Array.isArray(r.sections)||!r.sections.length)throw new Error('결과 형식을 확인하지 못했어요.');
@@ -321,6 +321,7 @@ function fullAnalysis(r){
   strengths.length?el('div',{class:'analysis-group'},el('h3',{},'이 글의 강점'),...strengths.map(x=>el('article',{class:'analysis-card strength'},quote(x),p(x.comment)))):null,
   improvements.length?el('div',{class:'analysis-group'},el('h3',{},'우선 개선할 점'),...improvements.map((x,i)=>el('article',{class:'analysis-card'},el('div',{class:'analysis-card-top'},el('span',{class:'analysis-tag'},priority[x.priority]||'개선 포인트'),el('span',{},String(i+1).padStart(2,'0'))),quote(x),el('strong',{},'아쉬운 점'),p(x.problem),el('strong',{},'개선 방향'),p(x.suggestion)))):null,
   questions.length?el('div',{class:'analysis-group'},el('h3',{},'직접 확인하면 좋은 점'),...questions.map(x=>el('article',{class:'analysis-card question'},quote(x),p(x.question)))):null,
+  (a.preservedChunks||r.revision?.preservedChunks)?p('일부 구간 '+(a.preservedChunks||r.revision.preservedChunks)+'개는 검증 또는 내용 보존을 확인하지 못해 원문 그대로 유지했어요.','fineprint'):null,
   a.sanitized?p('원문 근거를 확인하지 못한 분석 항목은 제외했어요.','fineprint'):null,
   a.filtered?p('잠긴 수정문과 겹치는 분석 문장은 미리보기에서 생략될 수 있어요.','fineprint'):null,
   !a.overview&&!strengths.length&&!improvements.length&&!questions.length?p('공개 범위 안에서 표시할 분석 내용을 준비하지 못했어요.','fineprint'):null);
