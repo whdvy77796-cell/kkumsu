@@ -181,15 +181,16 @@ async function submitRevision(clarify=false){
  S.busy=true;S.error='';S.sample=false;S.view='waiting';render();$('#main h1')?.focus();
  try{const data=await request('/api/insosoe',{method:'POST',body:S.pending,timeout:535000});if(data.status==='needs_input'){if(clarify||!Array.isArray(data.questions)||data.questions.length>3||data.questions.length<1)throw new Error('추가 확인 응답을 처리하지 못했어요.');S.questions=data.questions;S.answers=data.questions.map(()=> '');S.round=1;S.pending=null;S.view='clarify';}else{acceptResult(data);S.comparisonOriginal={resultId:S.result.resultId,text:S.input.originalText};S.pending=null;S.view='result';}}catch(error){if(error.code==='REQUEST_FAILED'||error.code==='PROVIDER_TIMEOUT'||error.status===422)S.pending=null;if(error.code==='AI_PROVIDER_CHANGED'){S.checks.consent=false;consentTarget=null;S.pending=null;await checkStatus();}S.error=error.code==='REQUEST_FAILED'?'이전 요청은 종료됐어요. 다시 누르면 새 요청으로 진행해요.':error.code==='AI_PROVIDER_CHANGED'?'AI 전송 대상이 변경되었어요. 현재 전송 내용을 확인하고 다시 동의해주세요.':error.name==='AbortError'?'응답 확인 시간이 지났어요. 입력은 유지됩니다. 같은 요청으로 다시 확인할 수 있어요.':error.message;S.view=clarify?'clarify':'input';}finally{S.busy=false;render();$('#form-error:not([hidden])')?.focus();if(S.result?.access==='full')void deleteDelivered();}
 }
+function safeReportScope(v){if(!v||!['chunk_analysis_synthesis','chunk_analysis_selection'].includes(v.method))return null;const n=x=>Number.isSafeInteger(x)&&x>=0&&x<=500?x:0;return {method:v.method,partial:v.partial===true,independentReview:v.independentReview===true,chunksTotal:n(v.chunksTotal),chunksAnalyzed:n(v.chunksAnalyzed),chunksPreserved:n(v.chunksPreserved),chunksUnanalyzed:n(v.chunksUnanalyzed),itemsOmitted:n(v.itemsOmitted)};}
 function safeAnalysisReport(raw){
  if(!raw||typeof raw!=='object')return null;const valid=(s,n)=>typeof s==='string'&&Array.from(s).length<=n,quote=x=>valid(x?.quote,180)?{quote:x.quote}:{};
- return {overview:valid(raw.overview,300)?raw.overview:'',strengths:(Array.isArray(raw.strengths)?raw.strengths:[]).slice(0,200).filter(x=>valid(x?.comment,240)).map(x=>({...quote(x),comment:x.comment})),improvements:(Array.isArray(raw.improvements)?raw.improvements:[]).slice(0,200).filter(x=>['high','medium','low'].includes(x?.priority)&&valid(x?.problem,240)&&valid(x?.suggestion,240)).map(x=>({...quote(x),priority:x.priority,problem:x.problem,suggestion:x.suggestion})),questions:(Array.isArray(raw.questions)?raw.questions:[]).slice(0,200).filter(x=>valid(x?.question,200)).map(x=>({...quote(x),question:x.question})),filtered:raw.filtered===true,sanitized:raw.sanitized===true,preservedChunks:Number.isSafeInteger(raw.preservedChunks)&&raw.preservedChunks>0&&raw.preservedChunks<=200?raw.preservedChunks:0};
+ return {overview:valid(raw.overview,300)?raw.overview:'',strengths:(Array.isArray(raw.strengths)?raw.strengths:[]).slice(0,200).filter(x=>valid(x?.comment,240)).map(x=>({...quote(x),comment:x.comment})),improvements:(Array.isArray(raw.improvements)?raw.improvements:[]).slice(0,200).filter(x=>['high','medium','low'].includes(x?.priority)&&valid(x?.problem,240)&&valid(x?.suggestion,240)).map(x=>({...quote(x),priority:x.priority,problem:x.problem,suggestion:x.suggestion})),questions:(Array.isArray(raw.questions)?raw.questions:[]).slice(0,200).filter(x=>valid(x?.question,200)).map(x=>({...quote(x),question:x.question})),filtered:raw.filtered===true,sanitized:raw.sanitized===true,scope:safeReportScope(raw.scope),preservedChunks:Number.isSafeInteger(raw.preservedChunks)&&raw.preservedChunks>0&&raw.preservedChunks<=200?raw.preservedChunks:0};
 }
 function acceptResult(data){
  const r=data?.result||data;if(!r?.resultId||!['preview','full'].includes(r.access)||!Array.isArray(r.sections)||!r.sections.length)throw new Error('결과 형식을 확인하지 못했어요.');
  if(r.access==='preview'){
   if(r.sections.some(s=>typeof s.heading!=='string'||!Array.isArray(s.segments)||s.segments.some(seg=>!['visible','locked'].includes(seg.kind)||(seg.kind==='visible'&&typeof seg.text!=='string'))))throw new Error('미리보기 형식이 올바르지 않아요.');
-  S.result={product:r.product,resultId:r.resultId,access:'preview',sections:r.sections.map(s=>({id:s.id,heading:s.heading,charCount:s.charCount,charLimit:s.charLimit,segments:s.segments.map(x=>x.kind==='visible'?{kind:'visible',text:x.text,...(Array.isArray(x.marks)?{marks:x.marks}:{})}:{kind:'locked',lines:Math.max(1,Math.min(8,Number(x.lines)||3))})})),previewLayout:r.previewLayout==='continuous-v2'?'continuous-v2':'legacy',analysisReport:safeAnalysisReport(r.analysisReport),quality:{checks:(r.quality?.checks||[]).map(c=>({key:c.key,label:c.label,status:c.status}))},revisionSummary:r.revisionSummary,previewDetails:previewDetailsData(r.previewDetails),purchase:r.purchase,privacy:r.privacy};
+  S.result={product:r.product,resultId:r.resultId,access:'preview',sections:r.sections.map(s=>({id:s.id,heading:s.heading,charCount:s.charCount,charLimit:s.charLimit,segments:s.segments.map(x=>x.kind==='visible'?{kind:'visible',text:x.text,...(Array.isArray(x.marks)?{marks:x.marks}:{})}:{kind:'locked',lines:Math.max(1,Math.min(8,Number(x.lines)||3))})})),previewLayout:r.previewLayout==='continuous-v2'?'continuous-v2':'legacy',analysisReport:safeAnalysisReport(r.analysisReport),revisionNotes:r.previewLayout==='continuous-v2'&&Array.isArray(r.revisionNotes)?r.revisionNotes:undefined,noteSummary:safeNoteSummary(r.noteSummary),quality:{checks:(r.quality?.checks||[]).map(c=>({key:c.key,label:c.label,status:c.status}))},revisionSummary:r.revisionSummary,previewDetails:previewDetailsData(r.previewDetails),purchase:r.purchase,privacy:r.privacy};
  }else{if(r.sections.some(s=>typeof s.text!=='string'))throw new Error('전문 형식이 올바르지 않아요.');S.result=r;}
  S.sample=false;S.deletion={state:'idle',payment:false,cache:false};server.freeAvailable=server.previewRepeat===true&&r.freeAvailable===true;server.latestResultId=r.resultId;
 }
@@ -291,10 +292,48 @@ function inlineEditNodes(value,ranges){
  const nodes=[];let at=0;for(const [start,end] of ranges){if(start>at)nodes.push(document.createTextNode(chars.slice(at,start).join('')));nodes.push(el('span',{class:'inline-edit'},chars.slice(start,end).join('')));at=end;}if(at<chars.length)nodes.push(document.createTextNode(chars.slice(at).join('')));return nodes;
 }
 function lockedDocument(lines){return el('div',{class:'document-locked'},el('div',{class:'locked-fade','aria-hidden':'true'},...Array.from({length:Math.max(2,Math.min(6,Number(lines)||3))},(_,i)=>el('div',{class:'locked-fake-line'+(i===2?' short':'')}))),el('div',{class:'locked-message'},el('strong',{},'나머지 수정본은 잠겨 있어요'),p('잠긴 글은 미리보기로 전송되지 않습니다.','fineprint')));}
+const NOTE_LABELS={logic:'논리',evidence:'근거',wording:'표현',spelling:'맞춤법'};
+function safeNoteSummary(raw){return raw&&Number.isSafeInteger(raw.shown)&&Number.isSafeInteger(raw.withheld)&&raw.shown>=0&&raw.withheld>=0&&raw.shown<=8&&raw.withheld<=8?{shown:raw.shown,withheld:raw.withheld}:null;}
+// All-or-nothing: any malformed, overlapping or out-of-range note drops every note rather than mislabel text.
+function safeNotes(raw,length){
+ if(!Array.isArray(raw)||raw.length>8)return [];let previous=0;const out=[];
+ for(const n of raw){if(!n||!Number.isSafeInteger(n.start)||!Number.isSafeInteger(n.end)||n.start<previous||n.end<=n.start||n.end>length||!Object.hasOwn(NOTE_LABELS,n.category)||typeof n.reason!=='string'||!n.reason.trim()||count(n.reason)>160)return [];previous=n.end;out.push({start:n.start,end:n.end,category:n.category,reason:n.reason.trim()});}
+ return out;
+}
+function validMarks(marks,length){if(!Array.isArray(marks)||marks.length>length)return [];let previous=0;for(const r of marks){if(!Array.isArray(r)||r.length!==2||!Number.isSafeInteger(r[0])||!Number.isSafeInteger(r[1])||r[0]<previous||r[1]<=r[0]||r[1]>length)return [];previous=r[1];}return marks;}
+function markPieces(chars,from,to,marks){
+ const out=[];let at=from;for(const [s,e] of marks){if(e<=from||s>=to)continue;const a=Math.max(s,from),b=Math.min(e,to);if(a>at)out.push(document.createTextNode(chars.slice(at,a).join('')));out.push(el('span',{class:'inline-edit'},chars.slice(a,b).join('')));at=b;}
+ if(at<to)out.push(document.createTextNode(chars.slice(at,to).join('')));return out;
+}
+function highlightWhy(i,on){const seg=$('#why-seg-'+i);if(seg)seg.classList?.toggle('active',on);}
+function jumpWhy(i){const note=$('#why-note-'+i);highlightWhy(i,true);note?.focus();}
+// Text is only ever inserted as text nodes. Notes align to code-point offsets in this exact text.
+function annotatedNodes(text,ranges,notes){
+ const chars=Array.from(String(text||'')),marks=validMarks(ranges,chars.length),list=safeNotes(notes,chars.length);
+ if(!list.length)return {nodes:inlineEditNodes(text,ranges),notes:[]};
+ const nodes=[];let at=0;
+ list.forEach((n,i)=>{
+  if(n.start>at)nodes.push(...markPieces(chars,at,n.start,marks));
+  nodes.push(el('span',{class:'why-seg',id:'why-seg-'+i},...markPieces(chars,n.start,n.end,marks)));
+  nodes.push(el('button',{type:'button',class:'why-chip','aria-label':'수정 이유 '+(i+1)+'번 보기','aria-describedby':'why-note-'+i,onclick:()=>jumpWhy(i),onfocus:()=>highlightWhy(i,true),onblur:()=>highlightWhy(i,false),onmouseenter:()=>highlightWhy(i,true),onmouseleave:()=>highlightWhy(i,false)},String(i+1)),el('span',{class:'why-pop','aria-hidden':'true'},el('b',{},'수정 이유 · '),n.reason));
+  at=n.end;
+ });
+ if(at<chars.length)nodes.push(...markPieces(chars,at,chars.length,marks));
+ return {nodes,notes:list};
+}
+function whyList(notes){
+ return notes.length?el('ol',{class:'why-list','aria-label':'수정 이유'},...notes.map((n,i)=>el('li',{class:'why-note',id:'why-note-'+i,tabindex:'-1',onfocus:()=>highlightWhy(i,true),onblur:()=>highlightWhy(i,false),onmouseenter:()=>highlightWhy(i,true),onmouseleave:()=>highlightWhy(i,false)},el('span',{class:'why-num','aria-hidden':'true'},String(i+1)),el('span',{class:'why-body'},el('span',{class:'why-cat'},NOTE_LABELS[n.category]+' 수정 이유'),el('span',{class:'why-text'},n.reason)),el('button',{type:'button',class:'why-back','aria-label':(i+1)+'번 수정 부분으로 이동',onclick:()=>{$('#why-seg-'+i)?.scrollIntoView?.({block:'center'});highlightWhy(i,true);}},'본문')))):null;
+}
+function noteStatus(summary,shown,full){
+ if(!summary||summary.withheld<=0)return null;
+ return p(full?'수정 이유 '+summary.withheld+'개는 위치나 내용을 확인하지 못해 표시하지 않았어요.':'수정 이유 '+summary.withheld+'개는 잠긴 구간에 있거나 공개 범위를 확인하지 못해 표시하지 않았어요.','fineprint note-status');
+}
 function revisedDocument(section,r,full){
- const marks=full?r.revision?.inlineEditRanges:null,legacy=!full&&r.previewLayout!=='continuous-v2';
- const excerpts=legacy?correctionPairs(r.previewDetails).map(x=>x.after).filter(Boolean):[];
- return el('article',{class:'result-paper continuous-paper'},el('div',{class:'document-heading'},el('div',{},p(full?'전체 수정본':'무료로 보는 수정본','eyebrow'),el('h2',{},'다듬은 자기소개서')),el('span',{class:'document-badge'},full?'전체 보기':r.previewLayout==='continuous-v2'?'앞 70% 무료':'이전 미리보기')),p(legacy?'이전에 공개된 수정본의 일부입니다.':'빨간색은 원문과 비교해 달라진 부분이에요. 삭제된 원문은 수정본에 표시되지 않습니다.','edit-legend'),full?el('div',{class:'essay-full'},...inlineEditNodes(section.text,marks)):el('div',{class:'preview-body'},...excerpts.map(x=>el('p',{class:'legacy-excerpt'},x)),...section.segments.map(seg=>seg.kind==='visible'?el('div',{class:'essay-full'},...inlineEditNodes(seg.text,seg.marks)):lockedDocument(seg.lines))));
+ const legacy=!full&&r.previewLayout!=='continuous-v2',excerpts=legacy?correctionPairs(r.previewDetails).map(x=>x.after).filter(Boolean):[];
+ const summary=legacy?null:safeNoteSummary(r.noteSummary);let shownNotes=0,unchangedText=false;
+ const body=full?(()=>{const out=annotatedNodes(section.text,r.revision?.inlineEditRanges,r.revisionNotes);shownNotes=out.notes.length;unchangedText=Array.isArray(r.revision?.inlineEditRanges)&&r.revision.inlineEditRanges.length===0;return el('div',{},el('div',{class:'essay-full'+(out.notes.length?' annotated':'')},...out.nodes),whyList(out.notes));})():el('div',{class:'preview-body'},...excerpts.map(x=>el('p',{class:'legacy-excerpt'},x)),...section.segments.map((seg,index)=>{if(seg.kind!=='visible')return lockedDocument(seg.lines);const out=index===0&&!legacy?annotatedNodes(seg.text,seg.marks,r.revisionNotes):{nodes:inlineEditNodes(seg.text,seg.marks),notes:[]};shownNotes+=out.notes.length;if(Array.isArray(seg.marks)&&seg.marks.length===0&&!legacy)unchangedText=true;return el('div',{},el('div',{class:'essay-full'+(out.notes.length?' annotated':'')},...out.nodes),whyList(out.notes));}));
+ const legend=legacy?'이전에 공개된 수정본의 일부입니다.':unchangedText?(full?'수정본에 표시할 추가·변경 문자가 없어요. 원문에서 삭제된 내용은 수정본에 표시되지 않습니다.':'공개된 앞 70%에 표시할 추가·변경 문자가 없어요. 원문에서 삭제된 내용은 수정본에 표시되지 않습니다.'):'빨간색은 원문과 비교해 달라진 부분이에요. 삭제된 원문은 수정본에 표시되지 않습니다.'+(shownNotes?' 문장 옆의 작은 설명은 수정한 이유예요.':'');
+ return el('article',{class:'result-paper continuous-paper'},el('div',{class:'document-heading'},el('div',{},p(full?'전체 수정본':'무료로 보는 수정본','eyebrow'),el('h2',{},'다듬은 자기소개서')),el('span',{class:'document-badge'},full?'전체 보기':r.previewLayout==='continuous-v2'?'앞 70% 무료':'이전 미리보기')),p(legend,'edit-legend'),body,noteStatus(summary,shownNotes,full));
 }
 function legacyPreviewDetails(r){
  if(r?.access!=='preview'||r.previewLayout==='continuous-v2'||!r.previewDetails)return null;
@@ -314,17 +353,23 @@ function resultPage(){
 
 function fullAnalysis(r){
  const a=r.revision?.deepAnalysis||r.analysisReport;if(!a||typeof a!=='object')return null;
- const strengths=Array.isArray(a.strengths)?a.strengths:[],improvements=Array.isArray(a.improvements)?a.improvements:[],questions=Array.isArray(a.questions)?a.questions:[],priority={high:'먼저 개선',medium:'개선 권장',low:'다듬기'};
- const quote=x=>x?.quote?el('p',{class:'analysis-quote'},'“'+x.quote+'”'):null;
+ const strengths=Array.isArray(a.strengths)?a.strengths:[],improvements=Array.isArray(a.improvements)?a.improvements:[],questions=Array.isArray(a.questions)?a.questions:[],full=r.access==='full';
+ const priority={high:'먼저 개선',medium:'개선 권장',low:'다듬기'},importance={high:'중요도 높음',medium:'중요도 보통',low:'중요도 낮음'};
+ const scope=safeReportScope(a.scope||r.revision?.reportScope);const scopeText=scope?(scope.method==='chunk_analysis_synthesis'?'긴 글은 각 구간의 분석을 종합'+(scope.independentReview?'하고 별도로 검수':'')+'했어요. 원문 전체를 다시 읽거나 구간 사이의 일관성을 검증한 것은 아니에요.':'긴 글의 종합 검수를 완료하지 못해 구간별로 확인된 일부 항목을 보여드려요.')+(scope.partial?' 일부 구간 또는 분석 항목은 종합에 포함되지 않았어요.':''):'';
+ const quote=x=>typeof x?.quote==='string'&&x.quote?el('blockquote',{class:'analysis-quote'},el('span',{class:'analysis-label'},'글 속 근거'),'“'+x.quote+'”'):p(full?'근거 문장이 제공되지 않은 항목이에요.':'공개 범위를 확인할 수 없어 근거 문장은 표시하지 않았어요.','analysis-noquote');
+ const field=(label,text,cls='')=>el('div',{class:'analysis-field '+cls},el('h5',{},label),p(text));
+ const group=(id,heading,desc,items,render)=>el('section',{class:'analysis-group','aria-labelledby':id},el('h3',{id},heading,el('span',{class:'analysis-count'},items.length+'개')),p(desc,'analysis-desc'),items.length?items.map(render):p('이 항목으로 표시할 수 있는 내용이 없어요.','fineprint'));
+ const none=!a.overview&&!strengths.length&&!improvements.length&&!questions.length;
  return el('section',{class:'analysis-report','aria-label':'자소서 분석보고서'},el('div',{class:'section-heading compact'},p('ANALYSIS REPORT','eyebrow'),el('h2',{},'자소서 분석보고서'),p('입력한 글을 바탕으로 살펴본 의견이에요. 사실과 지원 기준은 직접 확인해 주세요.','fineprint')),
+  scopeText?p(scopeText,'fineprint analysis-scope'):null,
+  none?p('공개 범위 안에서 표시할 분석 내용을 준비하지 못했어요.','fineprint'):el('div',{class:'analysis-summary','aria-label':'분석 요약'},el('span',{},'강점 '+strengths.length),el('span',{},'개선할 점 '+improvements.length),el('span',{},'확인 질문 '+questions.length)),
   a.overview?el('article',{class:'analysis-overview'},el('h3',{},'전체 진단'),p(a.overview)):null,
-  strengths.length?el('div',{class:'analysis-group'},el('h3',{},'이 글의 강점'),...strengths.map(x=>el('article',{class:'analysis-card strength'},quote(x),p(x.comment)))):null,
-  improvements.length?el('div',{class:'analysis-group'},el('h3',{},'우선 개선할 점'),...improvements.map((x,i)=>el('article',{class:'analysis-card'},el('div',{class:'analysis-card-top'},el('span',{class:'analysis-tag'},priority[x.priority]||'개선 포인트'),el('span',{},String(i+1).padStart(2,'0'))),quote(x),el('strong',{},'아쉬운 점'),p(x.problem),el('strong',{},'개선 방향'),p(x.suggestion)))):null,
-  questions.length?el('div',{class:'analysis-group'},el('h3',{},'직접 확인하면 좋은 점'),...questions.map(x=>el('article',{class:'analysis-card question'},quote(x),p(x.question)))):null,
+  none?null:group('ar-strengths','이 글의 강점','이미 잘 드러난 부분이에요. 수정본에서도 살리는 것이 좋아요.',strengths,(x,i)=>el('article',{class:'analysis-card strength'},el('div',{class:'analysis-card-top'},el('span',{class:'analysis-tag good'},'강점'),el('span',{},String(i+1).padStart(2,'0'))),quote(x),field('좋은 이유',x.comment))),
+  none?null:group('ar-improve','우선 개선할 점','무엇이 아쉬운지, 얼마나 중요한지, 어떻게 고칠지를 나눠서 보여줘요.',improvements,(x,i)=>el('article',{class:'analysis-card improve'},el('div',{class:'analysis-card-top'},el('span',{class:'analysis-tag'},priority[x.priority]||'개선 포인트'),el('span',{class:'analysis-importance'},importance[x.priority]||''),el('span',{},String(i+1).padStart(2,'0'))),quote(x),field('아쉬운 점',x.problem),field('이렇게 고쳐 보세요',x.suggestion,'action'))),
+  none?null:group('ar-questions','직접 확인하면 좋은 점','글에 없는 사실은 AI가 만들 수 없어요. 아래 질문에 스스로 답해 보세요.',questions,(x,i)=>el('article',{class:'analysis-card question'},el('div',{class:'analysis-card-top'},el('span',{class:'analysis-tag ask'},'확인 질문'),el('span',{},String(i+1).padStart(2,'0'))),quote(x),field('스스로 답해 볼 질문',x.question))),
   (a.preservedChunks||r.revision?.preservedChunks)?p('일부 구간 '+(a.preservedChunks||r.revision.preservedChunks)+'개는 검증 또는 내용 보존을 확인하지 못해 원문 그대로 유지했어요.','fineprint'):null,
   a.sanitized?p('원문 근거를 확인하지 못한 분석 항목은 제외했어요.','fineprint'):null,
-  a.filtered?p('잠긴 수정문과 겹치는 분석 문장은 미리보기에서 생략될 수 있어요.','fineprint'):null,
-  !a.overview&&!strengths.length&&!improvements.length&&!questions.length?p('공개 범위 안에서 표시할 분석 내용을 준비하지 못했어요.','fineprint'):null);
+  a.filtered?p('잠긴 수정문과 겹치는 분석 문장은 미리보기에서 생략될 수 있어요.','fineprint'):null);
 }
 
 function fullDetails(r){const rev=r.revision||{};const changes=rev.changes||[];return el('section',{class:'changes'},el('div',{class:'section-heading compact'},p('수정 전후 비교','eyebrow'),el('h2',{},'무엇을, 왜 바꿨나요?')),changes.length?changes.map((c,i)=>el('article',{class:'change-card'},el('div',{class:'change-heading'},el('span',{class:'pill'},labels[c.category]||c.category||'표현'),el('span',{},String(i+1).padStart(2,'0'))),el('div',{class:'change-comparison'},el('div',{},el('h3',{},'수정 전 발췌'),p(c.before,'quote before')),el('div',{},el('h3',{},'수정 후 발췌'),p(c.after,'quote after'))),p(c.reason,'change-reason'))):note('좋은 문장은 그대로 두었어요','서버가 제공한 변경 내역이 없습니다. 불필요한 재작성을 하지 않을 수 있어요.'),(rev.diagnosis||[]).length?el('div',{class:'diagnosis'},el('h3',{},'원문에서 살핀 부분'),...rev.diagnosis.map(d=>note(labels[d.category]||'검토',d.problem+' '+d.suggestion))):null,(rev.warnings||[]).length?el('div',{class:'notice warning'},el('h3',{},'제출 전 직접 확인해주세요'),el('ul',{},...rev.warnings.map(w=>el('li',{},typeof w==='string'?w:JSON.stringify(w))))):null);}
