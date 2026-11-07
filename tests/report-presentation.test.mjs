@@ -118,3 +118,18 @@ test('analysis cards separate quote, problem, importance and action without inve
 
 test('long report publishes only allowlisted truthful scope metadata',async()=>{const d=stored({visible:VIS,hidden:HID,changes:[change()]});d.revision.longChunked=true;d.revision.reportScope={method:'chunk_analysis_synthesis',partial:true,independentReview:true,chunksTotal:3,chunksAnalyzed:2,chunksPreserved:1,chunksUnanalyzed:0,itemsOmitted:4,notice:'비공개수정문장은절대공개금지입니다',privateSource:'비공개원문표현알파'};const {out}=await preview(d);assert.deepEqual(out.analysisReport.scope,{method:'chunk_analysis_synthesis',partial:true,independentReview:true,chunksTotal:3,chunksAnalyzed:2,chunksPreserved:1,chunksUnanalyzed:0,itemsOmitted:4});assert(!JSON.stringify(out).includes('절대공개금지'));assert(!JSON.stringify(out).includes('비공개원문표현알파'));});
 test('inline note remains visible on desktop and mobile and does not modify copied text',()=>{const css=readFileSync(new URL('../public/style.css',import.meta.url),'utf8');assert.match(css,/\.why-pop\{display:inline;position:static/);assert.match(css,/@media\(max-width:700px\)\{\.why-pop\{display:inline/);const r=fixture();r("S.result={product:'revision',access:'full',revision:{previewVersion:'continuous-v3',inlineEditRanges:[[0,2]]},revisionNotes:[{id:'n1',start:0,end:2,category:'logic',reason:'의미를 분명하게 했어요.'}],noteSummary:{shown:1,withheld:0},sections:[{id:'p1',heading:'x',text:'가상의 수정글입니다.'}],privacy:{autoDeleteOnDelivery:true}}");const result=r('resultPage()'),all=nodes(result);assert(all.some(n=>n.className==='why-pop'&&n.textContent.includes('의미를 분명하게')));assert.equal(r('fullText(false)'),'가상의 수정글입니다.');});
+
+test('incomplete review explanation and report are explicitly disclosed without exposing hidden text',async()=>{
+ const d=stored({visible:VIS,hidden:HID,changes:[change()]});d.revision.analysisSanitized=true;d.revision.reviewReasonSanitized=true;const {out}=await preview(d);
+ assert.equal(out.analysisReport.sanitized,true);assert.equal(out.analysisReport.reviewReasonSanitized,true);assert(!JSON.stringify(out).includes('절대공개금지'));
+ const r=fixture();r('S.result='+JSON.stringify({...out,privacy:{},purchase:{ready:false}}));const t=r('resultPage()').textContent;assert(t.includes('보고서가 불완전할 수 있어요'));assert(t.includes('검수 응답의 세부 사유 일부'));
+});
+
+test('Unicode format characters cannot conceal locked text in report or note reasons',async()=>{
+ const secret='비공개수정문장은절대공개금지입니다';
+ for(const c of ['\u200b','\u202e',String.fromCodePoint(0xe0001)]){
+  const disguised=Array.from(secret).join(c),d=stored({visible:VIS,hidden:HID,changes:[change({reason:'설명 '+disguised})]});
+  d.revision.deepAnalysis.strengths.push({quote:'가상의 안전한 근거',comment:'설명 '+disguised});
+  const {out}=await preview(d);assert.equal(out.revisionNotes.length,0);assert.equal(out.analysisReport.strengths.length,1);assert(!JSON.stringify(out).includes(disguised));
+ }
+});
