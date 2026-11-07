@@ -103,3 +103,8 @@ test('source quote matching rejects invisible insertion and different Korean cod
 test('whitespace-only quote variation is restored to an exact source slice',async()=>{
  const q=quote.replaceAll(' ','\u3000');const model=p=>reviewed(p,r=>{r.claims[0].evidence[0].quote=q;});const r=await runRevision(cfg,req(),{ai:mock([draft(),model]).ai});assert.equal(r.review.claims[0].evidence[0].quote,quote);
 });
+
+test('failure diagnostics allowlist only field categories, never essay or model output',()=>{
+ const sensitive='가상의비밀원문내용절대로기록금지';const e=new AppError('AI_FORMAT','응답 문자열 형식이나 길이가 올바르지 않습니다.',422,true);e.safeStage='review';e.safeReviewField='claim_quote';
+ const out=revisionFailureDiagnostic(e,3);assert.equal(out.formatField,'claim_quote');assert(!JSON.stringify(out).includes(sensitive));e.safeReviewField=sensitive;assert.equal(safeRevisionError(e).formatField,undefined);assert(!JSON.stringify(revisionFailureDiagnostic(e,3)).includes(sensitive));
+});
