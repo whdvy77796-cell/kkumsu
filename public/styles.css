@@ -321,6 +321,8 @@ table.metrics td { text-align: right; white-space: nowrap; padding-left: 10px; }
 .stage-bar span.done { background: #e7f6ee; color: var(--ok); }
 .research .sub-title { margin-top: 14px; }
 table.plat th a { font-weight: 700; }
+table.plat th { width: 58%; }
+table.plat td { width: 42%; white-space: normal; overflow-wrap: anywhere; }
 .st-ok { color: var(--ok); }
 .st-part { color: var(--warn); }
 .st-no { color: var(--muted); }
