@@ -347,3 +347,11 @@ details.sources-box li { margin: 3px 0; word-break: break-all; }
   .tone, .theme-meta, details.sources-box { font-size: 8pt; }
   details.sources-box summary { display: none; }
 }
+
+/* ───────── 개선안 보강 · PDF 저장 */
+.sol-web { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: #f3e8ff; color: #7e22ce; }
+.sol-effect { background: #f3faf6; border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+.pdf-render { position: absolute; left: -12000px; top: 0; width: 860px; background: #fff; }
+.pdf-render .card { box-shadow: none; margin-bottom: 0; }
+.pdf-brand { padding: 2px 2px 8px; }
+.pdf-brand img { height: 30px; width: auto; display: block; }
