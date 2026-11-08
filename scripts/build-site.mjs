@@ -10,8 +10,7 @@ const DIST = path.join(ROOT, 'dist');
 await fs.rm(DIST, { recursive: true, force: true });
 await fs.mkdir(DIST, { recursive: true });
 for (const dir of ['public', 'site']) {
-  for (const f of await fs.readdir(path.join(ROOT, dir))) {
-    await fs.copyFile(path.join(ROOT, dir, f), path.join(DIST, f));
-  }
+  // 하위 폴더(예: public/vendor)까지 그대로 복사한다
+  await fs.cp(path.join(ROOT, dir), DIST, { recursive: true });
 }
 console.log(`배포 파일: ${(await fs.readdir(DIST)).join(', ')}`);
