@@ -34,9 +34,9 @@ p { margin: 0 0 10px; }
 /* 상단 */
 .top { background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; }
 .top .wrap { display: flex; align-items: center; gap: 10px; min-height: 58px; }
-.logo { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink); font-weight: 800; font-size: 18px; }
-.logo svg { width: 30px; height: 30px; flex: none; }
-.store-name { margin-left: auto; font-size: 14px; color: var(--muted); max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.logo { display: flex; align-items: center; flex: none; text-decoration: none; }
+.logo img { display: block; height: 32px; width: auto; }
+.store-name { margin-left: auto; min-width: 0; flex: 1; text-align: right; font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .demo-bar { background: #2b2f3a; color: #fff; font-size: 13px; padding: 6px 0; }
 .demo-bar .wrap { display: flex; gap: 8px; align-items: center; }
 .demo-bar b { color: #ffd2b3; white-space: nowrap; }
@@ -190,7 +190,11 @@ details.more > summary { cursor: pointer; color: var(--brand-dark); font-weight:
 .feature b { flex: none; }
 hr.soft { border: 0; border-top: 1px dashed var(--line); margin: 14px 0; }
 
+@media (max-width: 359px) {
+  .logo img { height: 28px; }
+}
 @media (min-width: 640px) {
+  .logo img { height: 38px; }
   .grid2 { grid-template-columns: 1fr 1fr; }
   .opts.two { grid-template-columns: 1fr 1fr; }
   .kv { grid-template-columns: 1fr 1fr; gap: 0 24px; }

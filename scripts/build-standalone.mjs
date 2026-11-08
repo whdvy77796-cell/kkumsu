@@ -42,11 +42,20 @@ export async function buildStandalone(outPath, opts = {}) {
   for (const key of ORDER) bundle += `// ── ${key}\n` + transform(key, await fs.readFile(path.join(ROOT, key), 'utf8'));
   bundle = bundle.replace(/<\/script/gi, '<\\/script');
   const css = await fs.readFile(path.join(ROOT, 'public', 'styles.css'), 'utf8');
-  const svg = (await fs.readFile(path.join(ROOT, 'public', 'icon.svg'), 'utf8')).trim();
   let html = await fs.readFile(path.join(ROOT, 'public', 'index.html'), 'utf8');
   const rep = (from, to) => { if (!html.includes(from)) throw new Error(`index.html에서 찾지 못함: ${from}`); html = html.replace(from, () => to); };
+  const repAll = (from, to) => { if (!html.includes(from)) throw new Error(`index.html에서 찾지 못함: ${from}`); html = html.split(from).join(to); };
   rep('<link rel="stylesheet" href="/styles.css">', `<style>\n${css}\n</style>`);
-  rep('<link rel="icon" href="/icon.svg" type="image/svg+xml">', `<link rel="icon" href="data:image/svg+xml,${encodeURIComponent(svg)}">`);
+  // 로고·아이콘: 배포 폴더가 있으면 파일로 복사하고, 없으면(단일 파일 체험판) HTML 안에 넣는다
+  for (const name of ['logo.png', 'icon.png']) {
+    const file = path.join(ROOT, 'public', name);
+    if (opts.assetsDir) {
+      await fs.mkdir(opts.assetsDir, { recursive: true });
+      await fs.copyFile(file, path.join(opts.assetsDir, name));
+    } else {
+      repAll(`"/${name}"`, `"data:image/png;base64,${(await fs.readFile(file)).toString('base64')}"`);
+    }
+  }
   if (opts.siteUrl) {
     const url = opts.siteUrl.replace(/\/+$/, '') + '/';
     const title = opts.title || '매출올려드림 AI';

@@ -13,6 +13,7 @@ await fs.rm(DIST, { recursive: true, force: true });
 await buildStandalone(path.join(DIST, 'index.html'), {
   siteUrl: SITE_URL,
   title: '매출올려드림 AI · 음식점·카페 가게 진단',
+  assetsDir: DIST,
 });
 for (const f of await fs.readdir(path.join(ROOT, 'site'))) {
   await fs.copyFile(path.join(ROOT, 'site', f), path.join(DIST, f));
