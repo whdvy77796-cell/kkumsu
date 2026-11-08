@@ -77,6 +77,7 @@ test('도구: 웹 검색 + 페이지 읽기는 자동 수집이 허용된 블로
   assert.equal(search.parameters.max_uses, 6);
   assert.equal(fetchTool.type, 'openrouter:web_fetch');
   assert.equal(fetchTool.parameters.max_uses, 5);
+  assert.equal(fetchTool.parameters.engine, 'exa');
   assert.deepEqual(fetchTool.parameters.allowed_domains, FETCH_DOMAINS);
   for (const d of ['place.map.kakao.com', 'map.kakao.com', 'm.place.naver.com', 'pcmap.place.naver.com', 'google.com', 'www.google.com']) {
     assert.ok(!FETCH_DOMAINS.includes(d), `${d} 는 열지 않음`);
@@ -84,6 +85,7 @@ test('도구: 웹 검색 + 페이지 읽기는 자동 수집이 허용된 블로
   const exa = researchTools({ MAECHUL_RESEARCH_ENGINE: 'exa' })[0];
   assert.equal(exa.parameters.engine, 'exa');
   assert.equal(exa.parameters.max_characters, 1500);
+  assert.match(researchUser(BODY, new Date('2026-11-09T00:00:00+09:00')), /올해: 2026년/);
   assert.match(researchUser(BODY), /상호명: 골목국밥[\s\S]*대표 메뉴\(앞서 찾은 공개 정보\): 얼큰 소고기국밥 11,000원[\s\S]*알려진 링크: 네이버 플레이스 https:\/\/map\.naver\.com\/p\/1/);
   assert.deepEqual(RESEARCH_SCHEMA.required.sort(), Object.keys(RESEARCH_SCHEMA.properties).sort());
 });
