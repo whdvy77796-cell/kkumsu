@@ -1,14 +1,13 @@
 {
   "name": "maechul-ollyeodeurim-ai",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "매출올려드림 AI - 음식점·카페 사장님용 가게 진단 웹서비스 (첫 구현, 데모 모드)",
+  "description": "매출올려드림 AI - 상호명·주소로 AI가 가게 정보를 찾고 맞춤 설문을 만드는 웹서비스 (베타)",
   "type": "module",
   "scripts": {
-    "start": "node server/server.js",
+    "start": "node scripts/dev.mjs",
     "build": "node scripts/build-site.mjs",
-    "test": "node --test --test-force-exit tests/",
-    "build:standalone": "node scripts/build-standalone.mjs"
+    "test": "node --test --test-force-exit tests/"
   },
   "engines": {
     "node": "24.x"
