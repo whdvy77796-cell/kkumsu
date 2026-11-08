@@ -35,7 +35,7 @@ test('AI가 찾은 정보로 업종·운영 기간·판매 방식·채널·메�
 test('앞에서 입력한 대표 메뉴 이름을 이후 질문에 그대로 쓴다 (조사도 맞게)', () => {
   const c1 = buildCtx(state({ c_menus: ok([{ name: '얼큰 소고기국밥' }]), a_basic: ok({ category: '국밥·탕·찌개' }) }), STORE);
   assert.equal(resolve(QMAP.c_cost.title, c1), '대표 메뉴가 얼큰 소고기국밥이네요. 이 메뉴 한 그릇을 만들 때 반찬·소스·포장까지 포함해 재료비가 얼마나 드는지 알고 계신가요?');
-  assert.match(resolve(QMAP.h_comfort.fields.find((f) => f.key === 'apron').label, c1), /^얼큰 소고기국밥을 먹을 때/);
+  assert.match(resolve(QMAP.s_service.fields.find((f) => f.key === 'apron').label, c1), /^얼큰 소고기국밥을 먹을 때/);
   const c2 = buildCtx(state({ c_menus: ok([{ name: '떡볶이' }]), a_basic: ok({ category: '분식' }) }), null);
   assert.match(resolve(QMAP.c_cost.title, c2), /대표 메뉴가 떡볶이네요\. 이 메뉴 한 그릇을/);
   assert.match(resolve(QMAP.c_cook.title, c2), /^떡볶이는 만드는 데/);
@@ -75,7 +75,7 @@ test('가장 큰 고민에 맞는 추가 질문만 나온다', () => {
   const labor = ids(state({ ...common, a_problem: ok('labor') }), null);
   assert.ok(labor.includes('j_training') && labor.includes('o_peak'));
   const repeat = ids(state({ ...common, a_problem: ok('repeat') }), null);
-  assert.ok(repeat.includes('g_manage') && repeat.includes('n_ops') && repeat.includes('h_comfort'));
+  assert.ok(repeat.includes('g_manage') && repeat.includes('n_ops'));
   assert.ok(!repeat.includes('j_more') && !repeat.includes('o_peak'));
   const solo = ids(state({ ...common, a_staff: ok({ staff: 0, owner: 12 }), a_problem: ok('labor') }), null);
   assert.ok(!solo.includes('j_training'), '직원이 없으면 직원 교육 질문은 없다');
@@ -89,7 +89,7 @@ test('AI가 찾은 리뷰 신호(대기·가격·화장실)로 관련 질문을 
   const S = state({ a_problem: ok('acquisition'), a_split: ok(split(true, false, false)), a_staff: ok({ staff: 1, owner: 10 }), b_know: ok('unknown'), c_menus: ok([{ name: '얼큰 소고기국밥' }]), i_rest: ok({ type: 'own', sep: 'split' }) });
   const list = ids(S, STORE);
   for (const id of ['n_wait', 'c_price', 'i_mirror']) assert.ok(list.includes(id), id);
-  assert.ok(!list.includes('h_comfort'), '좌석 신호가 없으면 고객 편의 카드는 더하지 않는다');
+  assert.equal(resolve(QMAP.s_service.hint, buildCtx(S, STORE)), null, '화장실이 좁다는 불평은 좌석 신호로 세지 않는다');
   const c = buildCtx(S, STORE);
   assert.match(resolve(QMAP.n_wait.hint, c), /점심에 20분 넘게 기다림/);
   assert.equal(resolve(QMAP.i_state.title, c), '여자화장실 상태와 핸드워시는 어떤가요?');
@@ -97,7 +97,7 @@ test('AI가 찾은 리뷰 신호(대기·가격·화장실)로 관련 질문을 
   assert.ok(!none.includes('i_state') && !none.includes('i_mirror'), '화장실이 없으면 화장실 세부 질문 없음');
 });
 
-test('질문 수는 상황에 따라 대략 20~35개 사이로 유지된다', () => {
+test('질문 수는 상황에 따라 대략 20~36개 사이로 유지된다', () => {
   const scenarios = {
     '배달 국밥집·이익 고민·대략 앎': { a_problem: ok('profit'), a_split: ok(split(true, true, true)), a_staff: ok({ staff: 2, owner: 11 }), b_know: ok('approx'), c_menus: ok([{ name: '얼큰 소고기국밥' }, { name: '수육' }]), k_sides: ok({ provide: 'yes' }), i_rest: ok({ type: 'own', sep: 'split' }) },
     '매장 카페·손님 부족·혼자': { a_problem: ok('acquisition'), a_split: ok(split(true, true, false)), a_staff: ok({ staff: 0, owner: 10 }), b_know: ok('approx'), a_basic: ok({ category: '카페' }), c_menus: ok([{ name: '아메리카노' }]), i_rest: ok({ type: 'own', sep: 'unisex' }), e_spend: ok({ insta: 30 }) },
@@ -107,7 +107,7 @@ test('질문 수는 상황에 따라 대략 20~35개 사이로 유지된다', ()
   const counts = {};
   for (const [name, answers] of Object.entries(scenarios)) {
     counts[name] = visibleQuestions(state(answers), STORE).length;
-    assert.ok(counts[name] >= 20 && counts[name] <= 35, `${name}: ${counts[name]}개`);
+    assert.ok(counts[name] >= 20 && counts[name] <= 36, `${name}: ${counts[name]}개`);
   }
   console.log('시나리오별 질문 수', counts, '/ 전체 질문 은행', QUESTIONS.length);
 });
@@ -142,4 +142,19 @@ test('모든 질문이 화면·형식·이유를 갖고 있다', () => {
   assert.equal(guessCategory('평양냉면 전문점 (냉면·불고기·갈비)'), '면 요리');
   assert.equal(guessCategory('카페, 베이커리 카페'), '카페');
   assert.deepEqual(guessServices({ features: ['배달 전문'] }), { hall: false, takeout: null, delivery: true });
+});
+
+test('홀이 있으면 기본 서비스·손님 앞 기본을 묻고, 음식점이면 반찬·잔반을 묻는다', () => {
+  const base = { a_problem: ok('acquisition'), b_know: ok('unknown'), a_staff: ok({ staff: 1, owner: 10 }), c_menus: ok([{ name: '김치찌개' }]) };
+  const hallFood = ids(state({ ...base, a_split: ok(split(true, false, false)), a_basic: ok({ category: '한식' }) }), null);
+  for (const id of ['s_service', 's_manners', 'k_sides', 'k_leftover']) assert.ok(hallFood.includes(id), id);
+  const cafe = ids(state({ ...base, a_split: ok(split(true, true, false)), a_basic: ok({ category: '카페' }) }), null);
+  assert.ok(cafe.includes('s_service') && cafe.includes('s_manners'));
+  assert.ok(!cafe.includes('k_sides') && !cafe.includes('k_leftover'), '카페는 반찬·잔반 질문 없음');
+  const deliveryOnly = ids(state({ ...base, a_split: ok(split(false, false, true)), a_basic: ok({ category: '한식' }) }), null);
+  for (const id of ['s_service', 's_manners', 'k_sides', 'k_leftover']) assert.ok(!deliveryOnly.includes(id), `배달 전용이면 ${id} 없음`);
+  const c = buildCtx(state({ k_sides: ok({ provide: 'no' }) }), null);
+  assert.equal(isAnswered(QMAP.k_sides, ok({ provide: 'no' }), c), true, '반찬을 안 주면 나머지 칸은 묻지 않음');
+  assert.equal(isAnswered(QMAP.k_sides, ok({ provide: 'yes' }), c), false);
+  assert.equal(isAnswered(QMAP.k_sides, ok({ provide: 'yes', serve: '셀프바에서 덜어 가요', refill: '셀프로 더 가져가요' }), c), true, '가짓수는 선택');
 });

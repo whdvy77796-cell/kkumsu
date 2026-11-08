@@ -2,7 +2,8 @@
 import {
   PAGES, PROBLEMS, STATUS_LABEL, COST_RECORD_TIP,
   buildCtx, visiblePages, isAnswered, splitCheck, parseNum, resolve,
-} from '/questions.js';
+} from './questions.js';
+import { buildSolutions, LEVEL } from './solutions.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -771,6 +772,21 @@ function answerText(q, a, c) {
   }
 }
 
+function solutionCard(sol) {
+  return h('div', { class: `card sol sol-${sol.stars}` },
+    h('div', { class: 'sol-head' },
+      h('span', { class: 'stars' }, sol.stars ? '★'.repeat(sol.stars) : '확인 필요'),
+      h('span', { class: 'sol-level' }, LEVEL[sol.stars]),
+      h('span', { class: 'sol-area' }, sol.area)),
+    h('h3', null, sol.title),
+    h('p', { class: 'sol-row' }, h('b', null, '발견한 문제 '), sol.problem),
+    sol.evidence.length ? h('p', { class: 'sol-row small muted' }, h('b', null, '확인 근거 '), `사장님 답변 · ${sol.evidence.join(' · ')}`) : null,
+    h('div', { class: 'sub-title' }, '이렇게 해보세요'),
+    h('ol', { class: 'sol-steps' }, sol.actions.map((x) => h('li', null, x))),
+    sol.cost ? h('p', { class: 'sol-row small' }, h('b', null, '비용과 기간 '), sol.cost) : null,
+    h('p', { class: 'sol-row small' }, h('b', null, '확인 지표 '), sol.metric));
+}
+
 function renderDone() {
   if (!S.doneAt || !Number.isInteger(S.chosen)) { location.replace(Number.isInteger(S.chosen) ? '#/survey' : '#/'); return; }
   const store = chosenStore();
@@ -780,26 +796,33 @@ function renderDone() {
   const pages = visiblePages(S, store);
   const total = pages.reduce((n, p) => n + p.questions.length, 0);
   const problem = PROBLEMS.find((p) => p.v === (getA('a_problem')?.v?.value ?? getA('a_problem')?.v))?.label;
-  const tips = getA('b_know')?.v === 'unknown' ? [COST_RECORD_TIP] : [];
+  const sols = buildSolutions(S, store);
   show(
     h('div', { class: 'card' },
       h('h2', null, '인터뷰를 마쳤어요'),
       h('p', null, `${name}에 대한 질문 ${total}개에 답해 주셨어요.${problem ? ` 가장 큰 고민은 "${problem}"예요.` : ''}`),
       h('p', { class: 'small muted', style: { margin: 0 } }, '답변은 이 브라우저에만 저장돼 있어요.')),
-    tips.length ? [h('h3', { class: 'section-title' }, '지금 바로 해볼 일'), tips.map(tipCard)] : null,
-    pages.map((p) => h('div', { class: 'card' },
-      h('h3', null, resolve(p.title, c)),
-      h('ul', { class: 'answers' }, p.questions.map((q) => h('li', null,
-        h('span', { class: 'a-q' }, resolve(q.title, c)),
-        h('span', { class: 'a-v' }, answerText(q, getA(q.id), c))))))),
+    sols.length
+      ? [
+          h('h3', { class: 'section-title' }, `맞춤 솔루션 ${sols.length}개`),
+          h('p', { class: 'small muted' }, '답변에서 바로 확인된 것부터 정리했어요. ★★★ 우선 개선 · ★★ 이번 주 실행 · ★ 조건부 실험'),
+          sols.map(solutionCard),
+        ]
+      : h('div', { class: 'card note small' }, '지금 답변에서는 바로 고칠 기본 문제가 보이지 않았어요.'),
+    h('details', { class: 'card all-answers' },
+      h('summary', null, `내 답변 전체 보기 (${total}개)`),
+      pages.map((p) => h('div', { class: 'answer-group' },
+        h('h3', null, resolve(p.title, c)),
+        h('ul', { class: 'answers' }, p.questions.map((q) => h('li', null,
+          h('span', { class: 'a-q' }, resolve(q.title, c)),
+          h('span', { class: 'a-v' }, answerText(q, getA(q.id), c)))))))),
     h('div', { class: 'card note small' },
       h('b', null, '다음 단계 '),
-      '이 답변과 AI가 찾은 공개 정보를 함께 분석해 핵심 진단과 실행 계획을 만드는 기능을 준비하고 있어요.'),
+      '지금 솔루션은 기본 서비스·손님 앞 기본·반찬과 잔반·비용 기록을 먼저 다뤄요. 나머지 답변과 AI가 찾은 공개 정보를 함께 분석하는 핵심 진단과 실행 계획을 준비하고 있어요.'),
   );
   setNavbar(
     btn('답변 고치기', () => { S.pageId = PAGES[0].id; S.doneAt = null; save(); location.hash = '#/survey'; }),
     btn('처음부터 다시', () => { S = {}; save(); location.hash = '#/'; }, true),
   );
 }
-
 route();
