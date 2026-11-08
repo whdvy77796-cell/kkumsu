@@ -3,7 +3,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { createHandler as searchHandler, searchTool } from '../api/store-search.js';
-import { createHandler as surveyHandler } from '../api/survey.js';
 import { MemoryStore, RedisStore, RESERVE_LUA, kstDay } from '../lib/guard.mjs';
 import { extractJson, costMicro } from '../lib/ai.mjs';
 
@@ -41,6 +40,14 @@ const STORE_JSON = {
     strengths: ['양념이 맛있다', '양념이 맛있다'], weaknesses: ['대기가 길다'], features: [],
     channels: [{ type: '네이버 플레이스', url: 'https://map.naver.com/p/1' }, { type: '이상한 링크', url: 'javascript:alert(1)' }],
     matchLevel: 'high', matchReason: '주소가 같아요',
+    openedYear: '2019년 개업', floor: '1층',
+    services: { hall: true, takeout: 'yes', delivery: false, reservation: null },
+    reviewThemes: [
+      { theme: '대기', tone: 'bad', note: '점심 대기가 길다' },
+      { theme: '대기', tone: 'good', note: '중복 주제' },
+      { theme: '분위기', tone: 'good', note: '목록에 없는 주제' },
+      { theme: '맛', tone: 'great', note: '잘못된 경향' },
+    ],
   }],
   summary: '망원동 분식집', notFoundReason: null,
   sources: [
@@ -92,6 +99,10 @@ test('가게 찾기: Claude 웹 검색 결과를 정리하고 실제 비용으�
   assert.deepEqual(c.menu, [{ name: '떡볶이', price: '5,000원' }]);
   assert.deepEqual(c.strengths, ['양념이 맛있다']);
   assert.equal(c.channels.length, 1, 'javascript: 링크는 버린다');
+  assert.equal(c.openedYear, '2019년 개업');
+  assert.equal(c.floor, '1층');
+  assert.deepEqual(c.services, { hall: true, takeout: null, delivery: false, reservation: null }, '참/거짓이 아닌 값은 모름(null)');
+  assert.deepEqual(c.reviewThemes, [{ theme: '대기', tone: 'bad', note: '점심 대기가 길다' }], '정해진 주제·경향만, 주제당 하나');
   assert.deepEqual(out.sources, [
     { title: '망원동 골목분식 후기', url: 'https://blog.naver.com/a' },
     { title: '다이닝코드', url: 'https://www.diningcode.com/profile.php?rid=1' },
@@ -231,54 +242,11 @@ test('상태 확인(GET)은 비밀값 없이 준비 여부만 알려준다', asy
   assert.ok(!r.body.includes('test-key'));
 });
 
-test('맞춤 설문: 10문항을 만들고 중복·빈 문항을 정리한다', async () => {
-  const qs = Array.from({ length: 11 }, (_, i) => ({ text: i === 3 ? '' : `점심시간에 손님이 몰린다 ${i}`, area: '손님', why: '리뷰에 대기 이야기가 있어요' }));
-  qs.push({ text: '점심시간에 손님이 몰린다 0', area: '중복', why: '' });
-  const store = new MemoryStore();
-  const fetcher = fakeFetch([aiReply(JSON.stringify({ insights: [{ title: '대기', detail: '점심 대기 후기가 많아요' }], questions: qs }), { cost: 0.02, searches: 0 })]);
-  const handler = surveyHandler({ env: ENV, fetcher, store });
-  const r = res();
-  await handler(req({ body: { name: '골목분식', address: '서울 마포구 망원로 12', store: STORE_JSON.candidates[0] } }), r);
-  assert.equal(r.statusCode, 200, r.body);
-  const out = r.json();
-  assert.equal(out.questions.length, 10);
-  assert.deepEqual(out.questions.map((q) => q.id), Array.from({ length: 10 }, (_, i) => `q${i + 1}`));
-  assert.equal(new Set(out.questions.map((q) => q.text)).size, 10);
-  const sent = fetcher.calls[0].body;
-  assert.equal(sent.response_format.json_schema.name, 'store_survey');
-  assert.equal(sent.tools, undefined, '설문 만들기에는 검색을 쓰지 않는다');
-  assert.match(sent.messages[1].content, /골목분식/);
-  assert.equal(store.kv.get(budgetKey()), 20000);
-
-  const again = res();
-  await handler(req({ body: { name: '골목분식', address: '서울 마포구 망원로 12', store: STORE_JSON.candidates[0] } }), again);
-  assert.equal(again.json().cached, true);
-  assert.equal(fetcher.calls.length, 1);
-});
-
-test('맞춤 설문: 문항이 너무 적으면 실패로 알리고, 가게 정보 없이도 만들 수 있다', async () => {
-  const few = fakeFetch([aiReply(JSON.stringify({ insights: [], questions: [{ text: '하나', area: 'a', why: '' }] }))]);
-  let r = res();
-  await surveyHandler({ env: ENV, fetcher: few, store: new MemoryStore() })(req({ body: { name: '골목분식', address: '서울 마포구 망원로 12', store: STORE_JSON.candidates[0] } }), r);
-  assert.equal(r.statusCode, 502);
-  assert.equal(r.json().code, 'SURVEY_SHORT');
-
-  const ten = Array.from({ length: 10 }, (_, i) => ({ text: `문장 ${i}`, area: 'a', why: 'b' }));
-  const ok = fakeFetch([aiReply(JSON.stringify({ insights: [], questions: ten }))]);
-  r = res();
-  await surveyHandler({ env: ENV, fetcher: ok, store: new MemoryStore() })(req({ body: { name: '골목분식', address: '서울 마포구 망원로 12', store: null } }), r);
-  assert.equal(r.statusCode, 200, r.body);
-  assert.match(ok.calls[0].body.messages[1].content, /공개 정보를 찾지 못했습니다/);
-});
-
 test('모의 모드(MOCK_AI=1)는 로컬에서 키 없이 동작하고 운영 배포에서는 꺼진다', async () => {
   let r = res();
   await searchHandler({ env: { MOCK_AI: '1' }, mockDelay: 0 })(req({ body: { name: '골목분식', address: '서울 마포구 망원로 12' }, headers: { host: 'localhost:5180', origin: 'http://localhost:5180' } }), r);
   assert.equal(r.statusCode, 200);
   assert.equal(r.json().mock, true);
-  r = res();
-  await surveyHandler({ env: { MOCK_AI: '1' }, mockDelay: 0 })(req({ body: { name: '골목분식', address: '서울 마포구 망원로 12', store: null } }), r);
-  assert.equal(r.json().questions.length, 10);
   r = res();
   await searchHandler({ env: { MOCK_AI: '1', VERCEL: '1', VERCEL_ENV: 'production' }, mockDelay: 0 })(req({ body: { name: '골목분식', address: '서울 마포구 망원로 12' } }), r);
   assert.equal(r.statusCode, 503, '운영에서는 모의 응답을 쓰지 않는다');
