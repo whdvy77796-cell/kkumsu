@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { createHandler } from '../api/report.js';
+import { researchKey } from '../api/research.js';
+import { normalizeResearch } from '../lib/research.mjs';
 import { MemoryStore, kstDay } from '../lib/guard.mjs';
 import { computeMetrics, MIN_WAGE } from '../lib/report-calc.mjs';
 import { validateReportInput, buildReportInput, normalizeReport, REPORT_SCHEMA } from '../lib/report.mjs';
@@ -171,9 +173,20 @@ function fakeFetch(handlers) {
   return f;
 }
 const budgetKey = () => `maechul:v1:budget:${kstDay()}`;
+// 인터넷 조사는 미리 저장돼 있다고 보고(=/api/research 를 먼저 부른 경우) 보고서 호출만 센다
+const RESEARCH = {
+  ...normalizeResearch({
+    period: '2025년 3월~2026년 10월', reviewsChecked: 5,
+    platforms: [{ platform: '카카오맵', status: '확인 못 함', note: '자동 수집 금지' }, { platform: '네이버 블로그', status: '확인함', checked: '블로그 5편' }],
+    themes: [{ theme: '대기', tone: 'bad', count: 4, repeated: true, summary: '점심 대기가 길다는 글이 반복돼요.', examples: ['(블로그, 2026년 9월) 점심 30분 대기'] }],
+    infoIssues: ['영업시간이 출처마다 달라요'], limits: ['카카오맵 리뷰 본문은 직접 읽지 않음'],
+  }),
+  input: { name: '골목국밥', address: '서울 마포구 망원로 12' }, model: 'anthropic/claude-sonnet-5.5', searchedAt: '2026-11-09T01:00:00.000Z',
+};
+const withResearch = async (store) => { await store.setJson(researchKey('골목국밥', '서울 마포구 망원로 12'), RESEARCH); return store; };
 
 test('보고서 API: Claude가 만든 보고서를 정리하고, 실제 비용으로 정산하고, 같은 답은 캐시로 돌려준다', async () => {
-  const store = new MemoryStore();
+  const store = await withResearch(new MemoryStore());
   const fetcher = fakeFetch([aiReply('```json\n' + JSON.stringify(AI_REPORT) + '\n```')]);
   const handler = createHandler({ env: ENV, fetcher, store });
   const r1 = res();
@@ -185,11 +198,16 @@ test('보고서 API: Claude가 만든 보고서를 정리하고, 실제 비용�
   assert.equal(out.report.keyMetrics[0].value, '400만 원');
   assert.ok(out.metrics.length >= 10 && out.cautions.length >= 1 && out.bench.name === '한식');
   assert.equal(out.store.name, '골목국밥');
+  assert.equal(out.research.period, '2025년 3월~2026년 10월', '저장된 인터넷 조사 결과를 함께 돌려줌');
+  assert.equal(out.research.input, undefined);
   const sent = fetcher.calls[0].body;
   assert.equal(sent.model, 'anthropic/claude-sonnet-5.5');
   assert.equal(sent.tools, undefined, '보고서는 웹 검색을 쓰지 않는다');
   assert.equal(sent.provider.data_collection, 'deny');
   assert.match(sent.messages[1].content, /얼큰 소고기국밥/);
+  assert.match(sent.messages[1].content, /\[인터넷 조사 결과\][\s\S]*분석 기간: 2025년 3월~2026년 10월 · 실제로 읽은 후기·글: 5개/);
+  assert.match(sent.messages[1].content, /- 대기 · 아쉬움 · 4개 · 반복: 점심 대기가 길다는 글이 반복돼요\./);
+  assert.match(sent.messages[1].content, /- 카카오맵: 확인 못 함/);
   assert.equal(store.kv.get(budgetKey()), 90000, '예약 금액을 실제 비용 $0.09로 정산');
 
   const r2 = res();
@@ -204,7 +222,7 @@ test('보고서 API: Claude가 만든 보고서를 정리하고, 실제 비용�
 });
 
 test('보고서 API: 같은 보고서를 만드는 중이면 두 번째 요청은 AI를 부르지 않고 409', async () => {
-  const store = new MemoryStore();
+  const store = await withResearch(new MemoryStore());
   let release;
   const gate = new Promise((r) => { release = r; });
   const fetcher = fakeFetch([async () => { await gate; return aiReply(JSON.stringify(AI_REPORT)); }]);
@@ -226,7 +244,7 @@ test('보고서 API: 같은 보고서를 만드는 중이면 두 번째 요청�
 });
 
 test('보고서 API: JSON이 깨지면 저렴한 모델로 형식만 다시 맞춘다', async () => {
-  const store = new MemoryStore();
+  const store = await withResearch(new MemoryStore());
   const fetcher = fakeFetch([aiReply('보고서 초안입니다: 핵심은 노동 의존이에요...', { cost: 0.08 }), aiReply(JSON.stringify(AI_REPORT), { cost: 0.004 })]);
   const r = res();
   await createHandler({ env: ENV, fetcher, store })(req({ body: BODY }), r);
@@ -237,7 +255,7 @@ test('보고서 API: JSON이 깨지면 저렴한 모델로 형식만 다시 맞�
 });
 
 test('보고서 API: 다른 사이트·부족한 답변은 거절하고, 하루 횟수를 넘으면 429', async () => {
-  const store = new MemoryStore();
+  const store = await withResearch(new MemoryStore());
   const fetcher = fakeFetch([aiReply(JSON.stringify(AI_REPORT))]);
   const handler = createHandler({ env: { ...ENV, MAECHUL_IP_DAILY_REPORTS: '1' }, fetcher, store });
   const bad = res();
@@ -268,4 +286,36 @@ test('보고서 API: 모의 모드는 키 없이 같은 형식을 돌려주고, 
   await createHandler({ env: ENV })(req({ method: 'GET' }), g);
   assert.ok(!g.body.includes('test-key'));
   assert.equal(g.json().ok, true);
+});
+
+test('보고서 API: 인터넷 조사가 없으면 먼저 조사(웹 검색·블로그 읽기)하고 그 결과를 합쳐 보고서를 만든다', async () => {
+  const store = new MemoryStore();
+  const researchJson = {
+    period: '2026년 1월~10월', reviewsChecked: 4,
+    platforms: [{ platform: '네이버 블로그', status: '확인함', rating: '', reviewCount: '', checked: '블로그 4편', note: '', url: 'https://m.blog.naver.com/a/1' }],
+    themes: [{ theme: '맛', tone: 'good', count: 4, repeated: true, summary: '국물이 진하다는 글이 많아요.', examples: [] }],
+    menuPrices: [], infoIssues: [], competitors: [], area: '', sponsored: '', limits: [], sources: [],
+  };
+  const fetcher = fakeFetch([aiReply(JSON.stringify(researchJson), { cost: 0.2 }), aiReply(JSON.stringify(AI_REPORT), { cost: 0.07 })]);
+  const r = res();
+  await createHandler({ env: ENV, fetcher, store })(req({ body: { ...BODY, pasted: '카카오맵 4.1점 (리뷰 87개)\n\n\n\n최근: 국물이 진해요' } }), r);
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(fetcher.calls.length, 2, '조사 1번 + 보고서 1번');
+  const types = fetcher.calls[0].body.tools.map((x) => x.type);
+  assert.deepEqual(types, ['openrouter:web_search', 'openrouter:web_fetch']);
+  const researchPrompt = fetcher.calls[0].body.messages[1].content;
+  assert.ok(!researchPrompt.includes('바쁜데 남는 게 없어요') && !researchPrompt.includes('2400') && !researchPrompt.includes('카카오맵 4.1점'), '조사에는 인터뷰 답변·붙여 넣은 리뷰를 보내지 않음');
+  assert.equal(fetcher.calls[1].body.tools, undefined, '보고서 단계는 검색 없이');
+  const prompt = fetcher.calls[1].body.messages[1].content;
+  assert.match(prompt, /- 맛 · 좋음 · 4개 · 반복: 국물이 진하다는 글이 많아요\./);
+  assert.match(prompt, /\[사장님이 붙여 넣은 플랫폼 리뷰·평점\][^\n]*\n카카오맵 4\.1점 \(리뷰 87개\)\n\n최근: 국물이 진해요/);
+  const out = r.json();
+  assert.equal(out.research.reviewsChecked, 4);
+  assert.equal(out.pasted, true);
+  assert.equal(store.kv.get(budgetKey()), 270000, '조사 $0.20 + 보고서 $0.07 로 정산');
+  // 같은 가게로 다시 만들 때는 저장된 조사 결과를 씀 (답이 바뀌어도 조사는 다시 안 함)
+  const r2 = res();
+  await createHandler({ env: ENV, fetcher: fakeFetch([aiReply(JSON.stringify(AI_REPORT))]), store })(req({ body: { ...BODY, answers: { ...ANSWERS, a_budget: ok({ money: '거의 없어요', time: '1시간 미만' }) } } }), r2);
+  assert.equal(r2.statusCode, 200, r2.body);
+  assert.equal(r2.json().research.searchedAt, out.research.searchedAt);
 });
