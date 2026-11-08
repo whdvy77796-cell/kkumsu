@@ -43,6 +43,11 @@ const STORE_JSON = {
     matchLevel: 'high', matchReason: '주소가 같아요',
   }],
   summary: '망원동 분식집', notFoundReason: null,
+  sources: [
+    { title: '중복 링크', url: 'https://blog.naver.com/a' },
+    { title: '다이닝코드', url: 'https://www.diningcode.com/profile.php?rid=1' },
+    { title: '잘못된 링크', url: 'ftp://example.com/x' },
+  ],
 };
 
 function aiReply(content, { cost = 0.12, annotations = [], status = 200, searches = 2 } = {}) {
@@ -87,7 +92,10 @@ test('가게 찾기: Claude 웹 검색 결과를 정리하고 실제 비용으�
   assert.deepEqual(c.menu, [{ name: '떡볶이', price: '5,000원' }]);
   assert.deepEqual(c.strengths, ['양념이 맛있다']);
   assert.equal(c.channels.length, 1, 'javascript: 링크는 버린다');
-  assert.deepEqual(out.sources, [{ title: '망원동 골목분식 후기', url: 'https://blog.naver.com/a' }]);
+  assert.deepEqual(out.sources, [
+    { title: '망원동 골목분식 후기', url: 'https://blog.naver.com/a' },
+    { title: '다이닝코드', url: 'https://www.diningcode.com/profile.php?rid=1' },
+  ], '인용 링크 먼저, 모델이 적은 출처는 중복·잘못된 주소를 빼고 뒤에');
   assert.equal(out.cached, false);
   assert.equal(out.searches, 2);
 
