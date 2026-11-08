@@ -1,14 +1,15 @@
-// POST /api/report  { name, address, store, answers, refresh? }
-// 사장님이 동의한 뒤 보낸 인터뷰 답변과 AI가 찾은 공개 정보로 Claude가 진단 보고서와 맞춤 솔루션을 만든다.
-// 숫자는 서버가 계산하고(lib/report-calc.mjs), AI는 그 값과 답변만 근거로 쓴다.
-import { HttpError, send, sendError, readJson, checkOrigin, runMetered, hashKey } from '../lib/guard.mjs';
+// POST /api/report  { name, address, store, answers, pasted?, refresh? }
+// 사장님이 동의한 뒤 보낸 인터뷰 답변 + 서버 계산값 + AI가 인터넷에서 직접 조사한 공개 정보(/api/research)를 합쳐
+// Claude가 진단 보고서와 맞춤 솔루션을 만든다. 숫자는 서버가 계산하고(lib/report-calc.mjs), AI는 그 값만 근거로 쓴다.
+import { HttpError, send, sendError, readJson, checkOrigin, runMetered, hashKey, createStore } from '../lib/guard.mjs';
 import { chat, extractJson, DEFAULT_MODEL, REPAIR_MODEL } from '../lib/ai.mjs';
 import { REPORT_SYSTEM, REPORT_SCHEMA, REPORT_REPAIR_SYSTEM, validateReportInput, buildReportInput, normalizeReport, looksLikeReport } from '../lib/report.mjs';
 import { computeMetrics } from '../lib/report-calc.mjs';
-import { mockEnabled, mockReport } from '../lib/mock.mjs';
+import { mockEnabled, mockReport, mockResearch } from '../lib/mock.mjs';
 import { status } from './store-search.js';
+import { getResearch } from './research.js';
 
-export async function makeReport({ env, fetcher, input, computed, meter }) {
+export async function makeReport({ env, fetcher, input, computed, research, meter }) {
   const model = env.MAECHUL_REPORT_MODEL || env.MAECHUL_AI_MODEL || DEFAULT_MODEL;
   let r;
   try {
@@ -17,10 +18,10 @@ export async function makeReport({ env, fetcher, input, computed, meter }) {
       fetcher,
       model,
       system: REPORT_SYSTEM,
-      user: buildReportInput(input, computed),
+      user: buildReportInput(input, computed, research),
       maxTokens: 12000,
       reasoningEffort: 'low',
-      timeoutMs: 230000,
+      timeoutMs: 200000,
     });
   } catch (err) {
     if (err.charged === 'unknown') meter.markUnknown();
@@ -57,11 +58,20 @@ export async function makeReport({ env, fetcher, input, computed, meter }) {
     metrics: computed.metrics,
     cautions: computed.cautions,
     bench: computed.bench,
+    research: publicResearch(research),
+    pasted: !!input.pasted,
     store: { name: input.store?.name || input.name, address: input.store?.address || input.address },
     model: r.model,
     truncated: r.finish === 'length',
     createdAt: new Date().toISOString(),
   };
+}
+
+// 화면에 보여 줄 조사 결과 (내부 표시는 뺀다)
+function publicResearch(rs) {
+  if (!rs) return null;
+  const { input, cached, ...rest } = rs;
+  return rest;
 }
 
 export function createHandler(deps = {}) {
@@ -75,19 +85,29 @@ export function createHandler(deps = {}) {
         throw new HttpError(405, 'METHOD', '지원하지 않는 요청이에요.');
       }
       checkOrigin(req, env);
-      const input = validateReportInput(await readJson(req, 80000));
+      const input = validateReportInput(await readJson(req, 90000));
       const computed = computeMetrics({ answers: input.answers }, input.store);
-      if (mockEnabled(env)) return send(res, 200, await mockReport(input, computed, deps.mockDelay));
+      if (mockEnabled(env)) {
+        const research = await mockResearch(input, 0);
+        return send(res, 200, await mockReport(input, computed, deps.mockDelay, research));
+      }
+      const store = deps.store || createStore(env, fetcher);
+      // 1) 인터넷 조사: 화면이 먼저 /api/research 로 만들어 둔 결과를 쓰고, 없으면 여기서 조사한다.
+      const research = await getResearch({
+        env, fetcher, store, req,
+        input: { name: input.name, address: input.address, store: input.store, refresh: false, engine: null },
+      });
+      // 2) 보고서
       const result = await runMetered({
         env,
         fetcher,
-        store: deps.store,
+        store,
         req,
         kind: 'report',
-        cacheKey: hashKey('report', input.name, input.address, JSON.stringify(input.store), JSON.stringify(input.answers)),
+        cacheKey: hashKey('report', input.name, input.address, JSON.stringify(input.store), JSON.stringify(input.answers), input.pasted, research.searchedAt),
         refresh: input.refresh,
         lock: true,
-        run: (meter) => makeReport({ env, fetcher, input, computed, meter }),
+        run: (meter) => makeReport({ env, fetcher, input, computed, research, meter }),
       });
       return send(res, 200, result);
     } catch (err) {
