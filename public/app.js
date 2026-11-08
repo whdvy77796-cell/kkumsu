@@ -779,7 +779,10 @@ function answersKey() {
   for (let i = 0; i < s.length; i++) x = ((x * 33) ^ s.charCodeAt(i)) >>> 0;
   return `${s.length}-${x.toString(36)}`;
 }
-const reportFresh = () => !!S.report?.data && S.report.key === answersKey();
+// 보고서 형식 버전 (서버 lib/report.mjs 의 REPORT_VERSION 과 같게). 예전 형식 보고서는 다시 만들 수 있게 한다.
+const REPORT_V = 2;
+const reportOutdated = () => !!S.report?.data && S.report.key === answersKey() && (S.report.data.v || 1) < REPORT_V;
+const reportFresh = () => !!S.report?.data && S.report.key === answersKey() && (S.report.data.v || 1) >= REPORT_V;
 let reportJob = null; // { key, started, done, error, promise }
 
 // 같은 작업을 이미 하는 중이면(새로고침·두 번 누름) 끝날 때까지 기다렸다가 받아온다.
@@ -812,7 +815,7 @@ function startReport({ refresh = false } = {}) {
     job.stage = 'report';
     job.stageAt = Date.now();
     // 2) 조사 결과 + 답변 + 서버 계산값을 합쳐 보고서
-    const data = await postPatiently('/api/report', { name: S.name, address: S.address, store, answers: S.answers, pasted: S.pasted || '', refresh }, job);
+    const data = await postPatiently('/api/report', { name: S.name, address: S.address, store, answers: S.answers, refresh }, job);
     S.report = { key, data };
     save();
     return data;
@@ -850,35 +853,28 @@ function reportCta() {
     };
   }
   const old = !!S.report?.data;
+  const outdated = reportOutdated();
   const agree = h('input', { type: 'checkbox', id: 'agreeAi' });
-  const make = h('button', { class: 'btn primary block', type: 'button', disabled: true }, old ? '바뀐 내용으로 다시 만들기' : 'AI 진단 보고서 만들기');
-  const pasteBox = h('textarea', {
-    id: 'pasteReviews', rows: 4, maxlength: 3000,
-    placeholder: '예: 카카오맵 4.1점 (후기 87개) / 네이버 방문자 리뷰 1,234개 / 구글 4.3점 / 최근 리뷰: "국물이 진해요", "점심엔 30분 기다렸어요"',
-  });
-  pasteBox.value = S.pasted || '';
-  pasteBox.addEventListener('input', () => { S.pasted = pasteBox.value.slice(0, 3000); save(); });
+  const make = h('button', { class: 'btn primary block', type: 'button', disabled: true }, outdated ? '새 형식으로 다시 만들기' : old ? '바뀐 답변으로 다시 만들기' : 'AI 진단 보고서 만들기');
   const el = h('div', { class: 'card report-cta', id: 'reportCta' },
     h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, 'AI 진단 보고서')),
-    h('h2', null, old ? '답변이나 붙여 넣은 리뷰가 바뀌었어요' : '이제 AI가 진단 보고서를 만들어 드려요'),
-    h('p', null, old
-      ? '바뀐 내용으로 보고서를 다시 만들 수 있어요.'
-      : 'AI가 상호명과 주소로 카카오맵·네이버·구글·블로그·리뷰 사이트를 직접 찾아보고, 사장님 답변과 합쳐서 진단과 솔루션을 만들어요.'),
+    h('h2', null, outdated ? '보고서가 더 자세해졌어요' : old ? '답변이 바뀌었어요' : '이제 AI가 진단 보고서를 만들어 드려요'),
+    h('p', null, outdated
+      ? '이제 개선안이 8~10개로 늘고, 인터넷 조사에서 찾은 개선점이 더해져요. 새 형식으로 다시 만들 수 있어요.'
+      : old
+        ? '바뀐 답변으로 보고서를 다시 만들 수 있어요.'
+        : 'AI가 상호명과 주소로 카카오맵·네이버·구글·블로그·리뷰 사이트를 직접 찾아보고, 사장님 답변과 합쳐서 진단과 개선안 8~10개를 만들어요.'),
     h('ol', { class: 'cta-steps small' },
       h('li', null, h('b', null, '인터넷 조사 '), '검색 결과·블로그 후기·리뷰 사이트에서 평점, 리뷰 수, 반복되는 칭찬과 불만, 주변 가게, 플랫폼마다 다른 정보를 찾아요.'),
-      h('li', null, h('b', null, '보고서 작성 '), '조사 결과와 답변, 서버가 계산한 숫자를 합쳐 한 줄 진단·핵심 수치·우선순위 솔루션·실행 계획을 만들어요.')),
-    h('div', { class: 'field-block paste-block' },
-      h('div', { class: 'field-label' }, '카카오맵·네이버·구글 리뷰 붙여 넣기 ', h('small', null, '(선택)')),
-      h('p', { class: 'help' }, '카카오맵·네이버 플레이스·구글 지도는 자동으로 읽지 못하게 막혀 있어요. 우리 가게 평점·리뷰 수나 최근 리뷰 몇 개를 복사해 넣으면 함께 분석해요. 손님 이름은 지워 주세요.'),
-      pasteBox),
+      h('li', null, h('b', null, '보고서 작성 '), '조사 결과와 답변, 서버가 계산한 숫자를 합쳐 한 줄 진단·핵심 수치·우선순위 개선안·실행 계획을 만들어요.')),
     h('ul', { class: 'note-list small' },
       h('li', null, '인터넷 조사에는 상호명·주소와 앞서 찾은 공개 정보만 써요.'),
-      h('li', null, '보고서를 만들려면 인터뷰 답변과 붙여 넣은 리뷰를 OpenRouter를 거쳐 AI(Anthropic Claude)에 보내야 해요.'),
+      h('li', null, '보고서를 만들려면 인터뷰 답변을 OpenRouter를 거쳐 AI(Anthropic Claude)에 보내야 해요.'),
       h('li', null, '같은 내용으로 다시 열 때 비용이 들지 않도록, 보고서는 하루, 인터넷 조사 결과는 3일 동안 서버에 보관했다가 자동으로 지워요.'),
       h('li', null, '보통 2~4분 걸려요.')),
-    h('label', { class: 'consent' }, agree, h('span', null, '위 내용을 확인했고, 보고서를 만들기 위해 답변과 붙여 넣은 리뷰를 AI에 보내는 데 동의해요.')),
+    h('label', { class: 'consent' }, agree, h('span', null, '위 내용을 확인했고, 보고서를 만들기 위해 답변을 AI에 보내는 데 동의해요.')),
     make,
-    old ? h('p', { class: 'small', style: { margin: '10px 0 0' } }, h('a', { href: '#/report' }, '이전 내용으로 만든 보고서 보기')) : null);
+    old ? h('p', { class: 'small', style: { margin: '10px 0 0' } }, h('a', { href: '#/report' }, outdated ? '예전 형식 보고서 보기' : '이전 답변으로 만든 보고서 보기')) : null);
   const go = () => {
     if (!agree.checked) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -886,7 +882,6 @@ function reportCta() {
       toast('보고서를 만들려면 먼저 동의에 체크해 주세요.');
       return;
     }
-    S.pasted = pasteBox.value.slice(0, 3000);
     S.reportConsentAt = new Date().toISOString();
     save();
     startReport();
@@ -986,21 +981,158 @@ function evItem(text) {
 const KIND_CLASS = { '답변': 'ans', '계산': 'calc', '추정': 'est' };
 
 function aiSolutionCard(sol) {
+  const fromWeb = sol.evidence.some((e) => e.startsWith('[공개 정보]'));
   return h('div', { class: `card sol sol-${sol.stars}` },
     h('div', { class: 'sol-head' },
       sol.stars ? h('span', { class: 'stars' }, '★'.repeat(sol.stars)) : null,
       h('span', { class: 'sol-level' }, LEVEL[sol.stars]),
-      h('span', { class: 'sol-area' }, sol.area)),
+      h('span', { class: 'sol-area' }, sol.area),
+      fromWeb ? h('span', { class: 'sol-web' }, '인터넷 조사 반영') : null),
     h('h3', null, sol.title),
     sol.problem ? h('p', { class: 'sol-row' }, h('b', null, '발견한 문제 '), sol.problem) : null,
     sol.evidence.length ? [h('div', { class: 'sub-title' }, '확인 근거'), h('ul', { class: 'ev-list' }, sol.evidence.map(evItem))] : null,
     h('div', { class: 'sub-title' }, '실행 방법'),
     h('ol', { class: 'sol-steps' }, sol.actions.map((x) => h('li', null, x))),
+    sol.effect ? h('p', { class: 'sol-row sol-effect' }, h('b', null, '기대 효과 '), sol.effect) : null,
     h('dl', { class: 'sol-meta' },
       sol.owner ? [h('dt', null, '담당'), h('dd', null, sol.owner)] : null,
       sol.cost ? [h('dt', null, '비용과 기간'), h('dd', null, sol.cost)] : null,
       sol.supplies ? [h('dt', null, '준비물'), h('dd', null, sol.supplies)] : null,
       sol.metric ? [h('dt', null, '확인 지표'), h('dd', null, sol.metric)] : null));
+}
+
+// ───────── 보고서를 PDF 파일로 저장 (인쇄 창 없이 바로 내려받기)
+// 화면에 보이는 보고서를 A4 폭으로 복제해 블록(카드)별로 그림으로 찍고, 카드가 쪽 사이에서 잘리지 않게 배치한다.
+// 라이브러리(html2canvas·jsPDF, MIT)는 /vendor 에 두고 저장할 때만 불러온다.
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`불러오지 못함: ${src}`));
+    document.head.append(s);
+  });
+}
+async function ensurePdfLibs() {
+  if (!window.html2canvas) await loadScript('/vendor/html2canvas.min.js');
+  if (!window.jspdf?.jsPDF) await loadScript('/vendor/jspdf.umd.min.js');
+  if (!window.html2canvas || !window.jspdf?.jsPDF) throw new Error('PDF 도구를 불러오지 못했어요.');
+}
+// 긴 카드를 나눌 때 글줄 가운데가 잘리지 않도록, 안쪽 요소들의 아래쪽 경계를 자를 곳 후보로 쓴다.
+function cutPoints(el) {
+  const top = el.getBoundingClientRect().top;
+  const pts = new Set();
+  el.querySelectorAll('*').forEach((n) => {
+    const r = n.getBoundingClientRect();
+    if (r.height > 0) pts.add(Math.round(r.bottom - top));
+  });
+  return [...pts].sort((x, y) => x - y);
+}
+function pdfFileName(data) {
+  const name = String(data.store?.name || S.name || '가게').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40);
+  const d = new Date(data.createdAt || Date.now());
+  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d).replace(/-/g, '');
+  return `매출올려드림_${name}_진단보고서_${ymd}.pdf`;
+}
+let pdfBusy = false;
+async function saveReportPdf(data, button) {
+  if (pdfBusy) return;
+  pdfBusy = true;
+  const label = button?.textContent;
+  if (button) { button.disabled = true; button.textContent = '저장 중…'; }
+  if (/KAKAOTALK/i.test(navigator.userAgent)) toast('카카오톡 안에서는 파일 저장이 안 될 수 있어요. 안 되면 오른쪽 위 메뉴에서 다른 브라우저로 열어 주세요.', 6000);
+  else toast('PDF 파일을 만들고 있어요. 잠시만 기다려 주세요.', 8000);
+  const box = h('div', { class: 'pdf-render' });
+  try {
+    await ensurePdfLibs();
+    const logo = document.querySelector('.logo img')?.getAttribute('src') || '/logo.png';
+    box.append(h('div', { class: 'pdf-brand' }, h('img', { src: logo, alt: '매출올려드림 AI' })));
+    for (const child of view.children) {
+      if (child.classList.contains('no-print') || child.classList.contains('warn') && child.querySelector('a[href="#/done"]')) continue;
+      // 개선안 묶음은 카드마다 따로 배치해야 쪽 사이에서 잘리지 않는다
+      if (child.classList.contains('sol-list')) { for (const c of child.children) box.append(c.cloneNode(true)); continue; }
+      box.append(child.cloneNode(true));
+    }
+    box.querySelectorAll('details').forEach((d) => { d.open = true; });
+    box.querySelectorAll('details.sources-box > summary').forEach((s) => { s.replaceWith(h('div', { class: 'sub-title' }, '출처')); });
+    document.body.append(box);
+    // 목록 번호·글머리표는 그림 도구가 그리지 못할 때가 있어 글자로 바꿔 넣는다
+    box.querySelectorAll('ol, ul').forEach((list) => {
+      if (getComputedStyle(list).listStyleType === 'none') return;
+      const ordered = list.tagName === 'OL';
+      list.classList.add('pdf-list');
+      [...list.children].forEach((li, i) => {
+        if (li.tagName !== 'LI') return;
+        const body = h('span', { class: 'pdf-li' });
+        while (li.firstChild) body.append(li.firstChild);
+        li.append(h('span', { class: 'pdf-mark' }, ordered ? `${i + 1}.` : '•'), body);
+      });
+    });
+    await Promise.all([...box.querySelectorAll('img')].map((img) => (img.complete ? null : new Promise((r) => { img.onload = r; img.onerror = r; }))));
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    const PW = 210; const PH = 297; const M = 10; const W = PW - M * 2; const BOTTOM = PH - 12; const GAP = 3;
+    let y = M;
+    const place = (canvas, sy, sh) => {
+      const part = document.createElement('canvas');
+      part.width = canvas.width;
+      part.height = sh;
+      const ctx = part.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, part.width, part.height);
+      ctx.drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, canvas.width, sh);
+      const hmm = (sh * W) / canvas.width;
+      doc.addImage(part.toDataURL('image/jpeg', 0.86), 'JPEG', M, y, W, hmm, undefined, 'FAST');
+      y += hmm + GAP;
+    };
+    for (const block of [...box.children]) {
+      const canvas = await window.html2canvas(block, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, windowWidth: 1024 });
+      if (!canvas.width || !canvas.height) continue;
+      const pxPerMm = canvas.width / W;
+      const hmm = canvas.height / pxPerMm;
+      const room = BOTTOM - y;
+      if (hmm <= room) { place(canvas, 0, canvas.height); continue; }
+      if (hmm <= BOTTOM - M && room < (BOTTOM - M) * 0.4) {
+        // 남은 자리가 적으면 카드를 통째로 다음 쪽에서 시작
+        doc.addPage(); y = M;
+        place(canvas, 0, canvas.height);
+        continue;
+      }
+      // 남은 자리가 넉넉하거나 한 쪽보다 긴 카드: 빈 공간이 생기지 않게 글줄 경계에서 나눠 이어 붙인다
+      const scale = canvas.width / block.getBoundingClientRect().width;
+      const cuts = cutPoints(block).map((c) => Math.round(c * scale));
+      let sy = 0;
+      while (sy < canvas.height) {
+        if (BOTTOM - y < 25) { doc.addPage(); y = M; }
+        const maxPx = Math.floor((BOTTOM - y) * pxPerMm);
+        let end = Math.min(canvas.height, sy + maxPx);
+        if (end < canvas.height) {
+          const ok = cuts.filter((c) => c > sy + 60 && c <= end);
+          if (ok.length) end = ok[ok.length - 1];
+        }
+        place(canvas, sy, end - sy);
+        sy = end;
+        if (sy < canvas.height) { doc.addPage(); y = M; }
+      }
+    }
+    const pages = doc.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(140);
+      doc.text('www.kkumsu.com', M, PH - 5);
+      doc.text(`${i} / ${pages}`, PW - M, PH - 5, { align: 'right' });
+    }
+    doc.save(pdfFileName(data));
+    toast('PDF 파일로 저장했어요. 내려받은 파일(다운로드)에서 열어 보세요.', 5000);
+  } catch (e) {
+    console.error('[pdf]', e);
+    toast('저장하지 못했어요. 잠시 후 다시 눌러 주세요.', 5000);
+  } finally {
+    box.remove();
+    pdfBusy = false;
+    if (button) { button.disabled = false; button.textContent = label; }
+  }
 }
 
 // 인터넷 조사 결과 (문서 8장: 분석 기간·확인한 리뷰 수·출처·반복 여부 표시)
@@ -1056,9 +1188,9 @@ function drawReport(data, stale) {
   show(
     stale
       ? h('div', { class: 'card warn no-print' },
-          h('b', null, '답변이 바뀌었어요. '),
-          '이 보고서는 바뀌기 전 답변으로 만든 거예요. ',
-          h('a', { href: '#/done' }, '바뀐 답변으로 다시 만들기'))
+          h('b', null, reportOutdated() ? '보고서가 더 자세해졌어요. ' : '답변이 바뀌었어요. '),
+          reportOutdated() ? '이 보고서는 예전 형식(개선안 4~6개)이에요. ' : '이 보고서는 바뀌기 전 답변으로 만든 거예요. ',
+          h('a', { href: '#/done' }, reportOutdated() ? '새 형식으로 다시 만들기' : '바뀐 답변으로 다시 만들기'))
       : null,
     data.mock ? h('div', { class: 'card note small' }, '(모의 응답) 실제 AI가 아니라 화면 점검용으로 만든 보고서예요.') : null,
     h('div', { class: 'rep-head' },
@@ -1110,7 +1242,7 @@ function drawReport(data, stale) {
       : null,
 
     h('h2', { class: 'section-title' }, `우선 개선안 ${r.solutions?.length || 0}개`),
-    h('p', { class: 'small muted' }, '★★★ 우선 개선 · ★★ 이번 주 실행 · ★ 조건부 실험 · 확인 필요. 근거 표시: 답변 = 사장님 답변, 계산 = 서버 계산, 공개 정보 = AI가 인터넷에서 찾은 정보, 붙여 넣은 리뷰 = 사장님이 넣은 리뷰, 추정 = AI의 판단'),
+    h('p', { class: 'small muted' }, '★★★ 우선 개선 · ★★ 이번 주 실행 · ★ 조건부 실험 · 확인 필요. 근거 표시: 답변 = 사장님 답변, 계산 = 서버 계산, 공개 정보 = AI가 인터넷에서 찾은 정보, 추정 = AI의 판단. "인터넷 조사 반영"은 인터넷 후기·평판에서 찾은 개선점이에요.'),
     h('div', { class: 'sol-list' }, (r.solutions || []).map(aiSolutionCard)),
 
     h('section', { class: 'card' },
@@ -1126,7 +1258,7 @@ function drawReport(data, stale) {
       : null,
 
     h('div', { class: 'card note rep-foot' },
-      h('p', null, 'AI가 사장님 답변과 인터넷 공개 정보로 만든 진단이에요. 계산값은 사장님이 적은 숫자로 계산했고 추정이 섞여 있어요. 사진과 실제 장부는 보지 않았고, 카카오맵·네이버 플레이스·구글 지도 리뷰 본문은 자동으로 읽을 수 없어 검색 결과·블로그에 나온 내용과 사장님이 붙여 넣은 리뷰만 반영했어요. 중요한 결정 전에는 장부와 현장에서 꼭 확인해 주세요.'),
+      h('p', null, 'AI가 사장님 답변과 인터넷 공개 정보로 만든 진단이에요. 계산값은 사장님이 적은 숫자로 계산했고 추정이 섞여 있어요. 사진과 실제 장부는 보지 않았고, 카카오맵·네이버 플레이스·구글 지도 리뷰 본문은 자동으로 읽을 수 없어 검색 결과·블로그·리뷰 사이트에 나온 내용만 반영했어요. 중요한 결정 전에는 장부와 현장에서 꼭 확인해 주세요.'),
       data.truncated ? h('p', null, '보고서가 길어 끝부분이 잘렸을 수 있어요. 다시 만들면 나아질 수 있어요.') : null,
       h('p', { style: { margin: 0 } }, `만든 AI: ${data.model === 'mock' ? '모의 응답' : data.model || '-'}${data.cached ? ' · 저장된 보고서' : ''}`)),
     stale ? null : h('p', { class: 'small no-print', style: { textAlign: 'center' } },
@@ -1136,9 +1268,10 @@ function drawReport(data, stale) {
         route();
       } }, '보고서 새로 만들기')),
   );
+  const saveBtn = btn('저장하기', () => saveReportPdf(data, saveBtn), true);
   setNavbar(
     btn('완료 화면', () => { location.hash = '#/done'; }),
-    btn('인쇄·PDF 저장', () => window.print(), true),
+    saveBtn,
   );
 }
 route();

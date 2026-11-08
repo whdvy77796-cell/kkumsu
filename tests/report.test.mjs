@@ -7,7 +7,7 @@ import { researchKey } from '../api/research.js';
 import { normalizeResearch } from '../lib/research.mjs';
 import { MemoryStore, kstDay } from '../lib/guard.mjs';
 import { computeMetrics, MIN_WAGE } from '../lib/report-calc.mjs';
-import { validateReportInput, buildReportInput, normalizeReport, REPORT_SCHEMA } from '../lib/report.mjs';
+import { validateReportInput, buildReportInput, normalizeReport, REPORT_SCHEMA, REPORT_SYSTEM, REPORT_VERSION } from '../lib/report.mjs';
 
 const ENV = { OPENROUTER_API_KEY: 'test-key', SESSION_SECRET: 'x'.repeat(32), VERCEL: '1', VERCEL_ENV: 'preview' };
 const ok = (v) => ({ s: 'ok', v });
@@ -194,6 +194,7 @@ test('보고서 API: Claude가 만든 보고서를 정리하고, 실제 비용�
   assert.equal(r1.statusCode, 200, r1.body);
   const out = r1.json();
   assert.equal(out.cached, false);
+  assert.equal(out.v, REPORT_VERSION, '보고서 형식 버전');
   assert.equal(out.report.solutions[0].title, '손님이 보는 곳에서 식사하지 마세요.');
   assert.equal(out.report.keyMetrics[0].value, '400만 원');
   assert.ok(out.metrics.length >= 10 && out.cautions.length >= 1 && out.bench.name === '한식');
@@ -202,6 +203,7 @@ test('보고서 API: Claude가 만든 보고서를 정리하고, 실제 비용�
   assert.equal(out.research.input, undefined);
   const sent = fetcher.calls[0].body;
   assert.equal(sent.model, 'anthropic/claude-sonnet-5.5');
+  assert.equal(sent.max_tokens, 16000, '개선안 10개를 자세히 쓸 수 있는 길이');
   assert.equal(sent.tools, undefined, '보고서는 웹 검색을 쓰지 않는다');
   assert.equal(sent.provider.data_collection, 'deny');
   assert.match(sent.messages[1].content, /얼큰 소고기국밥/);
@@ -318,4 +320,21 @@ test('보고서 API: 인터넷 조사가 없으면 먼저 조사(웹 검색·블
   await createHandler({ env: ENV, fetcher: fakeFetch([aiReply(JSON.stringify(AI_REPORT))]), store })(req({ body: { ...BODY, answers: { ...ANSWERS, a_budget: ok({ money: '거의 없어요', time: '1시간 미만' }) } } }), r2);
   assert.equal(r2.statusCode, 200, r2.body);
   assert.equal(r2.json().research.searchedAt, out.research.searchedAt);
+});
+
+test('개선안: 10개까지 살리고 실행 단계·기대 효과를 남기며, 지시문은 8~10개와 인터넷 조사 개선점 3개 이상을 요구한다', () => {
+  const many = Array.from({ length: 12 }, (_, i) => ({
+    priority: i < 2 ? '우선 개선' : '이번 주 실행', area: '온라인 평판', title: `개선 ${i + 1}`, problem: '문제', evidence: ['[공개 정보] 네이버 블로그 4편: 대기 반복'],
+    actions: ['1단계', '2단계', '3단계', '4단계', '5단계', '6단계', '7단계', '8단계'], effect: '손님 불편이 줄어요', owner: '사장님', cost: '없음', supplies: '', metric: '대기 시간 기록',
+  }));
+  const r = normalizeReport({ ...AI_REPORT, solutions: many }, []);
+  assert.equal(r.solutions.length, 10);
+  assert.equal(r.solutions[0].actions.length, 7);
+  assert.equal(r.solutions[0].effect, '손님 불편이 줄어요');
+  assert.match(REPORT_SYSTEM, /8~10개/);
+  assert.match(REPORT_SYSTEM, /인터넷 조사 결과에서 찾은 개선점을 최소 3개/);
+  assert.ok(REPORT_SCHEMA.properties.solutions.items.required.includes('effect'));
+  // 붙여 넣은 리뷰가 없으면 그 칸은 지시문에서 뺀다
+  const input = validateReportInput(BODY);
+  assert.ok(!buildReportInput(input, computeMetrics({ answers: input.answers }, input.store), null).includes('[사장님이 붙여 넣은 플랫폼 리뷰·평점]'));
 });

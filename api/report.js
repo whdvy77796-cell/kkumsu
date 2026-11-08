@@ -3,7 +3,7 @@
 // Claude가 진단 보고서와 맞춤 솔루션을 만든다. 숫자는 서버가 계산하고(lib/report-calc.mjs), AI는 그 값만 근거로 쓴다.
 import { HttpError, send, sendError, readJson, checkOrigin, runMetered, hashKey, createStore } from '../lib/guard.mjs';
 import { chat, extractJson, DEFAULT_MODEL, REPAIR_MODEL } from '../lib/ai.mjs';
-import { REPORT_SYSTEM, REPORT_SCHEMA, REPORT_REPAIR_SYSTEM, validateReportInput, buildReportInput, normalizeReport, looksLikeReport } from '../lib/report.mjs';
+import { REPORT_SYSTEM, REPORT_SCHEMA, REPORT_REPAIR_SYSTEM, REPORT_VERSION, validateReportInput, buildReportInput, normalizeReport, looksLikeReport } from '../lib/report.mjs';
 import { computeMetrics } from '../lib/report-calc.mjs';
 import { mockEnabled, mockReport, mockResearch } from '../lib/mock.mjs';
 import { status } from './store-search.js';
@@ -19,7 +19,7 @@ export async function makeReport({ env, fetcher, input, computed, research, mete
       model,
       system: REPORT_SYSTEM,
       user: buildReportInput(input, computed, research),
-      maxTokens: 12000,
+      maxTokens: 16000,
       reasoningEffort: 'low',
       timeoutMs: 200000,
     });
@@ -39,8 +39,8 @@ export async function makeReport({ env, fetcher, input, computed, research, mete
         fetcher,
         model: env.MAECHUL_REPAIR_MODEL || REPAIR_MODEL,
         system: REPORT_REPAIR_SYSTEM,
-        user: r.text.slice(0, 40000),
-        maxTokens: 9000,
+        user: r.text.slice(0, 60000),
+        maxTokens: 14000,
         reasoningEffort: null,
         responseFormat: { type: 'json_schema', json_schema: { name: 'store_report', strict: true, schema: REPORT_SCHEMA } },
         timeoutMs: 60000,
@@ -54,6 +54,7 @@ export async function makeReport({ env, fetcher, input, computed, research, mete
   }
   if (!looksLikeReport(parsed)) throw new HttpError(502, 'AI_FORMAT', 'AI가 만든 보고서를 정리하지 못했어요. 다시 시도해 주세요.');
   return {
+    v: REPORT_VERSION,
     report: normalizeReport(parsed, computed.metrics),
     metrics: computed.metrics,
     cautions: computed.cautions,
@@ -104,7 +105,7 @@ export function createHandler(deps = {}) {
         store,
         req,
         kind: 'report',
-        cacheKey: hashKey('report', input.name, input.address, JSON.stringify(input.store), JSON.stringify(input.answers), input.pasted, research.searchedAt),
+        cacheKey: hashKey('report', `v${REPORT_VERSION}`, input.name, input.address, JSON.stringify(input.store), JSON.stringify(input.answers), input.pasted, research.searchedAt),
         refresh: input.refresh,
         lock: true,
         run: (meter) => makeReport({ env, fetcher, input, computed, research, meter }),
