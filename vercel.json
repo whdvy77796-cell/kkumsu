@@ -5,7 +5,8 @@
   "regions": ["icn1"],
   "functions": {
     "api/store-search.js": { "maxDuration": 180 },
-    "api/report.js": { "maxDuration": 300 }
+    "api/report.js": { "maxDuration": 300 },
+    "api/research.js": { "maxDuration": 300 }
   },
   "headers": [
     {
