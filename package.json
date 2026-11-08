@@ -1,6 +1,6 @@
 {
   "name": "maechul-ollyeodeurim-ai",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "매출올려드림 AI - 상호명·주소로 AI가 가게 정보를 찾고 맞춤 인터뷰와 AI 진단 보고서를 만드는 웹서비스 (베타)",
   "type": "module",
