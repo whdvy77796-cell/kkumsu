@@ -129,7 +129,7 @@ function renderIntro() {
   let linkInput;
   clear(view).append(
     h('section', { class: 'hero' },
-      h('h1', null, '우리 가게, 무엇부터 바꿔야 할까요?'),
+      h('h1', null, '우리 가게, 매출이 달라질 방법을 찾다!'),
       h('p', { class: 'muted' }, '질문에 답하면 가게를 분석하고 매출과 수익을 개선할 방법을 알려드립니다.'),
     ),
     h('div', { class: 'card note small' }, h('b', null, '지금은 데모 버전이에요. '), 'AI와 인터넷 검색이 아직 연결되지 않아, 답변과 공개한 판단 기준·계산식으로 분석해요. 결제 기능도 없어요.'),
