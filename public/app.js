@@ -1,7 +1,7 @@
 // 매출올려드림 AI · 상호명·주소 → AI 가게 찾기 → 맞는지 확인 → 가게 상황에 맞춘 인터뷰
 import {
   PAGES, PROBLEMS, STATUS_LABEL, COST_RECORD_TIP,
-  buildCtx, visiblePages, isAnswered, splitCheck, parseNum, resolve,
+  buildCtx, visiblePages, isAnswered, splitCheck, parseNum, resolve, answerText,
 } from './questions.js';
 import { buildSolutions, LEVEL } from './solutions.js';
 
@@ -110,6 +110,7 @@ function route() {
   if (hash === '#/find') renderFind();
   else if (hash === '#/survey') renderSurvey();
   else if (hash === '#/done') renderDone();
+  else if (hash === '#/report') renderReport();
   else renderHome();
 }
 window.addEventListener('hashchange', () => {
@@ -165,7 +166,8 @@ function renderHome() {
     ? h('div', { class: 'card note' },
         h('b', null, S.doneAt ? '지난 진단 답변이 있어요' : '진행 중인 진단이 있어요'),
         h('p', { class: 'small', style: { margin: '4px 0 8px' } }, chosenStore()?.name || S.name),
-        h('a', { class: 'btn small', href: S.doneAt ? '#/done' : '#/survey' }, S.doneAt ? '답변 보기' : '이어서 답하기'))
+        h('a', { class: 'btn small', href: S.doneAt ? '#/done' : '#/survey' }, S.doneAt ? '답변 보기' : '이어서 답하기'),
+        S.doneAt && S.report?.data ? h('a', { class: 'btn small', href: '#/report', style: { marginLeft: '6px' } }, '보고서 보기') : null)
     : null;
 
   show(
@@ -188,13 +190,15 @@ function renderHome() {
         h('li', null, h('b', null, '상호명·주소 입력 '), h('span', { class: 'muted small' }, '지금 이 화면')),
         h('li', null, h('b', null, 'AI가 가게 정보 찾기 '), h('span', { class: 'muted small' }, '지도·리뷰·SNS 등 인터넷 공개 정보 (30초~1분)')),
         h('li', null, h('b', null, '우리 가게가 맞는지 확인 '), h('span', { class: 'muted small' }, '아니면 다시 입력')),
-        h('li', null, h('b', null, '가게 인터뷰 '), h('span', { class: 'muted small' }, '가장 큰 고민과 운영 방식에 맞춰 질문이 달라져요. AI가 찾은 정보는 미리 채워 두고, 모르는 건 "잘 모름"을 누르면 돼요.')))),
+        h('li', null, h('b', null, '가게 인터뷰 '), h('span', { class: 'muted small' }, '가장 큰 고민과 운영 방식에 맞춰 질문이 달라져요. AI가 찾은 정보는 미리 채워 두고, 모르는 건 "잘 모름"을 누르면 돼요.')),
+        h('li', null, h('b', null, 'AI 진단 보고서 '), h('span', { class: 'muted small' }, '원할 때만, 동의 후에 만들어요. 한 줄 진단·핵심 수치·우선순위 솔루션·실행 계획 (1~2분)')))),
     h('div', { class: 'card note small' },
       h('b', null, '입력한 정보는 이렇게 쓰여요'),
       h('ul', { class: 'note-list' },
         h('li', null, '상호명과 주소는 가게 정보를 찾기 위해 OpenRouter를 거쳐 AI(Anthropic Claude)에 전달돼요.'),
         h('li', null, '같은 가게를 다시 찾을 때를 위해, 찾은 공개 정보는 서버에 3일 동안 임시 보관돼요.'),
-        h('li', null, '인터뷰 답변은 서버로 보내지 않고 이 브라우저에만 저장돼요.'))),
+        h('li', null, '인터뷰 답변은 이 브라우저에 저장돼요. AI 진단 보고서를 만들 때만, 사장님이 동의하면 OpenRouter를 거쳐 AI(Anthropic Claude)에 전달돼요.'),
+        h('li', null, '만든 보고서는 같은 답변으로 다시 열 때를 위해 서버에 하루 동안 보관했다가 자동으로 지워요.'))),
   );
   setNavbar(btn('다음', go, true));
 }
@@ -709,69 +713,6 @@ function renderInput(q, a, c, store, body, onValue) {
 const found = (list) => Array.isArray(list) && list.length > 0;
 
 // ───────── 4. 완료: 답변 정리
-function optionLabel(options, value) {
-  return (options || []).find((o) => o.v === value)?.label ?? value;
-}
-function answerText(q, a, c) {
-  if (!a) return '-';
-  if (a.s === 'unknown') return q.unknownLabel || STATUS_LABEL.unknown;
-  if (a.s === 'na') return q.naLabel || STATUS_LABEL.na;
-  const v = a.v;
-  const approx = a.s === 'approx' ? ' (대략)' : '';
-  const money = (x, unit) => (parseNum(x) === null ? null : `${fmt(parseNum(x))}${unit ? ` ${unit}` : ''}`);
-  switch (q.type) {
-    case 'choice': {
-      const val = v?.value ?? v;
-      const label = optionLabel(resolve(q.options, c), val);
-      return v?.detail ? `${label} (${v.detail})` : label;
-    }
-    case 'multi': return (v || []).join(', ');
-    case 'text': return v;
-    case 'number': return `${v} ${q.unit || ''}${approx}`;
-    case 'money': return `${money(v, q.unit) || '-'}${approx}`;
-    case 'group':
-      return q.fields.filter((f) => !f.when || f.when(c, v)).map((f) => {
-        const x = v?.[f.key];
-        if (x == null || x === '' || (Array.isArray(x) && !x.length)) return null;
-        const t = f.type === 'choice' ? optionLabel(f.options, x) : f.type === 'multi' ? x.join(', ') : f.type === 'money' ? money(x, f.unit) : f.type === 'number' ? `${x} ${f.unit || ''}` : x;
-        return `${f.short || resolve(f.label, c)}: ${t}`;
-      }).filter(Boolean).join(' · ') + approx;
-    case 'split': {
-      const names = { hall: '홀', takeout: '포장', delivery: '배달' };
-      return Object.keys(names).filter((k) => v?.[k]?.on).map((k) => (parseNum(v[k].pct) !== null ? `${names[k]} ${v[k].pct}%` : names[k])).join(' · ') + approx;
-    }
-    case 'rows':
-      return (v || []).map((r, i) => {
-        const parts = q.columns.map((col) => {
-          const x = r?.[col.key];
-          if (x == null || String(x).trim() === '') return null;
-          return col.type === 'text' ? x : `${col.type === 'money' ? fmt(parseNum(x) ?? x) : x}${col.unit ? ` ${col.unit}` : ''}`;
-        }).filter(Boolean);
-        return parts.length ? `${q.rowLabels[i]} ${parts.join(' ')}` : null;
-      }).filter(Boolean).join(' / ') + approx;
-    case 'costs': {
-      const items = resolve(q.items, c);
-      return items.map((it) => (parseNum(v?.[it.key]) !== null ? `${it.label} ${money(v[it.key], q.unit)}` : null)).filter(Boolean).join(' · ') + approx;
-    }
-    case 'channels':
-      return q.items.map((it) => (String(v?.[it.key] || '').trim() ? `${it.label}: ${v[it.key]}` : null)).filter(Boolean).join(' · ');
-    case 'reviews': {
-      const praise = [...(v?.praise || []), v?.praiseText].filter((x) => String(x || '').trim());
-      const bad = [...(v?.complaints || []), v?.complaintsText].filter((x) => String(x || '').trim());
-      return [praise.length ? `칭찬: ${praise.join(', ')}` : null, bad.length ? `불평: ${bad.join(', ')}` : null].filter(Boolean).join(' / ');
-    }
-    case 'menucost': {
-      if (v?.know === 'unknown') {
-        const items = (v.items || []).filter((x) => x?.name).map((x) => [x.name, money(x.price, '원'), x.size, x.use ? `1회 ${x.use}` : null].filter(Boolean).join(' '));
-        return `잘 몰라요${items.length ? ` → ${items.join(' / ')}` : ''}`;
-      }
-      const inc = (v?.includes || []).length ? ` (${v.includes.join('·')} 포함)` : '';
-      return `${v?.know === 'approx' ? '대략 ' : ''}${money(v?.amount, '원') || '-'}${inc}`;
-    }
-    default: return String(v ?? '');
-  }
-}
-
 function solutionCard(sol) {
   return h('div', { class: `card sol sol-${sol.stars}` },
     h('div', { class: 'sol-head' },
@@ -797,18 +738,20 @@ function renderDone() {
   const total = pages.reduce((n, p) => n + p.questions.length, 0);
   const problem = PROBLEMS.find((p) => p.v === (getA('a_problem')?.v?.value ?? getA('a_problem')?.v))?.label;
   const sols = buildSolutions(S, store);
+  const cta = reportCta();
   show(
     h('div', { class: 'card' },
       h('h2', null, '인터뷰를 마쳤어요'),
       h('p', null, `${name}에 대한 질문 ${total}개에 답해 주셨어요.${problem ? ` 가장 큰 고민은 "${problem}"예요.` : ''}`),
-      h('p', { class: 'small muted', style: { margin: 0 } }, '답변은 이 브라우저에만 저장돼 있어요.')),
+      h('p', { class: 'small muted', style: { margin: 0 } }, '답변은 이 브라우저에 저장돼 있어요. AI 보고서를 만들 때만 동의를 받고 보내요.')),
+    cta.el,
     sols.length
       ? [
-          h('h3', { class: 'section-title' }, `맞춤 솔루션 ${sols.length}개`),
-          h('p', { class: 'small muted' }, '답변에서 바로 확인된 것부터 정리했어요. ★★★ 우선 개선 · ★★ 이번 주 실행 · ★ 조건부 실험'),
+          h('h3', { class: 'section-title' }, `바로 확인된 솔루션 ${sols.length}개`),
+          h('p', { class: 'small muted' }, '답변에서 바로 확인된 것부터 정리했어요. AI 보고서는 이 내용과 나머지 답변·공개 정보를 함께 분석해요. ★★★ 우선 개선 · ★★ 이번 주 실행 · ★ 조건부 실험'),
           sols.map(solutionCard),
         ]
-      : h('div', { class: 'card note small' }, '지금 답변에서는 바로 고칠 기본 문제가 보이지 않았어요.'),
+      : h('div', { class: 'card note small' }, '지금 답변에서는 바로 고칠 기본 문제가 보이지 않았어요. AI 보고서에서 나머지 답변과 공개 정보를 함께 분석해요.'),
     h('details', { class: 'card all-answers' },
       h('summary', null, `내 답변 전체 보기 (${total}개)`),
       pages.map((p) => h('div', { class: 'answer-group' },
@@ -816,13 +759,289 @@ function renderDone() {
         h('ul', { class: 'answers' }, p.questions.map((q) => h('li', null,
           h('span', { class: 'a-q' }, resolve(q.title, c)),
           h('span', { class: 'a-v' }, answerText(q, getA(q.id), c)))))))),
-    h('div', { class: 'card note small' },
-      h('b', null, '다음 단계 '),
-      '지금 솔루션은 기본 서비스·손님 앞 기본·반찬과 잔반·비용 기록을 먼저 다뤄요. 나머지 답변과 AI가 찾은 공개 정보를 함께 분석하는 핵심 진단과 실행 계획을 준비하고 있어요.'),
+    h('p', { class: 'small', style: { textAlign: 'center' } },
+      h('button', { class: 'btn small', type: 'button', onclick: () => {
+        if (!confirm('지금까지의 답변과 보고서를 지우고 처음부터 시작할까요?')) return;
+        S = {}; save(); location.hash = '#/';
+      } }, '처음부터 다시')),
   );
   setNavbar(
     btn('답변 고치기', () => { S.pageId = PAGES[0].id; S.doneAt = null; save(); location.hash = '#/survey'; }),
-    btn('처음부터 다시', () => { S = {}; save(); location.hash = '#/'; }, true),
+    btn(cta.label, cta.go, true),
+  );
+}
+
+// ───────── 5. AI 진단 보고서 (동의 후 답변 전송 → /api/report)
+// 답변이 바뀌었는지 알아보는 간단한 지문
+function answersKey() {
+  const s = JSON.stringify({ c: S.chosen, n: S.name, a: S.address, x: S.answers || {} });
+  let x = 5381;
+  for (let i = 0; i < s.length; i++) x = ((x * 33) ^ s.charCodeAt(i)) >>> 0;
+  return `${s.length}-${x.toString(36)}`;
+}
+const reportFresh = () => !!S.report?.data && S.report.key === answersKey();
+let reportJob = null; // { key, started, done, error, promise }
+
+function startReport({ refresh = false } = {}) {
+  const key = answersKey();
+  if (reportJob && !reportJob.done && reportJob.key === key) return reportJob;
+  const body = { name: S.name, address: S.address, store: chosenStore(), answers: S.answers, refresh };
+  const job = { key, started: Date.now(), done: false, error: null };
+  job.promise = (async () => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const data = await post('/api/report', body, 295000);
+        S.report = { key, data };
+        save();
+        return data;
+      } catch (e) {
+        // 같은 보고서를 이미 만드는 중이면(새로고침·두 번 누름) 끝날 때까지 기다렸다가 받아온다.
+        if (e.code === 'BUSY' && attempt < 24) {
+          job.waiting = true;
+          await new Promise((r) => setTimeout(r, 12000));
+          body.refresh = false;
+          continue;
+        }
+        throw e;
+      }
+    }
+  })();
+  job.promise.then(
+    () => { job.done = true; },
+    (e) => { job.done = true; job.error = e; },
+  ).finally(() => {
+    if (location.hash === '#/report' || location.hash === '#/done') route();
+  });
+  reportJob = job;
+  return job;
+}
+
+function reportCta() {
+  if (reportFresh()) {
+    const go = () => { location.hash = '#/report'; };
+    return {
+      label: '보고서 보기', go,
+      el: h('div', { class: 'card report-cta ready' },
+        h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, 'AI 진단 보고서')),
+        h('h2', null, '보고서가 준비돼 있어요'),
+        S.report.data.report?.oneLine ? h('p', null, S.report.data.report.oneLine) : null,
+        h('button', { class: 'btn primary block', type: 'button', onclick: go }, '보고서 보기')),
+    };
+  }
+  if (reportJob && !reportJob.done && reportJob.key === answersKey()) {
+    const go = () => { location.hash = '#/report'; };
+    return {
+      label: '진행 상황 보기', go,
+      el: h('div', { class: 'card report-cta' },
+        h('h2', null, '보고서를 만드는 중이에요'),
+        h('p', { class: 'small' }, '보통 1~2분 걸려요.'),
+        h('button', { class: 'btn primary block', type: 'button', onclick: go }, '진행 상황 보기')),
+    };
+  }
+  const old = !!S.report?.data;
+  const agree = h('input', { type: 'checkbox', id: 'agreeAi' });
+  const make = h('button', { class: 'btn primary block', type: 'button', disabled: true }, old ? '바뀐 답변으로 다시 만들기' : 'AI 진단 보고서 만들기');
+  const el = h('div', { class: 'card report-cta', id: 'reportCta' },
+    h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, 'AI 진단 보고서')),
+    h('h2', null, old ? '답변이 바뀌었어요' : '이제 AI가 진단 보고서를 만들어 드려요'),
+    h('p', null, old
+      ? '바뀐 답변으로 보고서를 다시 만들 수 있어요.'
+      : '답변과 AI가 찾은 공개 정보를 함께 분석해서 한 줄 진단, 핵심 수치, 가장 중요한 문제와 바로 할 일, 우선순위 솔루션, 실행 계획까지 정리해요.'),
+    h('ul', { class: 'note-list small' },
+      h('li', null, '보고서를 만들려면 인터뷰 답변과 AI가 찾은 가게 정보를 OpenRouter를 거쳐 AI(Anthropic Claude)에 보내야 해요.'),
+      h('li', null, '같은 답변으로 다시 열 때 비용이 들지 않도록, 만든 보고서는 서버에 하루 동안 보관했다가 자동으로 지워요.'),
+      h('li', null, '보통 1~2분 걸리고, 하루에 3번까지 만들 수 있어요.')),
+    h('label', { class: 'consent' }, agree, h('span', null, '위 내용을 확인했고, 보고서를 만들기 위해 답변을 AI에 보내는 데 동의해요.')),
+    make,
+    old ? h('p', { class: 'small', style: { margin: '10px 0 0' } }, h('a', { href: '#/report' }, '이전 답변으로 만든 보고서 보기')) : null);
+  const go = () => {
+    if (!agree.checked) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      agree.focus();
+      toast('보고서를 만들려면 먼저 동의에 체크해 주세요.');
+      return;
+    }
+    S.reportConsentAt = new Date().toISOString();
+    save();
+    startReport();
+    location.hash = '#/report';
+  };
+  agree.addEventListener('change', () => { make.disabled = !agree.checked; });
+  make.addEventListener('click', go);
+  return { label: old ? '보고서 다시 만들기' : 'AI 보고서 만들기', go, el };
+}
+
+const REPORT_TIPS = [
+  '답변과 AI가 찾은 공개 정보를 함께 읽고 있어요.',
+  '매출·비용 계산값을 확인하고 있어요.',
+  '가장 중요한 문제와 바로 할 일을 고르고 있어요.',
+  '우선순위 솔루션을 정리하고 있어요.',
+  '실행 계획과 확인 지표를 정리하고 있어요.',
+  '거의 다 됐어요. 조금만 기다려 주세요.',
+];
+
+function renderReport() {
+  if (!S.doneAt || !Number.isInteger(S.chosen)) { location.replace(Number.isInteger(S.chosen) ? '#/survey' : '#/'); return; }
+  storeName.textContent = chosenStore()?.name || S.name;
+  const job = reportJob;
+  if (job && !job.done) return reportLoading(job);
+  if (job && job.error && job.key === answersKey() && !reportFresh()) return reportError(job.error);
+  if (!S.report?.data) { location.replace('#/done'); return; }
+  drawReport(S.report.data, !reportFresh());
+}
+
+function reportLoading(job) {
+  const elapsed = h('span', { class: 'elapsed' }, '0초');
+  const tip = h('p', { class: 'small muted' }, REPORT_TIPS[0]);
+  show(
+    h('div', { class: 'card loading' },
+      h('div', { class: 'spinner', 'aria-hidden': 'true' }),
+      h('h2', null, 'AI가 진단 보고서를 만들고 있어요'),
+      h('p', { class: 'small' }, '보통 1~2분 걸려요. ', elapsed),
+      tip,
+      h('p', { class: 'tiny muted', style: { margin: 0 } }, '이 창을 열어 두면 끝나는 대로 보여드려요. 같은 답변으로 다시 요청하면, 이미 만든 보고서는 추가 비용 없이 받아요.')),
+  );
+  setNavbar(btn('완료 화면으로', () => { location.hash = '#/done'; }));
+  const started = job.started;
+  const timer = setInterval(() => {
+    if (!elapsed.isConnected) { clearInterval(timer); return; }
+    const s = Math.round((Date.now() - started) / 1000);
+    elapsed.textContent = s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`;
+    tip.textContent = job.waiting ? '같은 답변으로 이미 만드는 중인 보고서를 기다리고 있어요.' : REPORT_TIPS[Math.min(REPORT_TIPS.length - 1, Math.floor(s / 20))];
+  }, 1000);
+}
+
+function reportError(e) {
+  const stop = ['IP_QUOTA', 'DAILY_BUDGET', 'AI_CREDIT', 'AI_CONFIG', 'STORE_CONFIG', 'ORIGIN', 'NAME', 'ANSWERS'].includes(e.code);
+  show(
+    h('div', { class: 'card warn' },
+      h('h2', null, '보고서를 만들지 못했어요'),
+      h('p', null, e.message || '잠시 후 다시 시도해 주세요.'),
+      h('p', { class: 'tiny muted' }, `오류 코드: ${e.code || '알 수 없음'}`)),
+  );
+  setNavbar(
+    btn('완료 화면으로', () => { reportJob = null; location.hash = '#/done'; }),
+    stop ? null : btn('다시 시도', () => { reportJob = null; startReport(); route(); }, true),
+  );
+}
+
+const EV_TAG = { '답변': 'ans', '계산': 'calc', '공개 정보': 'pub', '참고 통계': 'ref', '추정': 'est' };
+function evItem(text) {
+  const m = /^\[(답변|계산|공개 정보|참고 통계|추정)\]\s*/.exec(text);
+  return h('li', null, m ? h('span', { class: `ev-tag ev-${EV_TAG[m[1]]}` }, m[1]) : null, m ? text.slice(m[0].length) : text);
+}
+const KIND_CLASS = { '답변': 'ans', '계산': 'calc', '추정': 'est' };
+
+function aiSolutionCard(sol) {
+  return h('div', { class: `card sol sol-${sol.stars}` },
+    h('div', { class: 'sol-head' },
+      sol.stars ? h('span', { class: 'stars' }, '★'.repeat(sol.stars)) : null,
+      h('span', { class: 'sol-level' }, LEVEL[sol.stars]),
+      h('span', { class: 'sol-area' }, sol.area)),
+    h('h3', null, sol.title),
+    sol.problem ? h('p', { class: 'sol-row' }, h('b', null, '발견한 문제 '), sol.problem) : null,
+    sol.evidence.length ? [h('div', { class: 'sub-title' }, '확인 근거'), h('ul', { class: 'ev-list' }, sol.evidence.map(evItem))] : null,
+    h('div', { class: 'sub-title' }, '실행 방법'),
+    h('ol', { class: 'sol-steps' }, sol.actions.map((x) => h('li', null, x))),
+    h('dl', { class: 'sol-meta' },
+      sol.owner ? [h('dt', null, '담당'), h('dd', null, sol.owner)] : null,
+      sol.cost ? [h('dt', null, '비용과 기간'), h('dd', null, sol.cost)] : null,
+      sol.supplies ? [h('dt', null, '준비물'), h('dd', null, sol.supplies)] : null,
+      sol.metric ? [h('dt', null, '확인 지표'), h('dd', null, sol.metric)] : null));
+}
+
+function drawReport(data, stale) {
+  const r = data.report || {};
+  const when = (() => {
+    try { return new Date(data.createdAt).toLocaleString('ko-KR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Asia/Seoul' }); } catch { return ''; }
+  })();
+  const planCol = (title, items) => (items?.length ? h('div', { class: 'plan-col' }, h('h3', null, title), h('ul', null, items.map((x) => h('li', null, x)))) : null);
+  const analysis = [['수익 구조', r.analysis?.profit], ['메뉴', r.analysis?.menu], ['고객 경험', r.analysis?.customer], ['어떻게 이어지나요', r.analysis?.connection]].filter(([, t]) => t);
+  const b = data.bench;
+  show(
+    stale
+      ? h('div', { class: 'card warn no-print' },
+          h('b', null, '답변이 바뀌었어요. '),
+          '이 보고서는 바뀌기 전 답변으로 만든 거예요. ',
+          h('a', { href: '#/done' }, '바뀐 답변으로 다시 만들기'))
+      : null,
+    data.mock ? h('div', { class: 'card note small' }, '(모의 응답) 실제 AI가 아니라 화면 점검용으로 만든 보고서예요.') : null,
+    h('div', { class: 'rep-head' },
+      h('div', { class: 'rep-kicker' }, 'AI 진단 보고서 · 베타'),
+      h('h1', { class: 'rep-title' }, `${data.store?.name || S.name} 진단 보고서`),
+      h('p', { class: 'small muted' }, [when, data.store?.address].filter(Boolean).join(' · '))),
+
+    h('section', { class: 'card rep-core' },
+      h('div', { class: 'rep-label' }, '핵심 진단'),
+      r.situation && r.situation !== '기타' ? h('span', { class: 'situation' }, r.situation) : null,
+      h('p', { class: 'one-line' }, r.oneLine),
+      r.situationMessage ? h('p', { class: 'small muted' }, r.situationMessage) : null,
+      r.keyMetrics?.length
+        ? h('div', { class: 'key-metrics' }, r.keyMetrics.map((m) => h('div', null,
+            h('span', null, m.label), h('b', null, m.value), h('small', { class: `kind kind-${KIND_CLASS[m.kind] || 'calc'}` }, m.kind))))
+        : null,
+      h('div', { class: 'rep-block' },
+        h('h3', null, '가장 중요한 문제'),
+        h('p', { class: 'strong' }, r.topProblem?.title),
+        r.topProblem?.evidence?.length ? h('ul', { class: 'ev-list' }, r.topProblem.evidence.map(evItem)) : null),
+      h('div', { class: 'rep-block first-action' },
+        h('h3', null, '지금 바로 할 일'),
+        h('p', { class: 'strong' }, r.firstAction?.title),
+        r.firstAction?.how ? h('p', { class: 'small', style: { margin: 0 } }, r.firstAction.how) : null)),
+
+    r.urgent?.length
+      ? h('section', { class: 'card warn' }, h('h3', null, '위생·안전: 먼저 확인하세요'), h('ul', null, r.urgent.map((x) => h('li', null, x))))
+      : null,
+
+    data.metrics?.length
+      ? h('section', { class: 'card' },
+          h('h2', null, '숫자로 본 우리 가게'),
+          h('p', { class: 'small muted' }, '사장님이 적은 숫자로 서버가 계산했어요. AI가 지어낸 숫자는 없어요.'),
+          h('table', { class: 'metrics' }, h('tbody', null, data.metrics.map((m) => h('tr', null,
+            h('th', null, m.label, m.note ? h('small', null, m.note) : null),
+            h('td', null, h('b', null, m.value), h('small', { class: `kind kind-${KIND_CLASS[m.kind] || 'calc'}` }, m.kind)))))),
+          data.cautions?.length ? h('ul', { class: 'note-list small' }, data.cautions.map((x) => h('li', null, x))) : null,
+          b ? h('p', { class: 'tiny muted', style: { margin: '8px 0 0' } }, `참고: ${b.name} 평균 (매출 대비) 식재료비 ${b.food}% · 고용인 인건비 ${b.labor}% · 임차료 ${b.rent}% · 영업이익률 ${b.profit}% — ${b.source}`) : null)
+      : data.cautions?.length
+        ? h('section', { class: 'card note small' }, h('ul', { class: 'note-list' }, data.cautions.map((x) => h('li', null, x))))
+        : null,
+
+    analysis.length
+      ? h('section', { class: 'card' },
+          h('h2', null, '수익 구조·메뉴·고객 경험 연결 분석'),
+          analysis.map(([t, x]) => h('div', { class: 'analysis-item' }, h('h3', null, t), h('p', { style: { margin: 0 } }, x))))
+      : null,
+
+    h('h2', { class: 'section-title' }, `우선 개선안 ${r.solutions?.length || 0}개`),
+    h('p', { class: 'small muted' }, '★★★ 우선 개선 · ★★ 이번 주 실행 · ★ 조건부 실험 · 확인 필요. 근거 표시: 답변 = 사장님 답변, 계산 = 서버 계산, 공개 정보 = AI가 찾은 정보, 추정 = AI의 판단'),
+    h('div', { class: 'sol-list' }, (r.solutions || []).map(aiSolutionCard)),
+
+    h('section', { class: 'card' },
+      h('h2', null, '실행 계획'),
+      h('div', { class: 'plan-cols' },
+        planCol('이번 주', r.plan?.thisWeek), planCol('2~3주 차', r.plan?.nextWeeks), planCol('한 달 안', r.plan?.thisMonth)),
+      r.plan?.marketing ? h('div', { class: 'rep-block' }, h('h3', null, '마케팅 실행안'), h('p', { style: { margin: 0 } }, r.plan.marketing)) : null,
+      r.plan?.budget ? h('div', { class: 'rep-block' }, h('h3', null, '예산'), h('p', { style: { margin: 0 } }, r.plan.budget)) : null,
+      r.plan?.check ? h('div', { class: 'rep-block' }, h('h3', null, '성과 확인 방법'), h('p', { style: { margin: 0 } }, r.plan.check)) : null),
+
+    r.needCheck?.length
+      ? h('section', { class: 'card note' }, h('h3', null, '더 정확한 진단을 위해 확인할 것'), h('ul', { class: 'note-list' }, r.needCheck.map((x) => h('li', null, x))))
+      : null,
+
+    h('div', { class: 'card note rep-foot' },
+      h('p', null, 'AI가 사장님 답변과 인터넷 공개 정보로 만든 진단이에요. 계산값은 사장님이 적은 숫자로 계산했고 추정이 섞여 있어요. 사진·실제 장부·모든 리뷰를 직접 본 것은 아니에요. 중요한 결정 전에는 장부와 현장에서 꼭 확인해 주세요.'),
+      data.truncated ? h('p', null, '보고서가 길어 끝부분이 잘렸을 수 있어요. 다시 만들면 나아질 수 있어요.') : null,
+      h('p', { style: { margin: 0 } }, `만든 AI: ${data.model === 'mock' ? '모의 응답' : data.model || '-'}${data.cached ? ' · 저장된 보고서' : ''}`)),
+    stale ? null : h('p', { class: 'small no-print', style: { textAlign: 'center' } },
+      h('button', { class: 'btn small', type: 'button', onclick: () => {
+        if (!confirm('같은 답변으로 보고서를 새로 만들까요? 하루에 3번까지 만들 수 있어요.')) return;
+        startReport({ refresh: true });
+        route();
+      } }, '보고서 새로 만들기')),
+  );
+  setNavbar(
+    btn('완료 화면', () => { location.hash = '#/done'; }),
+    btn('인쇄·PDF 저장', () => window.print(), true),
   );
 }
 route();

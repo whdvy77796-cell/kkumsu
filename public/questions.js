@@ -856,3 +856,68 @@ export const COST_RECORD_TIP = {
   title: '비용 기록부터 시작하세요.',
   body: '지금 자료만으로는 이익이 줄어드는 원인을 정확히 확인하기 어려워요. 매일 마감 후 매출과 지출을 기록하고, 월말에는 남은 식재료를 확인하세요. 지금 쓰는 POS의 장부 기능이나 캐시노트처럼 매출·비용 조회와 장부 관리 기능이 있는 도구를 쓸 수 있어요. 도구에 연결되지 않는 비용과 재고는 따로 적어 두세요.',
 };
+
+// ───────── 답을 읽기 쉬운 글로 (화면 요약과 AI 보고서에 함께 씀)
+const fmtNum = (n) => Number(n).toLocaleString('ko-KR');
+export function optionLabel(options, value) {
+  return (options || []).find((o) => o.v === value)?.label ?? value;
+}
+export function answerText(q, a, c) {
+  if (!a) return '-';
+  if (a.s === 'unknown') return q.unknownLabel || STATUS_LABEL.unknown;
+  if (a.s === 'na') return q.naLabel || STATUS_LABEL.na;
+  const v = a.v;
+  const approx = a.s === 'approx' ? ' (대략)' : '';
+  const money = (x, unit) => (parseNum(x) === null ? null : `${fmtNum(parseNum(x))}${unit ? ` ${unit}` : ''}`);
+  switch (q.type) {
+    case 'choice': {
+      const val = v?.value ?? v;
+      const label = optionLabel(resolve(q.options, c), val);
+      return v?.detail ? `${label} (${v.detail})` : label;
+    }
+    case 'multi': return (v || []).join(', ');
+    case 'text': return v;
+    case 'number': return `${v} ${q.unit || ''}${approx}`;
+    case 'money': return `${money(v, q.unit) || '-'}${approx}`;
+    case 'group':
+      return q.fields.filter((f) => !f.when || f.when(c, v)).map((f) => {
+        const x = v?.[f.key];
+        if (x == null || x === '' || (Array.isArray(x) && !x.length)) return null;
+        const t = f.type === 'choice' ? optionLabel(f.options, x) : f.type === 'multi' ? x.join(', ') : f.type === 'money' ? money(x, f.unit) : f.type === 'number' ? `${x} ${f.unit || ''}` : x;
+        return `${f.short || resolve(f.label, c)}: ${t}`;
+      }).filter(Boolean).join(' · ') + approx;
+    case 'split': {
+      const names = { hall: '홀', takeout: '포장', delivery: '배달' };
+      return Object.keys(names).filter((k) => v?.[k]?.on).map((k) => (parseNum(v[k].pct) !== null ? `${names[k]} ${v[k].pct}%` : names[k])).join(' · ') + approx;
+    }
+    case 'rows':
+      return (v || []).map((r, i) => {
+        const parts = q.columns.map((col) => {
+          const x = r?.[col.key];
+          if (x == null || String(x).trim() === '') return null;
+          return col.type === 'text' ? x : `${col.type === 'money' ? fmtNum(parseNum(x) ?? x) : x}${col.unit ? ` ${col.unit}` : ''}`;
+        }).filter(Boolean);
+        return parts.length ? `${q.rowLabels[i]} ${parts.join(' ')}` : null;
+      }).filter(Boolean).join(' / ') + approx;
+    case 'costs': {
+      const items = resolve(q.items, c);
+      return items.map((it) => (parseNum(v?.[it.key]) !== null ? `${it.label} ${money(v[it.key], q.unit)}` : null)).filter(Boolean).join(' · ') + approx;
+    }
+    case 'channels':
+      return q.items.map((it) => (String(v?.[it.key] || '').trim() ? `${it.label}: ${v[it.key]}` : null)).filter(Boolean).join(' · ');
+    case 'reviews': {
+      const praise = [...(v?.praise || []), v?.praiseText].filter((x) => String(x || '').trim());
+      const bad = [...(v?.complaints || []), v?.complaintsText].filter((x) => String(x || '').trim());
+      return [praise.length ? `칭찬: ${praise.join(', ')}` : null, bad.length ? `불평: ${bad.join(', ')}` : null].filter(Boolean).join(' / ');
+    }
+    case 'menucost': {
+      if (v?.know === 'unknown') {
+        const items = (v.items || []).filter((x) => x?.name).map((x) => [x.name, money(x.price, '원'), x.size, x.use ? `1회 ${x.use}` : null].filter(Boolean).join(' '));
+        return `잘 몰라요${items.length ? ` → ${items.join(' / ')}` : ''}`;
+      }
+      const inc = (v?.includes || []).length ? ` (${v.includes.join('·')} 포함)` : '';
+      return `${v?.know === 'approx' ? '대략 ' : ''}${money(v?.amount, '원') || '-'}${inc}`;
+    }
+    default: return String(v ?? '');
+  }
+}
