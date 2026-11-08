@@ -1015,7 +1015,7 @@ function researchSection(rs, pv) {
   const ul = (items) => h('ul', { class: 'plain-list' }, items.map((x) => h('li', null, x)));
   return h('section', { class: 'card research' },
     h('h2', null, '인터넷에서 본 우리 가게'),
-    h('p', { class: 'small muted' }, `AI가 ${when ? `${when}에 ` : ''}상호명·주소로 직접 검색하고 블로그·리뷰 글을 읽었어요. 분석 기간: ${rs.period || '확인 안 됨'} · 실제로 읽은 후기·글 ${rs.reviewsChecked || 0}개${rs.sponsored ? ` · 협찬 글 ${rs.sponsored}` : ''}`),
+    h('p', { class: 'small muted' }, `AI가 ${when ? `${when}에 ` : ''}상호명·주소로 직접 검색하고 블로그·리뷰 글을 읽었어요. 분석 기간: ${rs.period || '확인 안 됨'} · 실제로 읽은 후기·글 ${rs.reviewsChecked || 0}개${rs.sponsored ? ` · 협찬 표시 글: ${rs.sponsored}` : ''}`),
     pv?.summary ? h('p', null, pv.summary) : null,
     rs.platforms?.length
       ? [sub('플랫폼별로 확인한 것'), h('table', { class: 'metrics plat' }, h('tbody', null, rs.platforms.map((p) => h('tr', null,
