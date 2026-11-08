@@ -604,6 +604,18 @@ export const QUESTIONS = [
     why: '반복해서 요청받는 물품부터 손님이 바로 쓸 수 있게 하고(앞치마 위치·안내 포함), 냉난방과 바구니·걸이·우산 보관, 직원 식사·보관 기준을 정해요.',
   },
   {
+    id: 'l_mood', page: 'experience', type: 'group',
+    when: (c) => c.hasHall && (c.is('acquisition') || c.is('repeat') || c.dateCrowd),
+    title: '조명·가구·메뉴판·음악이 가게 콘셉트와 맞나요? 음악은 어떻게 틀고 있나요?',
+    fields: [
+      { key: 'concept', label: '조명·가구·메뉴판·음악과 콘셉트', short: '콘셉트', type: 'choice', options: opts('잘 맞아요', '일부 안 맞아요', '신경 쓰지 못했어요') },
+      { key: 'music', label: '음악을 트는 방식 (시간대·음량)', short: '음악', type: 'choice', options: opts('시간대에 맞춰 곡과 음량을 바꿔요', '한 가지로 계속 틀어요', '음악을 틀지 않아요') },
+      { key: 'source', label: '매장에서 틀기 허용된 음원 서비스인가요?', short: '음원', type: 'choice', when: (c, v) => v?.music && v.music !== '음악을 틀지 않아요', options: opts('매장용 음원 서비스를 써요', '개인 스트리밍·유튜브를 틀어요', '잘 모르겠어요') },
+      { key: 'speaker', label: '가게 밖에 스피커를 쓸 수 있는 환경인가요?', short: '외부 스피커', type: 'choice', when: (c) => c.is('acquisition'), options: opts('건물 규정상 쓸 수 있어요', '쓸 수 없어요', '잘 모르겠어요') },
+    ],
+    why: '영향이 큰 부분부터 순서대로 조정하고, 대화·식사·체류 목적에 맞게 선곡과 음량을 제안해요. 유튜브 플레이리스트를 찾았다고 매장 재생이 허용되는 것은 아니라서, 이용이 허용된 서비스인지 확인해요. 외부 스피커는 건물 규정과 주변 환경을 확인한 경우에만 검토해요.',
+  },
+  {
     id: 'k_sides', page: 'experience', type: 'group',
     when: (c) => c.hasHall && c.sidesCat && (c.is('profit') || c.is('repeat')),
     title: '기본 반찬을 제공하나요? 어떤 반찬이 자주 남나요?',
