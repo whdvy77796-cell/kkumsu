@@ -310,3 +310,38 @@ table.metrics td { text-align: right; white-space: nowrap; padding-left: 10px; }
   h2, h3, .section-title { break-after: avoid; }
   a { color: inherit; text-decoration: none; }
 }
+
+/* ───────── 인터넷 조사 (보고서) */
+.cta-steps { margin: 8px 0 12px; padding-left: 20px; }
+.cta-steps li { margin: 4px 0; }
+.paste-block textarea { width: 100%; min-height: 96px; font-size: 15px; }
+.stage-bar { display: flex; gap: 6px; justify-content: center; margin: 4px 0 10px; font-size: 13px; font-weight: 700; }
+.stage-bar span { padding: 3px 10px; border-radius: 999px; background: #eef0f4; color: var(--muted); }
+.stage-bar span.on { background: var(--brand); color: #fff; }
+.stage-bar span.done { background: #e7f6ee; color: var(--ok); }
+.research .sub-title { margin-top: 14px; }
+table.plat th a { font-weight: 700; }
+.st-ok { color: var(--ok); }
+.st-part { color: var(--warn); }
+.st-no { color: var(--muted); }
+.theme-list { list-style: none; padding: 0; margin: 4px 0; }
+.theme-list li { border-bottom: 1px solid var(--line); padding: 8px 0; }
+.theme-list li:last-child { border-bottom: 0; }
+.theme-list p { margin: 4px 0 0; font-size: 15px; }
+.theme-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.tone { font-size: 13px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: #eef0f4; }
+.tone-good { background: #e7f6ee; color: var(--ok); }
+.tone-bad { background: #fde8e7; color: var(--bad); }
+.tone-mixed { background: #fff4e5; color: var(--warn); }
+.theme-meta { font-size: 13px; color: var(--muted); white-space: nowrap; }
+details.sources-box { margin-top: 12px; font-size: 14px; }
+details.sources-box summary { cursor: pointer; font-weight: 700; color: var(--brand-dark); }
+details.sources-box ol { margin: 6px 0 0; padding-left: 20px; }
+details.sources-box li { margin: 3px 0; word-break: break-all; }
+.ev-paste { background: #e0f2fe; color: #0369a1; }
+@media print {
+  .research .theme-list li, table.plat tr { break-inside: avoid; }
+  .theme-list p { font-size: 9pt; }
+  .tone, .theme-meta, details.sources-box { font-size: 8pt; }
+  details.sources-box summary { display: none; }
+}
