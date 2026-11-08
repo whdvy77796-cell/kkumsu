@@ -127,6 +127,9 @@ function renderIntro() {
   storeName.textContent = '';
   const saved = deviceCases();
   let linkInput;
+  // 첫 화면에서 바로 첫 질문을 보여주고, "다음"으로 이어진다
+  reg.step = 1;
+  const regUI = regCard(renderIntro);
   clear(view).append(
     h('section', { class: 'hero' },
       h('h1', null, '우리 가게, 매출이 달라질 방법을 찾다!'),
@@ -134,7 +137,7 @@ function renderIntro() {
       h('p', { class: 'hero-desc' }, '직접 가게를 운영한 5년의 경험과 실제 컨설팅 노하우를 담았습니다.'),
       h('p', { class: 'hero-trust' }, '가게에 대한 질문에 답하면, 수익 구조부터 메뉴·마케팅·운영까지 분석해 맞춤 보고서와 실행 전략을 제안합니다.'),
     ),
-    h('div', { class: 'btn-row' }, h('a', { class: 'btn primary block', href: '#/start' }, '우리 가게 진단 시작하기')),
+    regUI.card,
     h('div', { class: 'card' },
       h('h2', null, '받게 될 보고서 예시'),
       h('p', { class: 'small muted' }, '가상의 가게 2곳으로 만든 예시예요. 업종과 답변에 따라 질문과 결과가 어떻게 달라지는지 볼 수 있어요.'),
@@ -167,6 +170,7 @@ function renderIntro() {
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '이어하기 링크로 열기'), linkInput = h('input', { type: 'url', placeholder: '받아둔 링크를 붙여넣으세요' })),
       h('button', { class: 'btn', onclick: () => { const m = linkInput.value.match(/#\/open\/([^\s]+)/); if (!m) return toast('링크 형식이 올바르지 않아요.'); location.hash = `#/open/${m[1]}`; } }, '링크로 열기')),
   );
+  setNavbar(h('button', { class: 'btn primary', onclick: regUI.next }, '다음'));
 }
 
 // ───────────────── 예시 보고서
@@ -186,21 +190,21 @@ async function renderSample(kind) {
   );
 }
 
-// ───────────────── 가게 등록
+// ───────────────── 가게 등록 (첫 화면에서 바로 첫 질문, "다음"으로 이어짐)
 const reg = { step: 1, p: { name: '', address: '', biz: '', sub: '', channels: {}, concerns: [] } };
-function renderStart() {
-  storeName.textContent = '';
+const REG_TITLES = ['가게 이름과 업종을 알려주세요', '가게는 어디에 있나요?', '운영 중인 온라인 채널이 있나요? (선택)', '가장 큰 고민은 무엇인가요?'];
+
+function regCard(rerender) {
   const p = reg.p;
-  const card = h('div', { class: 'card' });
-  const hint = h('div', { class: 'hint' });
-  const title = ['가게 기본 정보', '가게 위치', '온라인 채널 (선택)', '가장 큰 고민'][reg.step - 1];
-  card.append(h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, `가게 등록 ${reg.step}/4`)), h('h2', null, title));
+  const card = h('div', { class: 'card', id: 'regCard' });
+  const hint = h('div', { class: 'hint', role: 'alert' });
+  card.append(h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, `가게 정보 ${reg.step}/4`)), h('h2', null, REG_TITLES[reg.step - 1]));
   if (reg.step === 1) {
     card.append(
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '가게 이름'), h('input', { type: 'text', value: p.name, maxlength: 80, placeholder: '예: 골목분식', oninput: (e) => { p.name = e.target.value; } })),
       h('div', { class: 'lab', style: { fontWeight: 700, marginTop: '12px' } }, '업종'),
-      h('div', { class: 'opts two' }, BIZ_TYPES.map((b) => h('button', { class: `opt ${p.biz === b.v ? 'on' : ''}`, onclick: () => { p.biz = b.v; p.sub = ''; renderStart(); } }, b.label))),
-      p.biz ? [h('div', { class: 'lab', style: { fontWeight: 700 } }, '세부 업종'), h('div', { class: 'chips' }, SUB_TYPES[p.biz].map((s) => h('button', { class: `chip ${p.sub === s ? 'on' : ''}`, onclick: () => { p.sub = s; renderStart(); } }, s)))] : null,
+      h('div', { class: 'opts two' }, BIZ_TYPES.map((b) => h('button', { class: `opt ${p.biz === b.v ? 'on' : ''}`, onclick: () => { p.biz = b.v; p.sub = ''; rerender(); } }, b.label))),
+      p.biz ? [h('div', { class: 'lab', style: { fontWeight: 700 } }, '세부 업종'), h('div', { class: 'chips' }, SUB_TYPES[p.biz].map((s) => h('button', { class: `chip ${p.sub === s ? 'on' : ''}`, onclick: () => { p.sub = s; rerender(); } }, s)))] : null,
       h('p', { class: 'small muted' }, '음식점과 카페는 묻는 질문이 달라요.'));
   } else if (reg.step === 2) {
     card.append(h('label', { class: 'field' }, h('span', { class: 'lab' }, '정확한 주소'), h('input', { type: 'text', value: p.address, maxlength: 200, placeholder: '예: 서울시 ○○구 ○○로 12, 1층', oninput: (e) => { p.address = e.target.value; } })),
@@ -214,40 +218,46 @@ function renderStart() {
         if (p.concerns.includes(c.id)) p.concerns = p.concerns.filter((x) => x !== c.id);
         else if (p.concerns.length >= 3) return toast('최대 3개까지 고를 수 있어요.');
         else p.concerns = [...p.concerns, c.id];
-        renderStart();
+        rerender();
       } }, c.label))),
       h('div', { class: 'card note small' }, h('b', null, '시작 전 안내 '), h('ul', null, h('li', null, '인터뷰는 15~25분 정도 걸려요. 중간에 자동 저장되고, 이어하기 링크로 다시 열 수 있어요.'), h('li', null, '모르는 값은 "정확히 모름", "대략 입력", "나중에 답하기"를 눌러도 돼요. 모르는 비용을 0원으로 계산하지 않아요.'), h('li', null, '데모 버전은 무료예요. 결제 단계가 없어요.'))));
   }
   card.append(hint);
-  clear(view).append(card);
+  const showHint = (msg) => { hint.textContent = msg; hint.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
   const next = async () => {
-    if (reg.step === 1 && (!p.name.trim() || !p.biz)) { hint.textContent = '가게 이름과 업종을 입력해 주세요.'; return; }
-    if (reg.step < 4) { reg.step++; renderStart(); window.scrollTo(0, 0); return; }
-    if (!p.concerns.length) { hint.textContent = '고민을 1개 이상 골라주세요.'; return; }
+    if (reg.step === 1 && (!p.name.trim() || !p.biz)) return showHint('가게 이름과 업종을 입력해 주세요.');
+    if (reg.step < 4) {
+      reg.step++;
+      if (location.hash === '#/start') renderStart(); else location.hash = '#/start';
+      window.scrollTo(0, 0);
+      return;
+    }
+    if (!p.concerns.length) return showHint('고민을 1개 이상 골라주세요.');
     const r = await api('/api/cases', { method: 'POST', body: { profile: p }, noAuth: true });
     rememberCase(r.id, r.token, p.name);
     S.caseId = r.id; S.token = r.token; S.data = r.data; S.version = r.version; S.report = null;
+    S.data.settings = S.data.settings || {};
     reg.step = 1; reg.p = { name: '', address: '', biz: '', sub: '', channels: {}, concerns: [] };
-    showLinkModal(true);
+    toast('답변은 자동 저장돼요. 이어하기 링크는 "보관·삭제"에 있어요.', 3500);
+    location.hash = `#/c/${r.id}/interview`;
   };
-  setNavbar(reg.step > 1 ? h('button', { class: 'btn', onclick: () => { reg.step--; renderStart(); } }, '이전') : h('a', { class: 'btn', href: '#/' }, '취소'),
-    h('button', { class: 'btn primary', onclick: next }, reg.step < 4 ? '다음' : '인터뷰 시작하기'));
+  const prev = () => {
+    if (reg.step <= 1) return;
+    reg.step--;
+    if (reg.step === 1) location.hash = '#/'; else renderStart();
+    window.scrollTo(0, 0);
+  };
+  return { card, next, prev };
 }
 
-function showLinkModal(first) {
-  const link = resumeLink();
-  setNavbar();
-  storeName.textContent = S.data.profile.name;
-  clear(view).append(h('div', { class: 'card' },
-    h('h2', null, first ? '진단을 만들었어요' : '이어하기 링크'),
-    h('p', null, STANDALONE() ? '아래 링크로 이 브라우저에서 이어서 작성하고 보고서를 다시 볼 수 있어요. 체험판은 이 브라우저에만 저장돼 다른 기기에서는 열리지 않아요.' : '아래 링크가 있으면 다른 기기에서도 이어서 작성하고 보고서를 다시 볼 수 있어요. 비밀번호처럼 보관하고 다른 사람에게 보내지 마세요.'),
-    h('div', { class: 'linkbox' }, link),
-    h('div', { class: 'btn-row' }, h('button', { class: 'btn', onclick: () => navigator.clipboard.writeText(link).then(() => toast('링크를 복사했어요.'), () => toast('복사하지 못했어요. 직접 선택해 복사해 주세요.')) }, '링크 복사'),
-      h('button', { class: 'btn', disabled: true, title: '데모에서는 이메일 발송이 연결되지 않았어요' }, '이메일로 받기 (준비 중)')),
-    h('p', { class: 'tiny muted' }, '이메일 발송은 아직 연결되지 않았어요. 링크를 잃어버리면 암호화된 자료를 되찾을 수 없어요.'),
-    h('a', { class: 'btn primary block', href: `#/c/${S.caseId}/interview` }, first ? '인터뷰 시작' : '돌아가기')));
+function renderStart() {
+  storeName.textContent = '';
+  // 첫 질문은 첫 화면에 있다
+  if (reg.step <= 1) { location.hash = '#/'; return; }
+  const { card, next, prev } = regCard(renderStart);
+  clear(view).append(card);
+  setNavbar(h('button', { class: 'btn', onclick: prev }, '이전'), h('button', { class: 'btn primary', onclick: next }, '다음'));
 }
-
 // ───────────────── 가게 정보 수정
 function renderProfile() {
   const p = S.data.profile;
