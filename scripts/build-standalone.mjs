@@ -59,7 +59,7 @@ export async function buildStandalone(outPath, opts = {}) {
   if (opts.siteUrl) {
     const url = opts.siteUrl.replace(/\/+$/, '') + '/';
     const title = opts.title || '매출올려드림 AI';
-    const desc = opts.description || '음식점·카페 사장님을 위한 가게 진단. 질문에 답하면 매출과 수익을 개선할 방법과 이번 주 할 일을 알려드려요.';
+    const desc = opts.description || '가게에 대한 질문에 답하면, 수익 구조부터 메뉴·마케팅·운영까지 분석해 맞춤 보고서와 실행 전략을 제안합니다.';
     rep('<title>매출올려드림 AI</title>', [
       `<title>${esc(title)}</title>`,
       `<link rel="canonical" href="${esc(url)}">`,
