@@ -186,6 +186,9 @@ details.more > summary { cursor: pointer; color: var(--brand-dark); font-weight:
 .linkbox { font-family: ui-monospace, Consolas, monospace; font-size: 14px; background: #f4f1ec; padding: 10px; border-radius: 10px; word-break: break-all; }
 .hero { padding: 6px 0 4px; }
 .hero h1 { font-size: 30px; }
+.hero .hero-sub { font-size: 21px; font-weight: 800; margin: 16px 0 6px; color: var(--ink); }
+.hero .hero-desc { font-size: 17px; color: var(--muted); margin: 0 0 12px; }
+.hero .hero-trust { font-size: 15px; font-weight: 700; color: #1f2f6b; background: #eef2ff; border-radius: 10px; padding: 10px 12px; margin: 0; }
 .feature { display: flex; gap: 10px; padding: 8px 0; }
 .feature b { flex: none; }
 hr.soft { border: 0; border-top: 1px dashed var(--line); margin: 14px 0; }
