@@ -187,6 +187,21 @@ details.why p { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
 .theme-chips .tone-bad { background: #fee2e2; color: #991b1b; }
 .theme-chips .tone-mixed { background: #fef3c7; color: #92400e; }
 
+/* 맞춤 솔루션 */
+.sol { border-left: 5px solid var(--line); }
+.sol-3 { border-left-color: var(--bad); }
+.sol-2 { border-left-color: var(--brand); }
+.sol-1 { border-left-color: #94a3b8; }
+.sol-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 4px; }
+.sol-3 .stars { color: var(--bad); }
+.sol-level { font-size: 14px; font-weight: 800; }
+.sol-area { font-size: 13px; color: var(--muted); background: #f4f6fa; border-radius: 999px; padding: 2px 10px; }
+.sol h3 { font-size: 19px; margin: 4px 0 8px; }
+.sol-row { margin: 0 0 8px; }
+.sol-steps { margin: 0 0 10px; padding-left: 22px; font-size: 16px; }
+.sol-steps li { margin: 5px 0; }
+details.all-answers > summary { cursor: pointer; font-weight: 800; font-size: 17px; }
+.answer-group h3 { margin-top: 16px; }
 /* 완료 */
 .section-title { margin: 18px 0 8px; }
 .answers { list-style: none; padding: 0; margin: 0; }
