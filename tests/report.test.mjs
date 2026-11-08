@@ -57,6 +57,10 @@ test('계산: 매출·비용·이익 세 가지를 나누고, 수수료 두 번 
   assert.ok(cautions.some((x) => /현금 흐름은 계산하지 않았어요/.test(x)));
   assert.equal(bench.name, '한식');
   assert.ok(metrics.every((m) => m.label && m.value && ['답변', '계산', '추정'].includes(m.kind)));
+  // 걱정 메뉴가 대표 메뉴 3개 중 하나면 두 번 계산하지 않는다
+  const worry = computeMetrics({ answers: { ...ANSWERS, c_worry: ok([{ name: '수육', price: '25000' }]), c_cost_more: ok({ m2: '9000', worry: '9000' }) } }, STORE).metrics;
+  assert.equal(metric(worry, '수육 1개 팔면 남는 금액').value, '16,000원');
+  assert.ok(!worry.some((m) => m.label.includes('(걱정 메뉴)')));
 });
 
 test('계산: 비용을 모르면 이익을 계산하지 않고, 이상한 값은 버린다', () => {
