@@ -37,7 +37,7 @@ test('화면 파일과 보안 헤더, 폴더 밖 파일 차단', async () => {
   assert.match(home.headers.get('content-security-policy') || '', /default-src 'self'/);
   assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
   assert.ok(home.body.toString('utf8').includes('<script type="module" src="/app.js"></script>'));
-  for (const p of ['/app.js', '/ui.js', '/report.js', '/screens.js', '/fields.js', '/styles.css', '/icon.svg', '/shared/engine.js', '/shared/diagnose.js']) {
+  for (const p of ['/app.js', '/ui.js', '/report.js', '/screens.js', '/fields.js', '/styles.css', '/logo.png', '/icon.png', '/shared/engine.js', '/shared/diagnose.js']) {
     assert.equal((await call(p)).status, 200, p);
   }
   assert.notEqual((await call('/shared/..%2Fserver%2Fserver.js')).status, 200, '폴더 밖 파일은 열리지 않아야 함');
