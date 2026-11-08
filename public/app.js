@@ -1,4 +1,9 @@
-// 매출올려드림 AI · 상호명·주소 → AI 가게 찾기 → 맞는지 확인 → 맞춤 설문 10문항
+// 매출올려드림 AI · 상호명·주소 → AI 가게 찾기 → 맞는지 확인 → 가게 상황에 맞춘 인터뷰
+import {
+  PAGES, PROBLEMS, STATUS_LABEL, COST_RECORD_TIP,
+  buildCtx, visiblePages, isAnswered, splitCheck, parseNum, resolve,
+} from '/questions.js';
+
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
 const navbarInner = document.getElementById('navbarInner');
@@ -26,7 +31,6 @@ function h(tag, attrs, ...children) {
   return append(el, children);
 }
 function clear(el) { el.replaceChildren(); return el; }
-// 화면 본문을 통째로 바꾼다 (null·false는 건너뜀)
 function show(...kids) { return append(clear(view), kids); }
 let toastTimer;
 function toast(msg, ms = 2800) {
@@ -41,10 +45,10 @@ function setNavbar(...items) {
   navbar.hidden = !list.length;
 }
 const btn = (label, onclick, primary = false) => h('button', { class: primary ? 'btn primary' : 'btn', type: 'button', onclick }, label);
+const fmt = (n) => Number(n).toLocaleString('ko-KR');
 
 // ───────── 상태 (이 브라우저에만 저장)
-const KEY = 'maechul.v2';
-const LIKERT = [[1, '전혀 그렇지 않다'], [2, '그렇지 않다'], [3, '보통이다'], [4, '그렇다'], [5, '매우 그렇다']];
+const KEY = 'maechul.v3';
 let S = load();
 function load() {
   try {
@@ -155,9 +159,10 @@ function renderHome() {
   nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addrIn.focus(); } });
   addrIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); go(); } });
 
-  const resume = S.survey && S.name
+  const started = Number.isInteger(S.chosen) && S.answers && Object.keys(S.answers).length;
+  const resume = started
     ? h('div', { class: 'card note' },
-        h('b', null, S.doneAt ? '지난 설문 답변이 있어요' : '진행 중인 설문이 있어요'),
+        h('b', null, S.doneAt ? '지난 진단 답변이 있어요' : '진행 중인 진단이 있어요'),
         h('p', { class: 'small', style: { margin: '4px 0 8px' } }, chosenStore()?.name || S.name),
         h('a', { class: 'btn small', href: S.doneAt ? '#/done' : '#/survey' }, S.doneAt ? '답변 보기' : '이어서 답하기'))
     : null;
@@ -182,13 +187,13 @@ function renderHome() {
         h('li', null, h('b', null, '상호명·주소 입력 '), h('span', { class: 'muted small' }, '지금 이 화면')),
         h('li', null, h('b', null, 'AI가 가게 정보 찾기 '), h('span', { class: 'muted small' }, '지도·리뷰·SNS 등 인터넷 공개 정보 (30초~1분)')),
         h('li', null, h('b', null, '우리 가게가 맞는지 확인 '), h('span', { class: 'muted small' }, '아니면 다시 입력')),
-        h('li', null, h('b', null, '맞춤 질문 10개 '), h('span', { class: 'muted small' }, '"전혀 그렇지 않다"부터 "매우 그렇다"까지 골라 답하기')))),
+        h('li', null, h('b', null, '가게 인터뷰 '), h('span', { class: 'muted small' }, '가장 큰 고민과 운영 방식에 맞춰 질문이 달라져요. AI가 찾은 정보는 미리 채워 두고, 모르는 건 "잘 모름"을 누르면 돼요.')))),
     h('div', { class: 'card note small' },
       h('b', null, '입력한 정보는 이렇게 쓰여요'),
       h('ul', { class: 'note-list' },
         h('li', null, '상호명과 주소는 가게 정보를 찾기 위해 OpenRouter를 거쳐 AI(Anthropic Claude)에 전달돼요.'),
         h('li', null, '같은 가게를 다시 찾을 때를 위해, 찾은 공개 정보는 서버에 3일 동안 임시 보관돼요.'),
-        h('li', null, '설문 답변은 서버로 보내지 않고 이 브라우저에만 저장돼요.'))),
+        h('li', null, '인터뷰 답변은 서버로 보내지 않고 이 브라우저에만 저장돼요.'))),
   );
   setNavbar(btn('다음', go, true));
 }
@@ -235,10 +240,20 @@ async function renderFind() {
 }
 
 const MATCH = { high: '입력한 주소와 일치', medium: '비슷해요 · 확인 필요', low: '다른 가게일 수 있어요' };
+const TONE = { good: '좋음', bad: '아쉬움', mixed: '엇갈림' };
+
+function servicesText(sv) {
+  if (!sv) return null;
+  const on = [sv.hall ? '홀' : null, sv.takeout ? '포장' : null, sv.delivery ? '배달' : null].filter(Boolean);
+  const extra = sv.reservation ? ' · 예약 가능' : '';
+  return on.length ? on.join(' · ') + extra : null;
+}
 
 function candidateCard(c, i, many) {
-  const rows = [['주소', c.address], ['업종', c.category], ['전화', c.phone], ['영업시간', c.hours], ['가격대', c.priceRange], ['평점', c.rating], ['리뷰', c.reviewCount]]
-    .filter(([, v]) => v);
+  const rows = [
+    ['주소', c.address], ['업종', c.category], ['운영 기간', c.openedYear], ['위치', c.floor], ['전화', c.phone], ['영업시간', c.hours],
+    ['판매 방식', servicesText(c.services)], ['가격대', c.priceRange], ['평점', c.rating], ['리뷰', c.reviewCount],
+  ].filter(([, v]) => v);
   const section = (title, items) => (items?.length ? [h('div', { class: 'sub-title' }, title), h('ul', { class: 'plain-list' }, items.map((s) => h('li', null, s)))] : null);
   return h('div', { class: 'card cand' },
     h('h3', null, c.name),
@@ -246,6 +261,9 @@ function candidateCard(c, i, many) {
     rows.length ? h('div', { class: 'kv' }, rows.map(([k, v]) => h('div', null, h('span', null, k), h('b', null, v)))) : null,
     c.menu?.length
       ? [h('div', { class: 'sub-title' }, '대표 메뉴'), h('div', { class: 'menu-chips' }, c.menu.map((m) => h('span', null, m.name, m.price ? h('small', null, m.price) : null)))]
+      : null,
+    c.reviewThemes?.length
+      ? [h('div', { class: 'sub-title' }, '리뷰 경향'), h('div', { class: 'theme-chips' }, c.reviewThemes.map((t) => h('span', { class: `tone-${t.tone}`, title: t.note || '' }, `${t.theme} ${TONE[t.tone] || ''}`)))]
       : null,
     section('손님들이 좋게 말하는 점', c.strengths),
     section('아쉽다는 의견', c.weaknesses),
@@ -267,8 +285,8 @@ function sourcesCard(r) {
 
 function choose(i) {
   S.chosen = i;
-  S.survey = null;
   S.answers = {};
+  S.pageId = PAGES[0].id;
   S.doneAt = null;
   save();
   location.hash = '#/survey';
@@ -277,6 +295,7 @@ function reject() {
   S.rejected = true;
   S.search = null;
   delete S.chosen;
+  S.answers = {};
   save();
   location.hash = '#/';
 }
@@ -291,7 +310,7 @@ function showResult(r) {
         h('p', { class: 'small muted' }, '간판에 적힌 상호명 그대로, 지점명이나 도로명 주소를 넣으면 찾을 가능성이 높아요. 새로 연 가게라면 정보가 없을 수도 있어요.')),
       sourcesCard(r),
     );
-    setNavbar(btn('다시 입력', reject), btn('정보 없이 질문 받기', () => choose(-1), true));
+    setNavbar(btn('다시 입력', reject), btn('정보 없이 인터뷰하기', () => choose(-1), true));
     return;
   }
   const many = cands.length > 1;
@@ -305,120 +324,482 @@ function showResult(r) {
   setNavbar(btn(many ? '모두 아니에요' : '아니에요', reject), many ? null : btn('네, 맞아요', () => choose(0), true));
 }
 
-// ───────── 3. 맞춤 설문 10문항
-async function renderSurvey() {
-  if (!S.name || !Number.isInteger(S.chosen)) { location.replace('#/'); return; }
-  const store = chosenStore();
-  storeName.textContent = store?.name || S.name;
-  if (!S.survey) {
-    const seq = navSeq;
-    const elapsed = h('span', { class: 'elapsed' }, '0초');
-    show(
-      h('div', { class: 'card loading' },
-        h('div', { class: 'spinner', 'aria-hidden': 'true' }),
-        h('h2', null, '맞춤 질문을 만들고 있어요'),
-        h('p', { class: 'small' }, '찾은 정보를 바탕으로 우리 가게에 맞는 질문 10개를 고르는 중이에요. 보통 10~30초 걸려요. ', elapsed)),
-    );
-    setNavbar(btn('이전', () => { location.hash = '#/find'; }));
-    const timer = startTimer(elapsed);
-    try {
-      const survey = await post('/api/survey', { name: S.name, address: S.address, store }, 100000);
-      if (seq !== navSeq) return;
-      S.survey = survey;
-      S.answers = {};
-      save();
-    } catch (e) {
-      if (seq !== navSeq) return;
-      showError(e, () => route());
-      return;
-    } finally {
-      clearInterval(timer);
+// ───────── 3. 가게 인터뷰
+function getA(id) { return S.answers?.[id]; }
+function setA(q, patch, c) {
+  const prev = S.answers[q.id] || { s: 'ok' };
+  const next = { ...prev, ...patch, pre: false };
+  if ('v' in patch && (prev.s === 'unknown' || prev.s === 'na')) next.s = 'ok';
+  if ('v' in patch && next.s === 'ok' && q.autoApprox?.(c)) next.s = 'approx';
+  S.answers[q.id] = next;
+  save();
+}
+
+function applyPrefill(questions, c) {
+  let changed = false;
+  for (const q of questions) {
+    if (S.answers[q.id] || !q.prefill) continue;
+    const v = q.prefill(c);
+    if (v != null) {
+      S.answers[q.id] = { s: 'ok', v, pre: true };
+      changed = true;
     }
   }
-  showSurvey();
+  if (changed) save();
+  return changed;
 }
 
-function showSurvey() {
-  const sv = S.survey;
-  const answers = (S.answers = S.answers || {});
-  const total = sv.questions.length;
-  const count = h('span', { class: 'navcount', 'aria-live': 'polite' });
-  const update = () => { count.textContent = `${sv.questions.filter((q) => answers[q.id]).length}/${total}`; };
+function currentPages(store) {
+  const pages = visiblePages(S, store);
+  let idx = pages.findIndex((p) => p.id === S.pageId);
+  if (idx < 0) {
+    const order = PAGES.map((p) => p.id);
+    const old = order.indexOf(S.pageId);
+    idx = pages.findIndex((p) => order.indexOf(p.id) > old);
+    if (idx < 0) idx = pages.length - 1;
+    S.pageId = pages[idx]?.id;
+  }
+  return { pages, idx };
+}
 
-  const cards = sv.questions.map((q, i) => {
-    const card = h('div', { class: 'card survey-q', id: `sq-${q.id}` });
-    const group = h('div', { class: 'likert', role: 'group', 'aria-labelledby': `qt-${q.id}` });
-    const buttons = LIKERT.map(([v, label]) => {
-      const b = h('button', { type: 'button', class: answers[q.id] === v ? 'on' : '', 'aria-pressed': String(answers[q.id] === v) }, label);
-      b.addEventListener('click', () => {
-        answers[q.id] = v;
-        save();
-        for (const x of buttons) {
-          x.classList.toggle('on', x === b);
-          x.setAttribute('aria-pressed', String(x === b));
-        }
-        card.classList.remove('missing');
-        update();
-      });
-      return b;
-    });
-    append(group, buttons);
-    return append(card, [
-      h('div', { class: 'qno' }, `${i + 1} / ${total}${q.area ? ` · ${q.area}` : ''}`),
-      h('p', { class: 'qtext', id: `qt-${q.id}` }, q.text),
-      group,
-      q.why ? h('p', { class: 'why' }, q.why) : null,
-    ]);
-  });
+function renderSurvey() {
+  if (!S.name || !Number.isInteger(S.chosen)) { location.replace('#/'); return; }
+  S.answers = S.answers || {};
+  const store = chosenStore();
+  storeName.textContent = store?.name || S.name;
+  drawPage(store, false);
+}
 
-  const finish = () => {
-    const missing = sv.questions.filter((q) => !answers[q.id]);
-    if (missing.length) {
-      for (const q of missing) document.getElementById(`sq-${q.id}`)?.classList.add('missing');
-      document.getElementById(`sq-${missing[0].id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      toast(`아직 답하지 않은 문항이 ${missing.length}개 있어요.`);
-      return;
-    }
-    S.doneAt = new Date().toISOString();
-    save();
-    location.hash = '#/done';
+function drawPage(store, keepScroll) {
+  const y = window.scrollY;
+  let { pages, idx } = currentPages(store);
+  if (applyPrefill(pages[idx].questions, buildCtx(S, store))) ({ pages, idx } = currentPages(store));
+  const page = pages[idx];
+  const c = buildCtx(S, store);
+  const all = pages.flatMap((p) => p.questions);
+  const answered = all.filter((q) => isAnswered(q, getA(q.id), c)).length;
+  const firstNo = pages.slice(0, idx).reduce((n, p) => n + p.questions.length, 0);
+  const shownIds = page.questions.map((q) => q.id).join(',');
+
+  // 답이 바뀌면 같은 화면의 질문 구성이 달라졌는지 확인한다 (분기 질문)
+  const refresh = (force) => {
+    const next = currentPages(store);
+    const ids = next.pages[next.idx]?.questions.map((q) => q.id).join(',');
+    if (force || ids !== shownIds || next.pages.length !== pages.length) drawPage(store, true);
+    else updateProgress();
+  };
+  const progressText = h('span', { class: 'navcount' });
+  const bar = h('i');
+  const updateProgress = () => {
+    const now = currentPages(store);
+    const cc = buildCtx(S, store);
+    const list = now.pages.flatMap((p) => p.questions);
+    const done = list.filter((q) => isAnswered(q, getA(q.id), cc)).length;
+    progressText.textContent = `${done}/${list.length}`;
+    bar.style.width = `${Math.round((done / Math.max(1, list.length)) * 100)}%`;
   };
 
+  const cards = [];
+  page.questions.forEach((q, i) => {
+    cards.push(questionCard(q, firstNo + i + 1, c, store, refresh));
+    if (q.id === 'b_know' && getA('b_know')?.v === 'unknown') cards.push(tipCard(COST_RECORD_TIP));
+  });
+
   show(
-    sv.insights?.length
-      ? h('div', { class: 'card' },
-          h('h2', null, 'AI가 살펴본 우리 가게'),
-          h('ul', { class: 'insights' }, sv.insights.map((it) => h('li', null, it.title ? h('b', null, it.title) : null, it.detail))))
+    h('div', { class: 'page-head' },
+      h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, `${idx + 1}단계 / ${pages.length}`), h('span', { class: 'tiny muted' }, `질문 ${all.length}개 중 ${answered}개 답함`)),
+      h('h2', null, resolve(page.title, c)),
+      h('p', { class: 'small muted' }, page.desc),
+      h('div', { class: 'bar' }, bar)),
+    idx === 0 && store
+      ? h('div', { class: 'card note small' }, 'AI가 찾은 정보로 업종·채널·판매 방식·메뉴 등을 미리 채워 두었어요. 맞으면 그대로 두고, 틀린 곳만 고쳐 주세요.')
       : null,
-    h('div', { class: 'card note' },
-      h('h2', null, `맞춤 질문 ${total}개`),
-      h('p', { class: 'small', style: { margin: 0 } }, '아래 문장이 우리 가게에 얼마나 맞는지 골라 주세요. 정답은 없어요. 지금 상황 그대로 답해 주시면 돼요.')),
     cards,
   );
-  update();
-  setNavbar(btn('이전', () => { location.hash = '#/find'; }), count, btn('제출하기', finish, true));
+  updateProgress();
+
+  const next = () => {
+    const cc = buildCtx(S, store);
+    const missing = page.questions.filter((q) => !isAnswered(q, getA(q.id), cc));
+    if (missing.length) {
+      for (const q of missing) document.getElementById(`q-${q.id}`)?.classList.add('missing');
+      document.getElementById(`q-${missing[0].id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast(`아직 답하지 않은 질문이 ${missing.length}개 있어요. 모르면 "잘 모름"을 눌러 주세요.`, 3500);
+      return;
+    }
+    const now = currentPages(store);
+    if (now.idx >= now.pages.length - 1) {
+      S.doneAt = new Date().toISOString();
+      save();
+      location.hash = '#/done';
+      return;
+    }
+    S.pageId = now.pages[now.idx + 1].id;
+    save();
+    drawPage(store, false);
+    window.scrollTo(0, 0);
+  };
+  const prev = () => {
+    const now = currentPages(store);
+    if (now.idx === 0) { location.hash = '#/find'; return; }
+    S.pageId = now.pages[now.idx - 1].id;
+    save();
+    drawPage(store, false);
+    window.scrollTo(0, 0);
+  };
+  setNavbar(btn('이전', prev), progressText, btn(idx === pages.length - 1 ? '완료' : '다음', next, true));
+  if (keepScroll) window.scrollTo(0, y);
 }
 
-// ───────── 4. 완료
+function tipCard(tip) {
+  return h('div', { class: 'card tip' },
+    h('div', { class: 'tip-head' }, h('span', { class: 'stars' }, tip.stars), h('b', null, tip.title)),
+    h('p', { class: 'small', style: { margin: 0 } }, tip.body));
+}
+
+// 질문 카드 하나
+function questionCard(q, no, c, store, refresh) {
+  const card = h('div', { class: 'card qcard', id: `q-${q.id}` });
+  const paint = () => {
+    const cc = buildCtx(S, store);
+    const a = getA(q.id);
+    clear(card);
+    card.classList.toggle('skipped', a?.s === 'unknown' || a?.s === 'na');
+    const body = h('div', { class: 'qbody' });
+    const statusRow = h('div', { class: 'status-row' });
+    const syncStatus = () => {
+      const s = getA(q.id)?.s;
+      for (const b of statusRow.children) b.classList.toggle('on', b.dataset.s === s);
+      card.classList.toggle('skipped', s === 'unknown' || s === 'na');
+    };
+    const onValue = (v, opts = {}) => {
+      setA(q, { v }, buildCtx(S, store));
+      card.classList.remove('missing', 'skipped');
+      syncStatus();
+      if (opts.repaint) paint();
+      if (opts.check !== false) refresh(false);
+    };
+    renderInput(q, getA(q.id), cc, store, body, onValue);
+    for (const s of q.allow || []) {
+      const label = s === 'na' ? q.naLabel || STATUS_LABEL.na : s === 'unknown' ? q.unknownLabel || STATUS_LABEL.unknown : '대략 입력';
+      statusRow.append(h('button', {
+        type: 'button', class: 'status-btn', 'data-s': s,
+        onclick: () => {
+          const cur = getA(q.id) || { s: 'ok' };
+          S.answers[q.id] = { ...cur, s: cur.s === s ? 'ok' : s, pre: false };
+          save();
+          card.classList.remove('missing');
+          syncStatus();
+          refresh(false);
+        },
+      }, label));
+    }
+    append(card, [
+      h('div', { class: 'qno' }, `질문 ${no}${a?.pre ? ' · AI가 미리 채움' : ''}`),
+      h('p', { class: 'qtext' }, resolve(q.title, cc)),
+      q.hint ? (() => { const t = resolve(q.hint, cc); return t ? h('p', { class: 'ai-hint' }, t) : null; })() : null,
+      q.help ? h('p', { class: 'help' }, q.help) : null,
+      body,
+      statusRow.children.length ? statusRow : null,
+      q.why ? h('details', { class: 'why' }, h('summary', null, '왜 묻나요?'), h('p', null, q.why)) : null,
+    ]);
+    syncStatus();
+  };
+  paint();
+  return card;
+}
+
+// ───────── 입력 칸
+function choiceButtons(options, current, onPick, { multi = false, compact = false } = {}) {
+  const wrap = h('div', { class: compact ? 'pills' : 'opts' });
+  const sel = multi ? new Set(current || []) : current;
+  for (const o of options) {
+    const on = multi ? sel.has(o.v) : sel === o.v;
+    wrap.append(h('button', {
+      type: 'button', class: `${compact ? 'pill' : 'opt'}${on ? ' on' : ''}`, 'aria-pressed': String(on),
+      onclick: () => {
+        if (multi) {
+          const set = new Set(current || []);
+          if (set.has(o.v)) set.delete(o.v); else set.add(o.v);
+          onPick([...set]);
+        } else onPick(o.v);
+      },
+    }, o.label, o.desc ? h('small', null, o.desc) : null));
+  }
+  return wrap;
+}
+
+function numberInput(value, unit, onInput, { placeholder, money = false } = {}) {
+  const input = h('input', { type: 'text', inputmode: 'decimal', value: value ?? '', placeholder: placeholder || '' });
+  const preview = h('span', { class: 'num-preview' });
+  const paintPreview = () => {
+    const n = parseNum(input.value);
+    preview.textContent = money && n !== null && n >= 1000 ? fmt(n) : '';
+  };
+  input.addEventListener('input', () => { paintPreview(); onInput(input.value, false); });
+  input.addEventListener('change', () => onInput(input.value, true));
+  paintPreview();
+  return h('div', { class: 'unit-input' }, input, unit ? h('span', { class: 'unit' }, unit) : null, preview);
+}
+
+function textInput(value, onInput, { placeholder, long = false } = {}) {
+  const el = h(long ? 'textarea' : 'input', long ? { rows: 3, placeholder: placeholder || '' } : { type: 'text', placeholder: placeholder || '' });
+  el.value = value ?? '';
+  el.addEventListener('input', () => onInput(el.value, false));
+  el.addEventListener('change', () => onInput(el.value, true));
+  return el;
+}
+
+function renderInput(q, a, c, store, body, onValue) {
+  const v = a?.v;
+  const typing = (val, done) => onValue(val, { check: done });
+  switch (q.type) {
+    case 'choice': {
+      body.append(choiceButtons(resolve(q.options, c), v?.value ?? v, (x) => {
+        if (q.detail) onValue({ value: x, detail: v?.detail || '' }, { repaint: true });
+        else onValue(x, { repaint: true });
+      }));
+      if (q.detail) {
+        body.append(textInput(v?.detail || '', (t, done) => {
+          const cur = getA(q.id)?.v;
+          onValue({ value: cur?.value ?? null, detail: t }, { check: done });
+        }, { placeholder: q.detail.placeholder }));
+      }
+      return;
+    }
+    case 'multi':
+      body.append(choiceButtons(resolve(q.options, c), v, (x) => onValue(x, { repaint: true }), { multi: true, compact: true }));
+      return;
+    case 'text':
+      body.append(textInput(v, typing, { placeholder: q.placeholder, long: q.long }));
+      return;
+    case 'number':
+    case 'money':
+      body.append(numberInput(v, q.unit, typing, { money: q.type === 'money' }));
+      return;
+    case 'group': {
+      const cur = { ...(v || {}) };
+      for (const f of q.fields) {
+        if (f.when && !f.when(c, cur)) continue;
+        const set = (x, opts) => { const nv = { ...(getA(q.id)?.v || {}), [f.key]: x }; onValue(nv, opts); };
+        let control;
+        if (f.type === 'choice') control = choiceButtons(f.options, cur[f.key], (x) => set(x, { repaint: true }), { compact: true });
+        else if (f.type === 'multi') control = choiceButtons(f.options, cur[f.key], (x) => set(x, { repaint: true }), { multi: true, compact: true });
+        else if (f.type === 'number' || f.type === 'money') control = numberInput(cur[f.key], f.unit, (x, done) => set(x, { check: done }), { money: f.type === 'money' });
+        else control = textInput(cur[f.key], (x, done) => set(x, { check: done }), { placeholder: f.placeholder });
+        body.append(h('div', { class: 'field-block' }, h('div', { class: 'field-label' }, resolve(f.label, c), f.optional ? h('small', null, ' (선택)') : null), control));
+      }
+      return;
+    }
+    case 'split': {
+      const cur = v || { hall: { on: true, pct: '' }, takeout: { on: false, pct: '' }, delivery: { on: false, pct: '' } };
+      const msg = h('p', { class: 'split-msg' });
+      const paintMsg = () => {
+        const chk = splitCheck(getA(q.id)?.v || cur, getA(q.id)?.s);
+        msg.textContent = chk.ok ? (chk.sum ? `합계 ${chk.sum}%` : '') : chk.msg;
+        msg.classList.toggle('bad', !chk.ok);
+      };
+      for (const [k, label] of [['hall', '홀 (매장 식사)'], ['takeout', '포장'], ['delivery', '배달']]) {
+        const row = cur[k] || { on: false, pct: '' };
+        const toggle = h('button', {
+          type: 'button', class: `pill${row.on ? ' on' : ''}`, 'aria-pressed': String(!!row.on),
+          onclick: () => {
+            const nv = JSON.parse(JSON.stringify(getA(q.id)?.v || cur));
+            nv[k] = { ...(nv[k] || {}), on: !nv[k]?.on };
+            onValue(nv, { repaint: true });
+          },
+        }, label);
+        const pct = numberInput(row.pct, '%', (x, done) => {
+          const nv = JSON.parse(JSON.stringify(getA(q.id)?.v || cur));
+          nv[k] = { ...(nv[k] || { on: true }), pct: x };
+          onValue(nv, { check: done });
+          paintMsg();
+        }, { placeholder: '비중' });
+        if (!row.on) pct.classList.add('off');
+        body.append(h('div', { class: 'split-row' }, toggle, pct));
+      }
+      body.append(msg);
+      paintMsg();
+      return;
+    }
+    case 'rows': {
+      const n = q.rowLabels.length;
+      const rows = Array.from({ length: n }, (_, i) => ({ ...((v || [])[i] || {}) }));
+      rows.forEach((row, i) => {
+        const line = h('div', { class: `row-line cols-${q.columns.length}` }, h('div', { class: 'row-label' }, q.rowLabels[i]));
+        for (const col of q.columns) {
+          const set = (x, done) => {
+            const nv = Array.from({ length: n }, (_, j) => ({ ...((getA(q.id)?.v || [])[j] || {}) }));
+            nv[i][col.key] = x;
+            onValue(nv, { check: done });
+          };
+          const control = col.type === 'text'
+            ? textInput(row[col.key], set, { placeholder: col.placeholder || col.label })
+            : numberInput(row[col.key], col.unit, set, { placeholder: col.placeholder || col.label, money: col.type === 'money' });
+          line.append(h('label', { class: `cell cell-${col.type}` }, h('span', { class: 'cell-label' }, col.label), control));
+        }
+        body.append(line);
+      });
+      return;
+    }
+    case 'costs':
+    case 'channels': {
+      const items = q.type === 'costs' ? resolve(q.items, c) : q.items;
+      const cur = { ...(v || {}) };
+      for (const it of items) {
+        const set = (x, done) => onValue({ ...(getA(q.id)?.v || {}), [it.key]: x }, { check: done });
+        const control = q.type === 'costs'
+          ? numberInput(cur[it.key], q.unit, set, { money: true })
+          : textInput(cur[it.key], set, { placeholder: it.placeholder });
+        body.append(h('label', { class: 'item-line' }, h('span', { class: 'item-label' }, it.label), control));
+      }
+      return;
+    }
+    case 'reviews': {
+      const cur = { praise: [], complaints: [], praiseText: '', complaintsText: '', ...(v || {}) };
+      const side = (key, textKey, title, found, placeholder) => {
+        const set = (patch, opts) => onValue({ ...cur, ...(getA(q.id)?.v || {}), ...patch }, opts);
+        return h('div', { class: 'field-block' },
+          h('div', { class: 'field-label' }, title),
+          found.length ? choiceButtons(found.map((x) => ({ v: x, label: x })), cur[key], (x) => set({ [key]: x }, { repaint: true }), { multi: true, compact: true }) : null,
+          textInput(cur[textKey], (t, done) => set({ [textKey]: t }, { check: done }), { placeholder }));
+      };
+      body.append(
+        side('praise', 'praiseText', '자주 듣는 칭찬', store?.strengths || [], found(store?.strengths) ? '빠진 칭찬이 있으면 적어 주세요' : '예: 국물이 진하다, 양이 많다'),
+        side('complaints', 'complaintsText', '자주 듣는 불평', store?.weaknesses || [], found(store?.weaknesses) ? '빠진 불평이 있으면 적어 주세요' : '예: 점심에 오래 기다린다'),
+      );
+      return;
+    }
+    case 'menucost': {
+      const cur = { know: null, amount: '', includes: [], items: [], ...(v || {}) };
+      const set = (patch, opts) => onValue({ ...cur, ...(getA(q.id)?.v || {}), ...patch }, opts);
+      body.append(choiceButtons([
+        { v: 'known', label: '알고 있어요' }, { v: 'approx', label: '대략 알아요' }, { v: 'unknown', label: '잘 몰라요' },
+      ], cur.know, (x) => set({ know: x }, { repaint: true }), { compact: true }));
+      if (cur.know === 'known' || cur.know === 'approx') {
+        body.append(
+          h('div', { class: 'field-block' }, h('div', { class: 'field-label' }, `${c.unit} 재료비`), numberInput(cur.amount, '원', (x, done) => set({ amount: x }, { check: done }), { money: true })),
+          h('div', { class: 'field-block' }, h('div', { class: 'field-label' }, '그 금액에 포함된 것'),
+            choiceButtons(['반찬', '소스', '고명·토핑', '포장재', '포함 안 됨'].map((x) => ({ v: x, label: x })), cur.includes, (x) => set({ includes: x }, { repaint: true }), { multi: true, compact: true })),
+        );
+      } else if (cur.know === 'unknown') {
+        body.append(h('p', { class: 'help' }, `${c.menuName}에 들어가는 주재료 3가지를 아는 만큼만 적어 주세요. 모르면 비워 두셔도 돼요. 재료별로 나눠서 원가를 추정해요.`));
+        for (let i = 0; i < 3; i++) {
+          const it = cur.items[i] || {};
+          const setItem = (key) => (x, done) => {
+            const items = Array.from({ length: 3 }, (_, j) => ({ ...((getA(q.id)?.v?.items || [])[j] || {}) }));
+            items[i][key] = x;
+            set({ items }, { check: done });
+          };
+          body.append(h('div', { class: 'row-line cols-4' },
+            h('div', { class: 'row-label' }, `재료 ${i + 1}`),
+            h('label', { class: 'cell cell-text' }, h('span', { class: 'cell-label' }, '재료'), textInput(it.name, setItem('name'), { placeholder: '예: 소고기' })),
+            h('label', { class: 'cell cell-money' }, h('span', { class: 'cell-label' }, '구매가격'), numberInput(it.price, '원', setItem('price'), { money: true })),
+            h('label', { class: 'cell cell-text' }, h('span', { class: 'cell-label' }, '구매 용량'), textInput(it.size, setItem('size'), { placeholder: '예: 1kg' })),
+            h('label', { class: 'cell cell-text' }, h('span', { class: 'cell-label' }, `${c.unit} 사용량`), textInput(it.use, setItem('use'), { placeholder: '예: 150g' }))));
+        }
+      }
+      return;
+    }
+    default:
+      body.append(h('p', { class: 'muted' }, '지원하지 않는 질문 형식이에요.'));
+  }
+}
+const found = (list) => Array.isArray(list) && list.length > 0;
+
+// ───────── 4. 완료: 답변 정리
+function optionLabel(options, value) {
+  return (options || []).find((o) => o.v === value)?.label ?? value;
+}
+function answerText(q, a, c) {
+  if (!a) return '-';
+  if (a.s === 'unknown') return q.unknownLabel || STATUS_LABEL.unknown;
+  if (a.s === 'na') return q.naLabel || STATUS_LABEL.na;
+  const v = a.v;
+  const approx = a.s === 'approx' ? ' (대략)' : '';
+  const money = (x, unit) => (parseNum(x) === null ? null : `${fmt(parseNum(x))}${unit ? ` ${unit}` : ''}`);
+  switch (q.type) {
+    case 'choice': {
+      const val = v?.value ?? v;
+      const label = optionLabel(resolve(q.options, c), val);
+      return v?.detail ? `${label} (${v.detail})` : label;
+    }
+    case 'multi': return (v || []).join(', ');
+    case 'text': return v;
+    case 'number': return `${v} ${q.unit || ''}${approx}`;
+    case 'money': return `${money(v, q.unit) || '-'}${approx}`;
+    case 'group':
+      return q.fields.filter((f) => !f.when || f.when(c, v)).map((f) => {
+        const x = v?.[f.key];
+        if (x == null || x === '' || (Array.isArray(x) && !x.length)) return null;
+        const t = f.type === 'choice' ? optionLabel(f.options, x) : f.type === 'multi' ? x.join(', ') : f.type === 'money' ? money(x, f.unit) : f.type === 'number' ? `${x} ${f.unit || ''}` : x;
+        return `${f.short || resolve(f.label, c)}: ${t}`;
+      }).filter(Boolean).join(' · ') + approx;
+    case 'split': {
+      const names = { hall: '홀', takeout: '포장', delivery: '배달' };
+      return Object.keys(names).filter((k) => v?.[k]?.on).map((k) => (parseNum(v[k].pct) !== null ? `${names[k]} ${v[k].pct}%` : names[k])).join(' · ') + approx;
+    }
+    case 'rows':
+      return (v || []).map((r, i) => {
+        const parts = q.columns.map((col) => {
+          const x = r?.[col.key];
+          if (x == null || String(x).trim() === '') return null;
+          return col.type === 'text' ? x : `${col.type === 'money' ? fmt(parseNum(x) ?? x) : x}${col.unit ? ` ${col.unit}` : ''}`;
+        }).filter(Boolean);
+        return parts.length ? `${q.rowLabels[i]} ${parts.join(' ')}` : null;
+      }).filter(Boolean).join(' / ') + approx;
+    case 'costs': {
+      const items = resolve(q.items, c);
+      return items.map((it) => (parseNum(v?.[it.key]) !== null ? `${it.label} ${money(v[it.key], q.unit)}` : null)).filter(Boolean).join(' · ') + approx;
+    }
+    case 'channels':
+      return q.items.map((it) => (String(v?.[it.key] || '').trim() ? `${it.label}: ${v[it.key]}` : null)).filter(Boolean).join(' · ');
+    case 'reviews': {
+      const praise = [...(v?.praise || []), v?.praiseText].filter((x) => String(x || '').trim());
+      const bad = [...(v?.complaints || []), v?.complaintsText].filter((x) => String(x || '').trim());
+      return [praise.length ? `칭찬: ${praise.join(', ')}` : null, bad.length ? `불평: ${bad.join(', ')}` : null].filter(Boolean).join(' / ');
+    }
+    case 'menucost': {
+      if (v?.know === 'unknown') {
+        const items = (v.items || []).filter((x) => x?.name).map((x) => [x.name, money(x.price, '원'), x.size, x.use ? `1회 ${x.use}` : null].filter(Boolean).join(' '));
+        return `잘 몰라요${items.length ? ` → ${items.join(' / ')}` : ''}`;
+      }
+      const inc = (v?.includes || []).length ? ` (${v.includes.join('·')} 포함)` : '';
+      return `${v?.know === 'approx' ? '대략 ' : ''}${money(v?.amount, '원') || '-'}${inc}`;
+    }
+    default: return String(v ?? '');
+  }
+}
+
 function renderDone() {
-  const sv = S.survey;
-  if (!sv || !S.doneAt) { location.replace(sv ? '#/survey' : '#/'); return; }
-  const name = chosenStore()?.name || S.name;
+  if (!S.doneAt || !Number.isInteger(S.chosen)) { location.replace(Number.isInteger(S.chosen) ? '#/survey' : '#/'); return; }
+  const store = chosenStore();
+  const name = store?.name || S.name;
   storeName.textContent = name;
-  const label = (v) => LIKERT.find(([x]) => x === v)?.[1] || '-';
+  const c = buildCtx(S, store);
+  const pages = visiblePages(S, store);
+  const total = pages.reduce((n, p) => n + p.questions.length, 0);
+  const problem = PROBLEMS.find((p) => p.v === (getA('a_problem')?.v?.value ?? getA('a_problem')?.v))?.label;
+  const tips = getA('b_know')?.v === 'unknown' ? [COST_RECORD_TIP] : [];
   show(
     h('div', { class: 'card' },
-      h('h2', null, '설문을 마쳤어요'),
-      h('p', null, `${name}에 대한 답변 ${sv.questions.length}개를 받았어요.`),
+      h('h2', null, '인터뷰를 마쳤어요'),
+      h('p', null, `${name}에 대한 질문 ${total}개에 답해 주셨어요.${problem ? ` 가장 큰 고민은 "${problem}"예요.` : ''}`),
       h('p', { class: 'small muted', style: { margin: 0 } }, '답변은 이 브라우저에만 저장돼 있어요.')),
-    h('div', { class: 'card' },
-      h('h3', null, '내 답변'),
-      h('ul', { class: 'answers' }, sv.questions.map((q, i) => h('li', null, h('span', null, `${i + 1}. ${q.text}`), h('span', { class: 'pick' }, label(S.answers?.[q.id])))))),
+    tips.length ? [h('h3', { class: 'section-title' }, '지금 바로 해볼 일'), tips.map(tipCard)] : null,
+    pages.map((p) => h('div', { class: 'card' },
+      h('h3', null, resolve(p.title, c)),
+      h('ul', { class: 'answers' }, p.questions.map((q) => h('li', null,
+        h('span', { class: 'a-q' }, resolve(q.title, c)),
+        h('span', { class: 'a-v' }, answerText(q, getA(q.id), c))))))),
     h('div', { class: 'card note small' },
       h('b', null, '다음 단계 '),
-      '이 답변과 AI가 찾은 정보를 바탕으로 맞춤 분석 보고서를 만드는 기능을 준비하고 있어요.'),
+      '이 답변과 AI가 찾은 공개 정보를 함께 분석해 핵심 진단과 실행 계획을 만드는 기능을 준비하고 있어요.'),
   );
-  setNavbar(btn('답변 고치기', () => { location.hash = '#/survey'; }), btn('처음부터 다시', () => { S = {}; save(); location.hash = '#/'; }, true));
+  setNavbar(
+    btn('답변 고치기', () => { S.pageId = PAGES[0].id; S.doneAt = null; save(); location.hash = '#/survey'; }),
+    btn('처음부터 다시', () => { S = {}; save(); location.hash = '#/'; }, true),
+  );
 }
 
 route();

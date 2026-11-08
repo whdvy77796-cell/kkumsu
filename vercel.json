@@ -4,8 +4,7 @@
   "outputDirectory": "dist",
   "regions": ["icn1"],
   "functions": {
-    "api/store-search.js": { "maxDuration": 180 },
-    "api/survey.js": { "maxDuration": 90 }
+    "api/store-search.js": { "maxDuration": 180 }
   },
   "headers": [
     {
