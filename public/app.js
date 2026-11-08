@@ -1056,6 +1056,18 @@ async function saveReportPdf(data, button) {
     box.querySelectorAll('details').forEach((d) => { d.open = true; });
     box.querySelectorAll('details.sources-box > summary').forEach((s) => { s.replaceWith(h('div', { class: 'sub-title' }, '출처')); });
     document.body.append(box);
+    // 목록 번호·글머리표는 그림 도구가 그리지 못할 때가 있어 글자로 바꿔 넣는다
+    box.querySelectorAll('ol, ul').forEach((list) => {
+      if (getComputedStyle(list).listStyleType === 'none') return;
+      const ordered = list.tagName === 'OL';
+      list.classList.add('pdf-list');
+      [...list.children].forEach((li, i) => {
+        if (li.tagName !== 'LI') return;
+        const body = h('span', { class: 'pdf-li' });
+        while (li.firstChild) body.append(li.firstChild);
+        li.append(h('span', { class: 'pdf-mark' }, ordered ? `${i + 1}.` : '•'), body);
+      });
+    });
     await Promise.all([...box.querySelectorAll('img')].map((img) => (img.complete ? null : new Promise((r) => { img.onload = r; img.onerror = r; }))));
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
