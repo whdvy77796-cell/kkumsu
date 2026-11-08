@@ -11,7 +11,6 @@ if (!process.env.OPENROUTER_API_KEY && process.env.MOCK_AI === undefined) proces
 
 const routes = {
   '/api/store-search': (await import('../api/store-search.js')).default,
-  '/api/survey': (await import('../api/survey.js')).default,
 };
 const MIME = {
   '.html': 'text/html; charset=utf-8',
