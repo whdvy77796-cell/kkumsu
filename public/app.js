@@ -875,7 +875,7 @@ function reportCta() {
       h('li', null, '인터넷 조사에는 상호명·주소와 앞서 찾은 공개 정보만 써요.'),
       h('li', null, '보고서를 만들려면 인터뷰 답변과 붙여 넣은 리뷰를 OpenRouter를 거쳐 AI(Anthropic Claude)에 보내야 해요.'),
       h('li', null, '같은 내용으로 다시 열 때 비용이 들지 않도록, 보고서는 하루, 인터넷 조사 결과는 3일 동안 서버에 보관했다가 자동으로 지워요.'),
-      h('li', null, '보통 2~4분 걸리고, 하루에 3번까지 만들 수 있어요.')),
+      h('li', null, '보통 2~4분 걸려요.')),
     h('label', { class: 'consent' }, agree, h('span', null, '위 내용을 확인했고, 보고서를 만들기 위해 답변과 붙여 넣은 리뷰를 AI에 보내는 데 동의해요.')),
     make,
     old ? h('p', { class: 'small', style: { margin: '10px 0 0' } }, h('a', { href: '#/report' }, '이전 내용으로 만든 보고서 보기')) : null);
@@ -1131,7 +1131,7 @@ function drawReport(data, stale) {
       h('p', { style: { margin: 0 } }, `만든 AI: ${data.model === 'mock' ? '모의 응답' : data.model || '-'}${data.cached ? ' · 저장된 보고서' : ''}`)),
     stale ? null : h('p', { class: 'small no-print', style: { textAlign: 'center' } },
       h('button', { class: 'btn small', type: 'button', onclick: () => {
-        if (!confirm('같은 답변으로 보고서를 새로 만들까요? 하루에 3번까지 만들 수 있어요.')) return;
+        if (!confirm('같은 답변으로 보고서를 새로 만들까요? 2~4분쯤 걸려요.')) return;
         startReport({ refresh: true });
         route();
       } }, '보고서 새로 만들기')),

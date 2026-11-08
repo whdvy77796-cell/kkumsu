@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { createHandler as searchHandler, searchTool } from '../api/store-search.js';
-import { MemoryStore, RedisStore, RESERVE_LUA, kstDay } from '../lib/guard.mjs';
+import { MemoryStore, RedisStore, RESERVE_LUA, kstDay, limits, UNLIMITED } from '../lib/guard.mjs';
 import { extractJson, costMicro } from '../lib/ai.mjs';
 
 const ENV = { OPENROUTER_API_KEY: 'test-key', SESSION_SECRET: 'x'.repeat(32), VERCEL: '1', VERCEL_ENV: 'preview' };
@@ -278,4 +278,23 @@ test('도우미: JSON 꺼내기, 비용 계산, 검색 도구 설정', () => {
   assert.equal(costMicro('anthropic/claude-sonnet-5.5', { prompt_tokens: 10000, completion_tokens: 1000, server_tool_use_details: { web_search_requests: 2 } }), 50000);
   assert.equal(searchTool({}).parameters.engine, 'auto');
   assert.equal(searchTool({ MAECHUL_SEARCH_ENGINE: 'exa' }).parameters.max_characters, 2000);
+});
+
+test('이용량 제한은 기본으로 없다: 하루 예산을 넘게 썼어도, 같은 방문자가 여러 번 써도 AI를 부른다', async () => {
+  const store = new MemoryStore();
+  store.kv.set(budgetKey(), 50 * 1e6); // 오늘 이미 $50 쓴 상태
+  const fetcher = fakeFetch([aiReply(JSON.stringify(STORE_JSON), { cost: 0.01 })]);
+  const handler = searchHandler({ env: ENV, fetcher, store });
+  for (let i = 0; i < 8; i++) {
+    const r = res();
+    await handler(req({ body: { name: `가게${i}`, address: '서울 마포구 망원로 1' } }), r);
+    assert.equal(r.statusCode, 200, r.body);
+  }
+  assert.equal(fetcher.calls.length, 8);
+  assert.equal(store.kv.get(budgetKey()), 50 * 1e6 + 8 * 10000, '제한은 없어도 쓴 금액은 기록한다');
+  const L = limits({});
+  assert.equal(L.dailyBudgetMicro, UNLIMITED);
+  assert.equal(L.ipDaily.report, UNLIMITED);
+  assert.equal(limits({ MAECHUL_DAILY_BUDGET_USD: 'off', MAECHUL_IP_DAILY_REPORTS: '0' }).ipDaily.report, UNLIMITED);
+  assert.equal(limits({ MAECHUL_DAILY_BUDGET_USD: '3' }).dailyBudgetMicro, 3000000, '값을 넣으면 그때만 제한');
 });

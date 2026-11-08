@@ -48,7 +48,7 @@ api/store-search.js   가게 찾기 (Claude + openrouter:web_search 서버 도�
 api/research.js       보고서용 인터넷 조사 (Claude + openrouter:web_search + openrouter:web_fetch, 허용된 사이트만 열기)
 api/report.js         AI 진단 보고서 (동의 후 받은 답변 + 서버 계산값 + 인터넷 조사 결과 → Claude)
 lib/ai.mjs            OpenRouter 호출, JSON 꺼내기, 비용 계산
-lib/guard.mjs         같은 사이트 요청만 허용, 방문자별 횟수·하루 예산 제한, 결과 캐시(Upstash Redis)
+lib/guard.mjs         같은 사이트 요청만 허용, AI 비용 기록(제한은 기본 없음, 환경변수로 켤 수 있음), 결과 캐시·중복 요청 잠금(Upstash Redis)
 lib/prompts.mjs       Claude 지시문과 응답 형식(JSON Schema)
 lib/validate.mjs      입력 검사, AI 응답 정리(빈 값·링크·길이·리뷰 주제)
 lib/mock.mjs          로컬 점검용 모의 응답 (MOCK_AI=1, 운영 배포에서는 꺼짐)
@@ -76,10 +76,10 @@ tests/report.test.mjs     보고서 점검 (계산값·수수료 이중 차감·
 | `OPENROUTER_API_KEY` | 예 | OpenRouter 키. 기본 모델 `anthropic/claude-sonnet-5.5` |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | 예 | Upstash Redis. 없으면 배포 환경에서 AI를 부르지 않습니다 |
 | `SESSION_SECRET` | 권장 | 방문자 IP를 해시할 때 쓰는 비밀값 |
-| `MAECHUL_DAILY_BUDGET_USD` | 아니오 | 하루 전체 AI 예산. 기본 **$1** |
-| `MAECHUL_IP_DAILY_SEARCHES` | 아니오 | 방문자(IP)별 하루 가게 찾기 횟수. 기본 **4** |
-| `MAECHUL_IP_DAILY_REPORTS` | 아니오 | 방문자(IP)별 하루 보고서 만들기 횟수. 기본 **3** (바꾸면 완료 화면 안내 문구도 함께 고치기) |
-| `MAECHUL_IP_DAILY_RESEARCH` | 아니오 | 방문자(IP)별 하루 인터넷 조사 횟수(같은 가게는 3일 저장). 기본 **3** |
+| `MAECHUL_DAILY_BUDGET_USD` | 아니오 | 하루 전체 AI 예산(달러). 기본 **제한 없음**. 값을 넣으면 그 금액에서 멈춤 |
+| `MAECHUL_IP_DAILY_SEARCHES` | 아니오 | 방문자(IP)별 하루 가게 찾기 횟수. 기본 **제한 없음** |
+| `MAECHUL_IP_DAILY_REPORTS` | 아니오 | 방문자(IP)별 하루 보고서 만들기 횟수. 기본 **제한 없음** |
+| `MAECHUL_IP_DAILY_RESEARCH` | 아니오 | 방문자(IP)별 하루 인터넷 조사 횟수(같은 가게는 3일 저장). 기본 **제한 없음** |
 | `MAECHUL_RESEARCH_ENGINE` | 아니오 | 조사용 검색 엔진. 기본 `auto`(Claude 자체 검색). `exa`·`parallel`·`perplexity` 가능 |
 | `MAECHUL_FETCH_ENGINE` | 아니오 | 페이지 읽기 엔진. 기본 `openrouter`(직접 가져오기, 무료) |
 | `MAECHUL_RESEARCH_MODEL` | 아니오 | 조사 모델만 따로 바꿀 때 |
@@ -94,7 +94,8 @@ tests/report.test.mjs     보고서 점검 (계산값·수수료 이중 차감·
 - 인터넷 조사는 호출 전에 $0.45를 잡아둔 뒤 실제 비용으로 정산하고, 같은 가게는 3일 동안 저장한 결과를 씁니다(답변을 바꿔 보고서를 다시 만들어도 조사는 다시 안 함).
 - 보고서 단계는 웹 검색 없이 만들고, 호출 전에 $0.25를 잡아둔 뒤 실제 비용으로 정산합니다. 같은 답변은 서버에 24시간 보관한 보고서를 돌려주고(비용 없음), 같은 보고서를 만드는 중이면 두 번째 요청은 AI를 부르지 않고 기다립니다(중복 비용 방지).
 - 호출 전에 최대 예상 비용($0.35)을 하루 예산에서 잡아두고, 끝나면 OpenRouter가 알려준 실제 비용으로 정산합니다.
-- 하루 예산이나 방문자별 횟수를 넘으면 AI를 부르지 않고 안내합니다 (한국 시간 기준 날짜).
+- **이용량 제한은 기본으로 꺼져 있습니다**(운영자 요청, 2026-11-09). 위 환경변수에 값을 넣으면 그때만 하루 예산·방문자별 횟수를 넘을 때 AI를 부르지 않고 안내합니다(한국 시간 기준 날짜). `0`·`off`는 제한 없음.
+- 제한이 없으면 OpenRouter 잔액이 실제 상한입니다(자동 충전이 꺼져 있으면 잔액이 떨어질 때 AI_CREDIT 안내가 나옵니다). OpenRouter 키 설정에서 키별 사용 한도를 걸 수도 있습니다.
 - 같은 상호명·주소는 3일 동안 캐시해서 다시 비용이 들지 않게 합니다.
 - `Origin`이 같은 주소인 요청만 받고, OpenRouter 요청에 `provider.data_collection: deny`를 넣습니다.
 
