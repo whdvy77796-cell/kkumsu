@@ -1,14 +1,16 @@
 // GET  /api/pay                                     결제 설정(모드·가격·클라이언트 키: 공개 값만)
 // POST /api/pay { action: 'view', rid, token }       보고서 다시 열기 (결제 전이면 잠긴 부분은 빼고 보냄)
 // POST /api/pay { action: 'order', rid, token }      결제창을 열기 위한 주문 만들기 (금액은 서버가 정함)
+// POST /api/pay { action: 'demo' }                 결제 과정 체험: 샘플 보고서를 잠긴 상태로 만들어 줌 (테스트 결제 모드에서만)
 // POST /api/pay { action: 'delete', rid, token }     서버에 보관된 보고서 지우기 (결제 기록은 법에 따라 남김)
 // POST /api/pay { action: 'confirm', paymentKey, orderId, amount, rid?, token? }
 //                                                     토스페이먼츠 결제 승인 → 맞춤 실행 패키지 열기
 import { HttpError, send, sendError, readJson, checkOrigin, createStore } from '../lib/guard.mjs';
 import {
-  payConfig, publicPay, publicPayment, loadReport, tokenOk, tokenHash, newId, repKey, orderKey,
+  payConfig, publicPay, publicPayment, loadReport, saveReport, tokenOk, tokenHash, newId, repKey, orderKey,
   RETENTION, ORDER_RE, tossCall,
 } from '../lib/pay.mjs';
+import SAMPLE from '../lib/sample-data.mjs';
 import { redactReport } from '../public/paywall.js';
 
 const GONE = '보고서를 찾지 못했어요. 결제하지 않은 보고서는 7일, 결제한 보고서는 90일 동안 보관해요.';
@@ -38,6 +40,15 @@ async function order({ env, store, cfg, body }) {
     rid: body.rid, amount: cfg.amount, orderName: cfg.orderName, mode: cfg.mode, status: 'ready', createdAt: new Date().toISOString(),
   }, RETENTION.order);
   return { orderId, amount: cfg.amount, orderName: cfg.orderName, clientKey: cfg.clientKey, mode: cfg.mode };
+}
+
+// 심사 담당자와 방문자가 결제창까지 바로 가 볼 수 있게, 샘플 보고서를 잠긴 상태로 하나 만들어 준다.
+// 실제 결제(live)에서는 막는다 (샘플을 돈 받고 팔지 않도록).
+async function demo({ env, store, cfg }) {
+  if (cfg.mode !== 'test') throw new HttpError(409, 'DEMO_OFF', '결제 과정 체험은 테스트 결제 모드에서만 열려요.');
+  const data = { ...SAMPLE, sample: true, demo: true };
+  const { rid, token } = await saveReport(store, env, data, RETENTION.demo);
+  return { ...redactReport(data), rid, token, paid: false, payment: null, pay: publicPay(cfg) };
 }
 
 async function remove({ env, store, body }) {
@@ -133,6 +144,7 @@ export function createHandler(deps = {}) {
       if (ctx.body.action === 'order') return send(res, 200, await order(ctx));
       if (ctx.body.action === 'confirm') return send(res, 200, await confirm(ctx));
       if (ctx.body.action === 'delete') return send(res, 200, await remove(ctx));
+      if (ctx.body.action === 'demo') return send(res, 200, await demo(ctx));
       throw new HttpError(400, 'ACTION', '알 수 없는 요청이에요.');
     } catch (err) {
       return sendError(res, err);
