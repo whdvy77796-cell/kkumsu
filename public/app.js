@@ -438,6 +438,16 @@ function drawPage(store, keepScroll) {
     }
     const now = currentPages(store);
     if (now.idx >= now.pages.length - 1) {
+      // 앞 단계에 아직 답하지 않은 질문이 있으면(순서가 바뀌었거나 답에 따라 질문이 새로 생긴 경우) 그 단계로 먼저 보낸다
+      const firstMissing = now.pages.findIndex((p) => p.questions.some((q) => !isAnswered(q, getA(q.id), cc)));
+      if (firstMissing >= 0 && firstMissing < now.idx) {
+        S.pageId = now.pages[firstMissing].id;
+        save();
+        drawPage(store, false);
+        window.scrollTo(0, 0);
+        toast('아직 답하지 않은 질문이 있는 단계로 왔어요. 이 단계를 마치면 끝나요.', 4000);
+        return;
+      }
       S.doneAt = new Date().toISOString();
       save();
       location.hash = '#/done';
