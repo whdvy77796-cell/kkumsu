@@ -1,5 +1,5 @@
 /*
- * AI 가게 소개 페이지: 서버 호출 없이 브라우저에서만 작동하는 독립 시안.
+ * 가게 소개 시안: 기본 시안·사진은 브라우저에만 남고, 선택적 AI 문구 기능은 동의 후 텍스트를 전송한다.
  * Usage: const instance = mountAiPlace(container, { onBack });
  * Call instance.destroy() before the host removes/replaces the mounted view.
  */
@@ -370,7 +370,7 @@ export function mountAiPlace(container, options = {}) {
             element('li', { class: `${index === step ? 'is-current' : ''}${index < step ? ' is-done' : ''}`, ...(index === step ? { 'aria-current': 'step' } : {}) },
               element('span', { class: 'ap-step-number' }, String(index + 1).padStart(2, '0')),
               element('span', {}, item.short)))),
-          element('div', { class: 'ap-sidebar-note' }, '입력한 정보와 사진은', element('br'), '이 브라우저 안에서만 사용해요.')),
+          element('div', { class: 'ap-sidebar-note' }, '기본 시안과 사진은 이 브라우저에서만 보여요.', element('br'), 'AI 문구 요청 시 동의한 텍스트를 전송해요.')),
         element('div', { class: 'ap-card' },
           element('div', { class: 'ap-progress-label' }, element('span', {}, steps[step].label), element('strong', {}, `${step + 1} / ${steps.length}`)),
           progress, content, alert,
