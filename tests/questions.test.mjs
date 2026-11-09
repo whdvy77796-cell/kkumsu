@@ -1,10 +1,7 @@
 // 인터뷰 질문 분기 점검 (설계 문서 원칙대로 질문이 바뀌는지)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  QUESTIONS, QMAP, PAGES, buildCtx, visibleQuestions, visiblePages, isAnswered, splitCheck, resolve,
-  guessCategory, guessPeriod, guessServices, storeFlags, josa,
-} from '../public/questions.js';
+import { QUESTIONS, QMAP, PAGES, buildCtx, visibleQuestions, visiblePages, isAnswered, splitCheck, resolve, guessCategory, guessPeriod, guessServices, storeFlags, josa } from '../public/questions.js';
 
 const STORE = {
   name: '얼큰집', address: '서울 마포구 망원로 1', category: '국밥 전문점', openedYear: '2019년 개업', floor: '2층',
@@ -158,4 +155,32 @@ test('홀이 있으면 기본 서비스·손님 앞 기본을 묻고, 음식점�
   assert.equal(isAnswered(QMAP.k_sides, ok({ provide: 'no' }), c), true, '반찬을 안 주면 나머지 칸은 묻지 않음');
   assert.equal(isAnswered(QMAP.k_sides, ok({ provide: 'yes' }), c), false);
   assert.equal(isAnswered(QMAP.k_sides, ok({ provide: 'yes', serve: '셀프바에서 덜어 가요', refill: '셀프로 더 가져가요' }), c), true, '가짓수는 선택');
+});
+
+test('단계 순서: 1단계 → 반찬·식재료·마케팅·리뷰·기본 서비스·청소·운영·실행 준비 → 예산과 매출·비용 → 대표 메뉴 → 자세히', () => {
+  assert.deepEqual(PAGES.map((p) => p.id), ['basic', 'sides', 'purchase', 'marketing', 'experience', 'basics', 'clean', 'ops', 'finish', 'money', 'menu', 'menuDetail']);
+  assert.equal(QMAP.a_problem.page, 'basic', '가장 큰 고민은 1단계');
+  assert.equal(QMAP.b_know.page, 'basic', '비용 파악 여부는 1단계');
+});
+
+test('1단계만 답하면 앞 단계 질문이 정해지고, 뒤의 매출·메뉴 단계를 답해도 앞 단계에 질문이 새로 생기지 않는다', () => {
+  const late = new Set(['money', 'menu', 'menuDetail']);
+  const earlyIds = (answers) => visiblePages({ answers }, STORE).filter((p) => !late.has(p.id)).flatMap((p) => p.questions.map((q) => q.id)).join(',');
+  for (const problem of ['acquisition', 'profit', 'repeat', 'labor']) {
+    for (const know of ['exact', 'approx', 'unknown']) {
+      const step1 = {
+        a_basic: ok({ category: '국밥·탕·찌개' }), a_split: ok(split(true, true, true)), a_staff: ok({ staff: '2', owner: '10' }),
+        a_problem: ok(problem), b_know: ok(know),
+      };
+      const before = earlyIds(step1);
+      const after = earlyIds({
+        ...step1,
+        a_budget: ok({ money: '30만 원 이하', time: '1~3시간' }),
+        b_sales: ok([{ sales: '2400', days: '26' }]), b_costs: ok({ food: '1000', labor: '400', rent: '250', etc: '100' }),
+        c_menus: ok([{ name: '얼큰 소고기국밥', price: '11000', qty: '1200' }, { name: '수육', price: '25000', qty: '200' }]),
+        c_worry: ok([{ name: '수육', price: '25000' }]), c_cost: ok({ know: 'known', amount: '4800', includes: [] }),
+      });
+      assert.equal(after, before, `${problem}/${know}: 앞 단계 질문이 바뀜`);
+    }
+  }
 });

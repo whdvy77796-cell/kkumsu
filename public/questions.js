@@ -162,10 +162,7 @@ export function buildCtx(S, store) {
 
 // ───────── 화면(페이지)
 export const PAGES = [
-  { id: 'basic', title: '가게 기본 정보', desc: '정확한 매장과 손님, 판매 방식을 먼저 확인해요. AI가 찾은 정보는 미리 채워 두었으니 틀린 곳만 고쳐 주세요.' },
-  { id: 'money', title: '목표와 매출·비용', desc: '무엇을 먼저 해결할지 정하고, 실제로 얼마나 남는지 확인해요.' },
-  { id: 'menu', title: '대표 메뉴', desc: '많이 팔리는 메뉴 3개와 수익성이 걱정되는 메뉴 1개를 집중해서 볼게요.' },
-  { id: 'menuDetail', title: (c) => `${c.menuName} 자세히`, desc: '가격·원가·조리 부담을 함께 확인해요.' },
+  { id: 'basic', title: '가게 기본 정보', desc: '정확한 매장과 손님, 판매 방식, 가장 큰 고민을 먼저 확인해요. AI가 찾은 정보는 미리 채워 두었으니 틀린 곳만 고쳐 주세요.' },
   { id: 'sides', title: '반찬과 잔반', desc: '반찬이 나가는 방식과 손님이 남기는 음식을 함께 봐요. 남는 음식은 손님 만족과 재료비를 함께 알려주는 자료예요.' },
   { id: 'purchase', title: '식재료 구매와 재고', desc: '구매가격과 버리는 손실을 함께 봐요.' },
   { id: 'marketing', title: '마케팅과 SNS', desc: '쓴 돈과 실제로 늘어난 손님을 연결해서 봐요.' },
@@ -174,6 +171,10 @@ export const PAGES = [
   { id: 'clean', title: '청소와 화장실', desc: '청결과 편의, 공간의 인상까지 확인해요.' },
   { id: 'ops', title: '운영·배달·직원', desc: '실제로 남는 돈과 일의 변화를 기준으로 판단해요.' },
   { id: 'finish', title: '실행 준비', desc: '이미 해본 것과 실제로 맡을 사람을 확인해요.' },
+  // 숫자를 적는 단계는 뒤로 (사장님 요청 2026-11-09): 매출·비용 → 대표 메뉴 → 대표 메뉴 자세히
+  { id: 'money', title: '예산과 매출·비용', desc: '개선에 쓸 예산과, 실제로 얼마나 팔고·쓰고·남는지 확인해요.' },
+  { id: 'menu', title: '대표 메뉴', desc: '많이 팔리는 메뉴 3개와 수익성이 걱정되는 메뉴 1개를 집중해서 볼게요.' },
+  { id: 'menuDetail', title: (c) => `${c.menuName} 자세히`, desc: '가격·원가·조리 부담을 함께 확인해요.' },
 ];
 
 // ───────── 질문
@@ -246,7 +247,8 @@ export const QUESTIONS = [
   },
 
   {
-    id: 'a_problem', page: 'money', type: 'choice',
+    // 뒤 단계 질문이 가장 큰 고민에 따라 달라져서 1단계에서 묻는다
+    id: 'a_problem', page: 'basic', type: 'choice',
     title: '지금 가장 해결하고 싶은 문제는 무엇인가요?',
     options: PROBLEMS,
     detail: { key: 'detail', placeholder: '구체적으로 적어 주시면 더 정확해요 (선택)' },
@@ -264,7 +266,8 @@ export const QUESTIONS = [
 
   // ── 3. 매출과 비용
   {
-    id: 'b_know', page: 'money', type: 'choice',
+    // 식재료·배달 1건 질문이 이 답에 따라 달라져서 1단계에서 묻는다 (자세한 매출·비용은 뒤 단계)
+    id: 'b_know', page: 'basic', type: 'choice',
     title: '지난달 얼마를 팔고, 얼마를 쓰고, 얼마가 남았는지 알고 계신가요?',
     options: opts(['exact', '정확히 알고 있어요'], ['approx', '대략 알고 있어요'], ['unknown', '잘 모르겠어요']),
     why: '알고 계시면 세부 비용을 확인하고, 모르시면 기록하는 방법부터 안내해요.',
