@@ -126,7 +126,9 @@ test('missing citations or explicit zero searches omit competitors, not valid qu
 test('shared quota/budget reservations, injected store and exact three-day cache/lock TTL', async () => {
   let clock = Date.parse('2026-11-09T00:00:00Z');
   const store = new Store(), fetcher = stub(), opts = options({ store, fetcher, now: () => clock });
-  await getDiagnosisResearch(opts); await getDiagnosisResearch(opts);
+  const initial = await getDiagnosisResearch(opts); const cached = await getDiagnosisResearch(opts);
+  assert.match(initial.researchNotice, /이번 요청/); assert.match(cached.researchNotice, /저장 결과/);
+  assert.match(cached.researchNotice, /2026-11-09T00:00:00.000Z/);
   assert.equal(fetcher.calls.length, 1);
   assert.equal(store.reservations[0].estimate, limits(ENV).estimateMicro.search);
   assert.match(store.reservations[0].ipKey, /:ip:search:/);

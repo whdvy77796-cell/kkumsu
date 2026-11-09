@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { createHandler } from '../api/geo-diagnosis.js';
-import { SCAN_ROWS, unknownTechnicalScan, confirmedPriorities, buildBusiness } from '../lib/geo-diagnosis.mjs';
+import { SCAN_ROWS, unknownTechnicalScan, confirmedPriorities, buildBusiness, addressesMatch } from '../lib/geo-diagnosis.mjs';
 import { MemoryStore, kstDay } from '../lib/guard.mjs';
 
 const ENV = { OPENROUTER_API_KEY: 'test-not-real-key', SESSION_SECRET: 'test-secret', VERCEL: '1', VERCEL_ENV: 'preview' };
@@ -187,4 +187,87 @@ test('failed enrichment retains measured report and does not retry or fake AI re
 test('specific robot disallow and exact homepage 404 are grounded issues', () => {
   const s=scanFixture({robots:{status:'present',evidence:'HTTP 200; 검사기 allow; Googlebot:disallow, Bingbot:allow'},accessibility:{status:'absent',evidence:'페이지 HTTP 404'}});
   const p=confirmedPriorities(s);assert.equal(p.length,2);assert.match(p[0].problem,/Googlebot:disallow/);assert.match(p[1].problem,/HTTP 404/);assert.match(p[0].inconvenience,/다른 봇이나 경로/);
+});
+
+
+test('road address permits only metropolitan aliases, commas and parenthesized parcel supplements', () => {
+  const road = '대구 중구 동성로3길 32-13';
+  for (const address of [
+    '대구광역시 중구 동성로3길 32-13 (삼덕동1가 28-32)',
+    '대구 중구 동성로3길 32-13, (삼덕동1가, 28-32)',
+    ' 대구광역시  중구 동성로3길 32-13 (삼덕동1가 28-32번지) ',
+  ]) {
+    assert.equal(addressesMatch(road,address),true,address);
+    assert.equal(addressesMatch(address,road),true,address);
+    const input = {...INPUT,address:road};
+    const business = buildBusiness(raw({candidates:[candidate({address})]}),input);
+    assert.equal(business.category,'생활용품 소매업'); assert.equal(business.address,road);
+    assert.match(business.description,/미검증 검색 단서/);
+  }
+});
+
+test('road matching does not collapse different cities, streets, building numbers, parcels or branches', () => {
+  const road = '대구 중구 동성로3길 32-13';
+  for (const other of [
+    '대구 중구 동성로3길 32-14 (삼덕동1가 28-32)',
+    '대구 중구 동성로3길 32 (삼덕동1가 28-32)',
+    '대구 중구 동성로3길 32-130 (삼덕동1가 28-32)',
+    '대구 중구 동성로4길 32-13 (삼덕동1가 28-32)',
+    '서울 중구 동성로3길 32-13 (삼덕동1가 28-32)',
+    '대구 남구 동성로3길 32-13 (삼덕동1가 28-32)',
+    '대구 중구 동성로3길 32-13 (동성로점)',
+    '대구 중구 동성로3길 32-13 (삼덕동1가 28-32 동성로점)',
+  ]) assert.equal(addressesMatch(road,other),false,other);
+  assert.equal(addressesMatch(road+' (삼덕동1가 28-32)',road+' (삼덕동1가 28-33)'),false);
+  assert.equal(addressesMatch(road+' 본점',road+' 지점'),false);
+});
+
+test('floors, units and building designators survive parcel cleanup and conflicting details reject', () => {
+  const road = '대구 중구 동성로3길 32-13';
+  assert.equal(addressesMatch(road+', 2층 201호',road+' (삼덕동1가 28-32), 2층 201호'),true);
+  assert.equal(addressesMatch(road+' (2층) 201호',road+' (삼덕동1가 28-32), 2층 201호'),true);
+  assert.equal(addressesMatch(road,road+' (삼덕동1가 28-32), 2층 201호'),true);
+  assert.equal(addressesMatch(road+' 지하1층',road+' (삼덕동1가 28-32), B1층'),true);
+  for (const [left,right] of [
+    ['2층','3층'], ['2층 201호','2층 202호'], ['1동 201호','2동 201호'],
+    ['지하1층','1층'], ['2층','(3층)'], ['2층','(삼덕동1가 28-32 3층)'],
+    ['2층','2층 3층'], ['201호','201호 202호'],
+  ]) assert.equal(addressesMatch(road+' '+left,road+' (삼덕동1가 28-32), '+right),false,left+' / '+right);
+});
+
+test('parcel-normalized matching still requires exactly one high candidate with exact business name', () => {
+  const input = {...INPUT,address:'대구 중구 동성로3길 32-13'};
+  const c = candidate({address:'대구광역시 중구 동성로3길 32-13 (삼덕동1가 28-32)'});
+  for (const candidates of [[{...c,name:INPUT.name+' 동성로점'}],[{...c,matchLevel:'medium'}],[c,c]]) {
+    const b = buildBusiness(raw({candidates}),input);
+    assert.equal(b.category,null); assert.deepEqual(b.offerings,[]); assert.match(b.description,/확인하지 못해/);
+  }
+});
+
+test('business summary is two useful sentences grounded only in input name/address and searched category/menu', () => {
+  const b = buildBusiness(raw({candidates:[candidate({menu:[{name:'생활용품',price:'1000원'},{name:'청소도구',price:null}],strengths:['전국 최고'],features:['24시간'],rating:'5점',description:'검증 완료 업체'})]}),INPUT);
+  assert.match(b.description,/서울 중구 예시로 15/); assert.match(b.description,/예시상사/);
+  assert.match(b.description,/생활용품 소매업/); assert.match(b.description,/생활용품, 청소도구/);
+  assert.match(b.description,/미검증 검색 단서/); assert.equal(b.description.split(/\.\s+|\.$/).filter(Boolean).length,2);
+  assert.doesNotMatch(b.description,/전국 최고|24시간|5점|검증 완료|1000원|09:00/);
+});
+
+test('summary missing fields stay unknown, and unmatched business retains the original unavailable notice', () => {
+  const missing = buildBusiness(raw({candidates:[candidate({category:null,menu:[]})]}),INPUT);
+  assert.match(missing.description,/업종은 미확인/); assert.match(missing.description,/상품·서비스 항목은 미확인/);
+  assert.match(missing.description,/미검증 검색 단서/);
+  const unmatched = buildBusiness(raw({candidates:[candidate({address:'서울 중구 예시로 16'})]}),INPUT);
+  assert.equal(unmatched.description,'사용자 입력 상호·주소입니다. 단일 업체의 일치를 충분히 확인하지 못해 검색 상세를 표시하지 않습니다.');
+  assert.doesNotMatch(unmatched.description,/생활용품/);
+});
+
+test('endpoint preserves integrated researcher and scanner while supplying the grounded matched summary', async () => {
+  const input = {...INPUT,address:'대구 중구 동성로3길 32-13',website:WEBSITE};
+  const original = scanFixture(); let seen;
+  const {h} = setup({data:raw({candidates:[candidate({address:'대구광역시 중구 동성로3길 32-13 (삼덕동1가 28-32)'})]}),scan:async()=>original,researcher:async({business})=>{seen=business;return {suggestedQuestions:['테스트 질문?'],competitors:[],researchNotice:'추가 연구 보존'};}});
+  const result = await invoke(h,input);
+  assert.equal(result.status,200); assert.equal(seen.category,'생활용품 소매업');
+  assert.match(seen.description,/대구 중구 동성로3길 32-13/); assert.match(seen.description,/미검증 검색 단서/);
+  assert.deepEqual(result.body.technicalScan,original); assert.deepEqual(result.body.suggestedQuestions,['테스트 질문?']);
+  assert.match(result.body.notice,/추가 연구 보존/);
 });
