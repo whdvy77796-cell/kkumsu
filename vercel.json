@@ -2,25 +2,56 @@
   "framework": null,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "regions": ["icn1"],
+  "regions": [
+    "icn1"
+  ],
   "functions": {
-    "api/store-search.js": { "maxDuration": 180 },
-    "api/report.js": { "maxDuration": 300 },
-    "api/research.js": { "maxDuration": 300 }
+    "api/store-search.js": {
+      "maxDuration": 180
+    },
+    "api/report.js": {
+      "maxDuration": 300
+    },
+    "api/research.js": {
+      "maxDuration": 300
+    },
+    "api/pay.js": {
+      "maxDuration": 60
+    }
   },
   "headers": [
     {
       "source": "/(fonts|vendor)/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     },
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "no-referrer" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://js.tosspayments.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.tosspayments.com https://static.toss.im; connect-src 'self' https://*.tosspayments.com; frame-src https://*.tosspayments.com https://*.toss.im; font-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://*.tosspayments.com https://*.toss.im"
+        }
       ]
     }
   ]
