@@ -5,7 +5,7 @@ import { Readable } from 'node:stream';
 import { createHandler } from '../api/report.js';
 import { researchKey } from '../api/research.js';
 import { normalizeResearch } from '../lib/research.mjs';
-import { MemoryStore, kstDay } from '../lib/guard.mjs';
+import { MemoryStore, kstDay, hashKey } from '../lib/guard.mjs';
 import { computeMetrics, MIN_WAGE } from '../lib/report-calc.mjs';
 import { validateReportInput, buildReportInput, normalizeReport, REPORT_SCHEMA, REPORT_SYSTEM, REPORT_VERSION } from '../lib/report.mjs';
 
@@ -123,7 +123,8 @@ const AI_REPORT = {
 test('결과 정리: 우선순위 순서, 없는 계산값 라벨 제거, 빈 솔루션 제거, 상황 문장', () => {
   const metrics = computeMetrics({ answers: ANSWERS }, STORE).metrics;
   const r = normalizeReport(AI_REPORT, metrics);
-  assert.deepEqual(r.solutions.map((s) => s.stars), [3, 2]);
+  assert.deepEqual(r.solutions.map((s) => s.stars), [3, 2, 0]);
+  assert.equal(r.solutions[2].aiVisibility, true);
   assert.equal(r.solutions[0].supplies, '가림막');
   assert.deepEqual(r.keyMetrics.map((m) => m.label), ['추정 영업이익', '사장님 노동비를 반영한 이익']);
   assert.equal(r.situationMessage, '대표 메뉴 원가와 판매 방식별 비용 구조를 조정해야 해요.');
@@ -133,6 +134,58 @@ test('결과 정리: 우선순위 순서, 없는 계산값 라벨 제거, 빈 �
   // 형식 고치기용 스키마는 모든 키가 필수이고 추가 키를 막는다
   assert.deepEqual(REPORT_SCHEMA.required.sort(), Object.keys(REPORT_SCHEMA.properties).sort());
   assert.equal(REPORT_SCHEMA.properties.solutions.items.additionalProperties, false);
+});
+
+test('AI 검색: 인식과 선택 목표를 반영하고 실제 검색 결과를 꾸미지 않으며 기존 순서를 보존한다', () => {
+  const source = { answers: { a_ai_search: ok({ awareness: 'new', importance: 'unsure', goal: '혼자 점심 먹기 좋은 곳' }) } };
+  const r = normalizeReport(AI_REPORT, [], source);
+  assert.deepEqual(r.solutions.slice(0, 2).map((s) => s.title), ['손님이 보는 곳에서 식사하지 마세요.', '바쁜 시간 역할을 나누세요.']);
+  const s = r.solutions.find((x) => x.aiVisibility === true);
+  assert.equal(s.stars, 0, '확인 필요이며 위생·안전보다 상위가 아님');
+  assert.match(s.problem, /처음 들어도 괜찮아요/);
+  assert.match(s.problem, /확인한 결과가 아니에요/);
+  assert.ok(s.evidence.some((x) => /\[답변\].*처음 들어요/.test(x)));
+  assert.ok(s.evidence.some((x) => /\[답변\].*잘 모르겠어요/.test(x)));
+  assert.ok(s.evidence.some((x) => /\[답변\].*혼자 점심 먹기 좋은 곳/.test(x)));
+  assert.match(s.actions.join(' '), /혼자 점심 먹기 좋은 곳/);
+  assert.match(s.actions.join(' '), /위생·안전.*먼저/);
+  assert.match(s.actions.join(' '), /상호.*주소.*영업시간.*메뉴.*가격/);
+  assert.match(s.actions.join(' '), /출처가 없거나 확인이 어려우면/);
+  assert.match(s.effect, /순위.*추천.*AI 학습은 보장되지 않아요/);
+  assert.match(s.metric, /방문이나 매출 증가를 판단하지 마세요/);
+  assert.ok(s.evidence.every((x) => !x.startsWith('[공개 정보]')));
+  assert.equal(r.urgent.length, AI_REPORT.urgent.length);
+  assert.deepEqual(r.firstAction, AI_REPORT.firstAction);
+  assert.equal(normalizeReport(AI_REPORT, [], source).solutions.at(-1).title, s.title, '동일 입력은 항상 동일 안내');
+  assert.deepEqual(normalizeReport(AI_REPORT, [], source).solutions.at(-1), s, '동일 입력은 안내 내용도 같다');
+});
+
+test('AI 검색: 답변이 없거나 모르거나 형식이 잘못됐으면 근거를 만들지 않고 기본 안내를 제공한다', () => {
+  for (const answer of [undefined, { s: 'unknown', v: { awareness: 'new', importance: 'high', goal: '숨긴 목표' } }, ok(null), ok([]), ok({ awareness: 'invalid', importance: 'invalid' })]) {
+    const r = normalizeReport(AI_REPORT, [], { answers: { a_ai_search: answer } });
+    const s = r.solutions.at(-1);
+    assert.equal(s.aiVisibility, true);
+    assert.deepEqual(s.evidence, []);
+    assert.match(s.actions.join(' '), /떠오르는 질문이 없다면/);
+    assert.doesNotMatch(JSON.stringify(s), /숨긴 목표|\[공개 정보\]/);
+  }
+  const unsupportedMarker = normalizeReport({ ...AI_REPORT, solutions: [{ ...AI_REPORT.solutions[0], aiVisibility: true }] }, []);
+  assert.equal(unsupportedMarker.solutions.filter((s) => s.aiVisibility === true).length, 1, 'AI가 넣은 표식은 무시하고 서버 안내만 신뢰');
+});
+
+test('AI 검색 설문은 입력 정리·AI 자료에 전달되며 선택 검색 목표는 사장님 답변으로 표시된다', () => {
+  const ai = ok({ awareness: 'heard', importance: 'high', goal: '혼자 점심 먹기 좋은 곳' });
+  const input = validateReportInput({ ...BODY, answers: { ...ANSWERS, a_ai_search: ai } });
+  assert.deepEqual(input.answers.a_ai_search, ai);
+  const prompt = buildReportInput(input, computeMetrics({ answers: input.answers }, input.store));
+  assert.match(prompt, /들어봤지만 써보진 않았어요/);
+  assert.match(prompt, /중요할 것 같아요/);
+  assert.match(prompt, /혼자 점심 먹기 좋은 곳/);
+  assert.match(REPORT_SYSTEM, /실제 AI 검색 결과나 노출 상태를 조사하지 않았다면 확인했다고 쓰지 않습니다/);
+  const s = normalizeReport(AI_REPORT, [], input).solutions.at(-1);
+  assert.match(s.evidence.join(' '), /들어봤지만 써보진 않았어요/);
+  assert.match(s.actions.join(' '), /혼자 점심 먹기 좋은 곳/);
+  assert.equal(REPORT_VERSION, 3, '새 생성 보고서 캐시 버전');
 });
 
 // ───────── 서버 함수
@@ -221,6 +274,38 @@ test('보고서 API: Claude가 만든 보고서를 정리하고, 실제 비용�
   await handler(req({ body: { ...BODY, refresh: true } }), r3);
   assert.equal(r3.json().cached, false);
   assert.equal(fetcher.calls.length, 2, '다시 만들기는 새로 부름');
+});
+
+test('보고서 API: 새 보고서의 AI 검색 안내는 선택 목표를 반영해 별도 무료 공개되고 이전 버전 캐시는 쓰지 않는다', async () => {
+  const store = await withResearch(new MemoryStore());
+  const answer = ok({ awareness: 'new', importance: 'unsure', goal: '혼자 점심 먹기 좋은 곳' });
+  const body = { ...BODY, answers: { ...ANSWERS, a_ai_search: answer } };
+  const input = validateReportInput(body);
+  const oldKey = hashKey('report', 'v2', input.name, input.address, JSON.stringify(input.store), JSON.stringify(input.answers), input.pasted, RESEARCH.searchedAt);
+  await store.setJson(oldKey, { v: 2, report: { oneLine: '옛 캐시', solutions: [] } });
+  const fetcher = fakeFetch([aiReply(JSON.stringify(AI_REPORT))]);
+  const env = { ...ENV, TOSS_CLIENT_KEY: 'test_ck_abc123', TOSS_SECRET_KEY: 'test_sk_def456' };
+  const handler = createHandler({ env, fetcher, store });
+  const first = res();
+  await handler(req({ body }), first);
+  assert.equal(first.statusCode, 200, first.body);
+  const out = first.json();
+  assert.equal(out.v, 3);
+  assert.equal(out.cached, false);
+  assert.equal(out.locked, true);
+  assert.equal(out.report.solutions[0].title, '손님이 보는 곳에서 식사하지 마세요.', '기존 우선순위 유지');
+  assert.ok(out.report.solutions[0].actions.length, '기존 첫 개선안 무료');
+  const readiness = out.report.solutions.find((s) => s.aiVisibility === true);
+  assert.ok(readiness && readiness.actions.length >= 4, '별도 AI 검색 안내 전체 무료');
+  assert.match(readiness.actions.join(' '), /혼자 점심 먹기 좋은 곳/);
+  assert.ok(readiness.evidence.every((e) => !e.startsWith('[공개 정보]')));
+  assert.ok(!out.report.solutions[1].actions, '다른 유료 실행 내용은 계속 잠김');
+  assert.match(fetcher.calls[0].body.messages[1].content, /혼자 점심 먹기 좋은 곳/);
+  const again = res();
+  await handler(req({ body }), again);
+  assert.equal(again.json().cached, true);
+  assert.equal(again.json().report.solutions.find((s) => s.aiVisibility === true).actions.length, readiness.actions.length);
+  assert.equal(fetcher.calls.length, 1);
 });
 
 test('보고서 API: 같은 보고서를 만드는 중이면 두 번째 요청은 AI를 부르지 않고 409', async () => {
@@ -322,17 +407,19 @@ test('보고서 API: 인터넷 조사가 없으면 먼저 조사(웹 검색·블
   assert.equal(r2.json().research.searchedAt, out.research.searchedAt);
 });
 
-test('개선안: 10개까지 살리고 실행 단계·기대 효과를 남기며, 지시문은 8~10개와 인터넷 조사 개선점 3개 이상을 요구한다', () => {
+test('개선안: 기존 10개까지 살리고 실행 단계·기대 효과를 남기며, 근거가 충분한 경우에만 인터넷 조사 개선점을 요구한다', () => {
   const many = Array.from({ length: 12 }, (_, i) => ({
     priority: i < 2 ? '우선 개선' : '이번 주 실행', area: '온라인 평판', title: `개선 ${i + 1}`, problem: '문제', evidence: ['[공개 정보] 네이버 블로그 4편: 대기 반복'],
     actions: ['1단계', '2단계', '3단계', '4단계', '5단계', '6단계', '7단계', '8단계'], effect: '손님 불편이 줄어요', owner: '사장님', cost: '없음', supplies: '', metric: '대기 시간 기록',
   }));
   const r = normalizeReport({ ...AI_REPORT, solutions: many }, []);
-  assert.equal(r.solutions.length, 10);
+  assert.equal(r.solutions.length, 11, '기존 개선안 10개에 AI 검색 기본 안내를 더한다');
+  assert.equal(r.solutions.filter((s) => s.aiVisibility === true).length, 1);
   assert.equal(r.solutions[0].actions.length, 7);
   assert.equal(r.solutions[0].effect, '손님 불편이 줄어요');
   assert.match(REPORT_SYSTEM, /8~10개/);
-  assert.match(REPORT_SYSTEM, /인터넷 조사 결과에서 찾은 개선점을 최소 3개/);
+  assert.match(REPORT_SYSTEM, /확인된 공개 근거가 충분하면 인터넷 조사 결과에서 찾은 개선점을 최소 3개/);
+  assert.match(REPORT_SYSTEM, /부족하면 개수를 채우려고 만들지 않습니다/);
   assert.ok(REPORT_SCHEMA.properties.solutions.items.required.includes('effect'));
   // 붙여 넣은 리뷰가 없으면 그 칸은 지시문에서 뺀다
   const input = validateReportInput(BODY);

@@ -163,7 +163,11 @@ test('보고서 만들기: 결제를 받으면 잠긴 보고서 + 보고서 번�
   assert.ok(!JSON.stringify(saved).includes(d.token), '토큰은 해시로만 보관');
   if (saved.data.report.solutions.length > 1) {
     assert.equal(d.locked, true);
-    assert.ok(!d.report.solutions[1].actions, '2순위부터 실행 방법은 안 보냄');
+    for (const [i, sol] of d.report.solutions.entries()) {
+      if (i > 0 && !sol.aiVisibility) assert.ok(!sol.actions, 'AI 검색 준비 안내 외의 유료 실행 방법은 안 보냄');
+    }
+    const aiGuide = d.report.solutions.find(s => s.aiVisibility);
+    assert.ok(aiGuide?.actions?.length, 'AI 검색 준비 안내는 무료로 열림');
   }
   // 결제를 안 받는 모드: 지금처럼 전체 보고서
   const off = await call(reportHandler({ env: { ...env, TOSS_CLIENT_KEY: '', TOSS_SECRET_KEY: '' }, store, mockDelay: 0 }), { body: BODY });
@@ -308,4 +312,18 @@ test('결제 과정 체험: 테스트 모드에서만 샘플을 잠긴 상태로
   assert.equal((await call(payHandler({ env: { ...TEST_ENV, TOSS_CLIENT_KEY: '' }, store }), { body: { action: 'demo' } })).statusCode, 409);
   const live = { ...TEST_ENV, VERCEL_ENV: 'production', TOSS_CLIENT_KEY: 'live_gck_1', TOSS_SECRET_KEY: 'live_gsk_2' };
   assert.equal((await call(payHandler({ env: live, store }), { body: { action: 'demo' } })).statusCode, 409);
+});
+
+
+test('AI 검색 준비 안내는 기존 1순위와 별개로 무료이고 유료 분량에서 제외한다', () => {
+  const data = { report: { solutions: [
+    {title:'안전 점검', actions:['먼저 확인'], evidence:[]},
+    {title:'유료 개선', actions:['상세 실행'], evidence:[]},
+    {title:'AI 검색 준비', aiVisibility:true, actions:['정보 정리'], evidence:[]}
+  ], analysis:{}, plan:{} } };
+  const result = redactReport(data);
+  assert.deepEqual(result.report.solutions[0].actions,['먼저 확인']);
+  assert.equal(result.report.solutions[1].actions,undefined);
+  assert.deepEqual(result.report.solutions[2].actions,['정보 정리']);
+  assert.equal(packageSize(result).solutions,1);
 });
