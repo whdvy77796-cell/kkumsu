@@ -5,6 +5,9 @@ import {
 } from './questions.js';
 import { buildSolutions, LEVEL } from './solutions.js';
 import { PROMO } from './promo.js';
+import { PAY } from './pay-config.js';
+import { redactReport, packageSize, FREE_SOLUTIONS } from './paywall.js';
+import { BUSINESS, businessReady } from './business.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -45,9 +48,10 @@ function setNavbar(...items) {
   const list = items.flat().filter(Boolean);
   append(clear(navbarInner), list);
   navbar.hidden = !list.length;
+  document.body.classList.toggle('has-navbar', list.length > 0);
 }
 // 앞으로 가는 주요 버튼에는 화살표(→)를 붙인다 (모양만, 글자는 그대로)
-const GO_LABELS = ['다음', 'AI 보고서 만들기', '보고서 보기', '진행 상황 보기'];
+const GO_LABELS = ['다음', 'AI 보고서 만들기', '보고서 보기', '진행 상황 보기', '무료 진단 시작'];
 const btn = (label, onclick, primary = false) => h('button', { class: primary ? (GO_LABELS.includes(label) ? 'btn primary go' : 'btn primary') : 'btn', type: 'button', onclick }, label);
 const fmt = (n) => Number(n).toLocaleString('ko-KR');
 
@@ -110,9 +114,14 @@ let navSeq = 0;
 function route() {
   navSeq++;
   const hash = location.hash || '#/';
-  // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다 (home·find·survey·done·report)
-  document.body.dataset.page = ({ '#/find': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report' })[hash] || 'home';
-  if (hash === '#/find') renderFind();
+  const linked = /^#\/r\/([A-Za-z0-9_-]{16,32})\.([A-Za-z0-9_-]{16,100})$/.exec(hash);
+  const policy = { '#/terms': 'terms', '#/privacy': 'privacy', '#/refund': 'refund' }[hash];
+  // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다 (home·find·survey·done·report·policy)
+  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
+  if (linked) renderLinked(linked[1], linked[2]);
+  else if (policy) renderPolicy(policy);
+  else if (hash === '#/sample') renderSample();
+  else if (hash === '#/find') renderFind();
   else if (hash === '#/survey') renderSurvey();
   else if (hash === '#/done') renderDone();
   else if (hash === '#/report') renderReport();
@@ -144,6 +153,52 @@ function showError(e, retry) {
 }
 
 // ───────── 1. 첫 화면: 상호명·주소
+// 첫 화면의 '무료 진단 시작': 가게 입력 칸으로 이동해 바로 입력하게 한다
+let wantStart = false;
+function focusStart() {
+  const card = document.getElementById('startCard');
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => {
+    const empty = [...card.querySelectorAll('input')].find((x) => !x.value.trim());
+    (empty || card.querySelector('input'))?.focus({ preventScroll: true });
+  }, 420);
+}
+function goStart() {
+  if ((location.hash || '#/') === '#/') { focusStart(); return; }
+  wantStart = true;
+  location.hash = '#/';
+}
+// 무료와 유료의 차이 (설문을 시작하기 전에 안내)
+function plansCard() {
+  const off = PAY.mode === 'off';
+  return h('section', { class: 'card plans-card', id: 'plans' },
+    h('h2', null, '무료 진단과 맞춤 실행 패키지'),
+    h('p', { class: 'small muted' }, '설문을 시작하기 전에 무엇이 무료이고 무엇이 유료인지 먼저 알려드려요.'),
+    h('div', { class: 'plans' },
+      h('div', { class: 'plan plan-free' },
+        h('div', { class: 'plan-name' }, '무료 핵심 진단'),
+        h('div', { class: 'price-tag' }, h('b', { class: 'price-now' }, '0원')),
+        h('ul', { class: 'check-list' },
+          h('li', null, '한 줄 진단과 핵심 숫자'),
+          h('li', null, '가장 중요한 문제와 지금 바로 할 일'),
+          h('li', null, '인터넷에서 본 우리 가게 (평점·후기·주변 경쟁점)'),
+          h('li', null, '숫자로 본 우리 가게 (매출·비용·이익 계산)'),
+          h('li', null, '우선 개선안 목록과 1순위 개선안 전체'))),
+      h('div', { class: 'plan plan-paid' },
+        h('div', { class: 'plan-name' }, '맞춤 실행 패키지', h('span', { class: 'plan-chip' }, '보고서 1건')),
+        priceTag(),
+        h('ul', { class: 'check-list' },
+          h('li', null, '모든 개선안의 실행 방법·확인 근거·기대 효과'),
+          h('li', null, '개선안마다 담당·비용과 기간·준비물·확인 지표'),
+          h('li', null, '실행 계획과 수익 구조·메뉴·고객 경험 연결 분석'),
+          h('li', null, 'PDF 저장 · 90일 다시 보기 링크 · 결제 영수증')))),
+    h('p', { class: 'small plans-note' }, off
+      ? '결제는 준비 중이에요. 준비가 끝나기 전에 만든 보고서는 실행 자료까지 전부 무료로 보여드려요.'
+      : `무료 진단을 먼저 보고, 실행 패키지는 보고서 화면에서 원할 때만 결제해요. 토스페이먼츠 카드·간편결제.${PAY.mode === 'test' ? ' (지금은 테스트 결제 모드라 실제로 돈이 나가지 않아요.)' : ''}`),
+    h('a', { class: 'btn small', href: '#/sample' }, '샘플 보고서로 미리 보기'));
+}
+
 function renderHome() {
   storeName.textContent = '';
   let nameIn;
@@ -153,7 +208,7 @@ function renderHome() {
   const go = () => {
     const name = nameIn.value.trim().replace(/\s+/g, ' ');
     const address = addrIn.value.trim().replace(/\s+/g, ' ');
-    if (!name) { hint.textContent = '상호명을 입력해 주세요.'; nameIn.focus(); return; }
+    if (!name) { hint.textContent = '상호명을 입력해 주세요.'; focusStart(); return; }
     if (address.length < 4) { hint.textContent = '주소를 입력해 주세요. 동·도로명까지 적으면 더 정확해요.'; addrIn.focus(); return; }
     const same = S.name === name && S.address === address;
     if (same && S.search?.result && !S.rejected) { location.hash = '#/find'; return; }
@@ -174,16 +229,21 @@ function renderHome() {
         h('a', { class: 'btn small', href: S.doneAt ? '#/done' : '#/survey' }, S.doneAt ? '답변 보기' : '이어서 답하기'),
         S.doneAt && S.report?.data ? h('a', { class: 'btn small', href: '#/report', style: { marginLeft: '6px' } }, '보고서 보기') : null)
     : null;
+  const off = PAY.mode === 'off';
 
   show(
     h('section', { class: 'hero' },
       h('h1', null, '우리 가게, 매출이 달라질 방법을 찾다!'),
-      h('h2', { class: 'hero-sub' }, '우리 가게, 어디를 바꾸면 더 잘될까요?'),
-      h('p', { class: 'hero-desc' }, '직접 가게를 운영한 5년의 경험과 실제 컨설팅 노하우를 담았습니다.'),
-      h('p', { class: 'hero-trust' }, '가게에 대한 질문에 답하면, 수익 구조부터 메뉴·마케팅·운영까지 분석해 맞춤 보고서와 실행 전략을 제안합니다.')),
+      h('h2', { class: 'hero-sub' }, '우리 가게의 문제를 진단하고, 바로 실행할 자료까지 받아보세요'),
+      h('p', { class: 'hero-desc' }, '상호명과 주소를 넣고 가게 질문에 답하면, AI가 인터넷 평판과 사장님 숫자를 함께 살펴 무엇부터 고칠지 진단해요. 실행 방법과 계획은 맞춤 실행 패키지로 받아보세요.'),
+      h('div', { class: 'hero-actions' },
+        h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료 진단 시작'),
+        h('a', { class: 'btn', href: '#/sample' }, '샘플 보고서 보기')),
+      h('p', { class: 'hero-note' }, off ? '회원가입 없이 무료로 진단해요' : `회원가입 없이 무료로 진단해요 · 실행 패키지 ${won(PAY.amount)}는 진단을 본 뒤 원할 때만`)),
     resume,
+    plansCard(),
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
-      h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '첫 질문')),
+      h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료 진단 시작')),
       h('h2', null, '가게 이름과 주소를 알려주세요'),
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '상호명'), nameIn),
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '주소'), addrIn),
@@ -196,16 +256,21 @@ function renderHome() {
         h('li', null, h('b', null, 'AI가 가게 정보 찾기 '), h('span', { class: 'muted small' }, '지도·리뷰·SNS 등 인터넷 공개 정보 (30초~1분)')),
         h('li', null, h('b', null, '우리 가게가 맞는지 확인 '), h('span', { class: 'muted small' }, '아니면 다시 입력')),
         h('li', null, h('b', null, '가게 인터뷰 '), h('span', { class: 'muted small' }, '가장 큰 고민과 운영 방식에 맞춰 질문이 달라져요. AI가 찾은 정보는 미리 채워 두고, 모르는 건 "잘 모름"을 누르면 돼요.')),
-        h('li', null, h('b', null, 'AI 진단 보고서 '), h('span', { class: 'muted small' }, '원할 때만, 동의 후에 만들어요. AI가 카카오맵·네이버·구글·블로그를 직접 찾아보고 답변과 합쳐 진단·솔루션·실행 계획을 만들어요 (2~4분)')))),
+        h('li', null, h('b', null, 'AI 진단 보고서 '), h('span', { class: 'muted small' }, off
+          ? '원할 때만, 동의 후에 만들어요. AI가 카카오맵·네이버·구글·블로그를 직접 찾아보고 답변과 합쳐 진단·개선안·실행 계획을 만들어요 (2~4분)'
+          : '원할 때만, 동의 후에 만들어요 (2~4분). 핵심 진단은 무료로 보고, 실행 방법·계획·PDF는 맞춤 실행 패키지로 열 수 있어요.')))),
     h('div', { class: 'card note small privacy-card' },
       h('b', null, '입력한 정보는 이렇게 쓰여요'),
       h('ul', { class: 'note-list' },
-        h('li', null, '상호명과 주소는 가게 정보를 찾기 위해 OpenRouter를 거쳐 AI(Anthropic Claude)에 전달돼요.'),
-        h('li', null, '같은 가게를 다시 찾을 때를 위해, 찾은 공개 정보는 서버에 3일 동안 임시 보관돼요.'),
+        h('li', null, '상호명과 주소는 가게 정보를 찾기 위해 OpenRouter를 거쳐 AI(Anthropic Claude)에 전달돼요. 찾은 공개 정보와 인터넷 조사 결과는 서버에 3일 동안 임시 보관돼요.'),
         h('li', null, '인터뷰 답변은 이 브라우저에 저장돼요. AI 진단 보고서를 만들 때만, 사장님이 동의하면 OpenRouter를 거쳐 AI(Anthropic Claude)에 전달돼요.'),
-        h('li', null, '만든 보고서는 같은 답변으로 다시 열 때를 위해 서버에 하루 동안 보관했다가 자동으로 지워요.'))),
+        h('li', null, '만든 보고서는 서버에 7일 동안 보관했다가 자동으로 지워요. 맞춤 실행 패키지를 결제하면 다시 보기 링크를 위해 결제일부터 90일 보관해요. 보고서 화면에서 직접 지울 수도 있어요.'),
+        h('li', null, '결제는 토스페이먼츠 결제창에서 해요. 카드 번호 같은 결제 정보는 저장하지 않고, 주문번호·결제 금액·일시·수단만 전자상거래법에 따라 5년 보관해요.')),
+      h('p', { style: { margin: '8px 0 0' } }, h('a', { href: '#/privacy' }, '개인정보처리방침 자세히 보기'))),
   );
-  setNavbar(btn('다음', go, true));
+  const navGo = btn('무료 진단 시작', () => (nameIn.value.trim() && addrIn.value.trim().length >= 4 ? go() : focusStart()), true);
+  setNavbar(navGo);
+  if (wantStart) { wantStart = false; setTimeout(focusStart, 60); }
 }
 
 // ───────── 2. AI 가게 찾기 → 맞는지 확인
@@ -885,7 +950,8 @@ function reportCta() {
     h('ul', { class: 'note-list small' },
       h('li', null, '인터넷 조사에는 상호명·주소와 앞서 찾은 공개 정보만 써요.'),
       h('li', null, '보고서를 만들려면 인터뷰 답변을 OpenRouter를 거쳐 AI(Anthropic Claude)에 보내야 해요.'),
-      h('li', null, '같은 내용으로 다시 열 때 비용이 들지 않도록, 보고서는 하루, 인터넷 조사 결과는 3일 동안 서버에 보관했다가 자동으로 지워요.'),
+      h('li', null, '보고서는 서버에 7일(맞춤 실행 패키지를 결제하면 결제일부터 90일), 인터넷 조사 결과는 3일 동안 보관했다가 자동으로 지워요.'),
+      PAY.mode === 'off' ? null : h('li', null, h('b', null, '핵심 진단은 무료예요. '), `나머지 개선안의 실행 방법·실행 계획·PDF 저장은 보고서를 본 뒤 원할 때만 맞춤 실행 패키지(${won(PAY.amount)})로 열 수 있어요.`),
       h('li', null, '보통 2~4분 걸려요.')),
     h('label', { class: 'consent' }, agree, h('span', null, '위 내용을 확인했고, 보고서를 만들기 위해 답변을 AI에 보내는 데 동의해요.')),
     make,
@@ -1050,7 +1116,9 @@ function pdfFileName(data) {
   return `매출올려드림_${name}_진단보고서_${ymd}.pdf`;
 }
 let pdfBusy = false;
-async function saveReportPdf(data, button) {
+async function saveReportPdf(data, button, opts = {}) {
+  // PDF 저장은 맞춤 실행 패키지에 포함 (잠긴 보고서는 저장하지 않는다)
+  if (data?.locked) { toast('PDF 저장은 맞춤 실행 패키지에 포함돼요. 결제하면 바로 저장할 수 있어요.', 4000); focusPayCard(); return; }
   if (pdfBusy) return;
   pdfBusy = true;
   const label = button?.textContent;
@@ -1170,10 +1238,10 @@ async function saveReportPdf(data, button) {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(140);
-      doc.text('www.kkumsu.com', M, PH - 5);
+      doc.text(opts.sample ? 'www.kkumsu.com - SAMPLE' : 'www.kkumsu.com', M, PH - 5);
       doc.text(`${i} / ${pages}`, PW - M, PH - 5, { align: 'right' });
     }
-    doc.save(pdfFileName(data));
+    doc.save(opts.fileName || pdfFileName(data));
     toast('PDF 파일로 저장했어요. 내려받은 파일(다운로드)에서 열어 보세요.', 5000);
   } catch (e) {
     console.error('[pdf]', e);
@@ -1278,24 +1346,276 @@ function promoSection() {
     PROMO.items.map(item));
 }
 
-function drawReport(data, stale) {
+// ───────── 무료 핵심 진단 / 유료 맞춤 실행 패키지 (잠금 규칙: paywall.js · 결제 설정: pay-config.js)
+const won = (n) => `${fmt(n)}원`;
+const salePct = () => (PAY.list > PAY.amount ? Math.floor(((PAY.list - PAY.amount) / PAY.list) * 100) : 0);
+// 잠긴 자리에 흐리게 그릴 가짜 글자 (진짜 내용은 서버가 결제 전에는 보내지 않는다)
+const FILLER = ['가게', '손님', '메뉴', '가격', '주문', '기록', '확인', '오픈', '마감', '직원', '사진', '리뷰', '답글', '안내', '계산', '재료', '원가', '비용', '시간', '이번 주', '한 달', '표시', '정리', '준비', '시작', '비교', '체크', '매출', '자리', '대기'];
+function filler(seed, words = 9) {
+  let x = (seed * 7919 + 104729) % 100003;
+  const out = [];
+  for (let i = 0; i < words; i++) {
+    x = (x * 48271 + 11) % 2147483647;
+    out.push(FILLER[x % FILLER.length]);
+  }
+  return `${out.join(' ')}.`;
+}
+function lockedLines(n, seed, numbered = false) {
+  return h(numbered ? 'ol' : 'ul', { class: numbered ? 'sol-steps' : 'ev-list' },
+    Array.from({ length: Math.max(1, n || 0) }, (_, i) => h('li', null, filler(seed + i, 6 + ((seed + i) % 6)))));
+}
+function lockedBox(label, ...kids) {
+  return h('div', { class: 'locked' },
+    h('div', { class: 'locked-blur', 'aria-hidden': 'true' }, kids),
+    h('div', { class: 'locked-badge' }, h('span', { class: 'lock-icon', 'aria-hidden': 'true' }), h('span', null, label)));
+}
+function lockedSolutionCard(sol, i) {
+  const L = sol.locked || {};
+  const meta = ['담당', '비용과 기간', '준비물', '확인 지표'].slice(0, L.meta || 0);
+  const seed = (i + 2) * 31;
+  return h('div', { class: `card sol sol-${sol.stars} sol-locked` },
+    h('div', { class: 'sol-head' },
+      sol.stars ? h('span', { class: 'stars' }, '★'.repeat(sol.stars)) : null,
+      h('span', { class: 'sol-level' }, LEVEL[sol.stars]),
+      h('span', { class: 'sol-area' }, sol.area),
+      sol.web ? h('span', { class: 'sol-web' }, '인터넷 조사 반영') : null),
+    h('h3', null, sol.title),
+    sol.problem ? h('p', { class: 'sol-row' }, h('b', null, '발견한 문제 '), sol.problem) : null,
+    lockedBox(`실행 방법 ${L.actions || 0}단계${L.evidence ? ` · 근거 ${L.evidence}개` : ''}${meta.length ? ' · 담당·비용·지표' : ''} · 결제하면 열려요`,
+      L.evidence ? [h('div', { class: 'sub-title' }, '확인 근거'), lockedLines(L.evidence, seed)] : null,
+      h('div', { class: 'sub-title' }, '실행 방법'),
+      lockedLines(L.actions, seed + 7, true),
+      L.effect ? h('p', { class: 'sol-row sol-effect' }, h('b', null, '기대 효과 '), filler(seed + 19, 8)) : null,
+      meta.length ? h('dl', { class: 'sol-meta' }, meta.map((t, k) => [h('dt', null, t), h('dd', null, filler(seed + 23 + k, 4))])) : null));
+}
+const ANALYSIS_LABEL = { profit: '수익 구조', menu: '메뉴', customer: '고객 경험', connection: '어떻게 이어지나요' };
+function lockedAnalysis(keys) {
+  if (!keys?.length) return null;
+  return h('section', { class: 'card' },
+    h('h2', null, '수익 구조·메뉴·고객 경험 연결 분석'),
+    lockedBox(`연결 분석 ${keys.length}가지 · 결제하면 열려요`,
+      keys.map((k, i) => h('div', { class: 'analysis-item' }, h('h3', null, ANALYSIS_LABEL[k] || k), h('p', { style: { margin: 0 } }, filler(i * 13 + 3, 22))))));
+}
+function lockedPlan(L = {}) {
+  const col = (title, n, seed) => h('div', { class: 'plan-col' }, h('h3', null, title), h('ul', null, Array.from({ length: Math.max(1, n || 0) }, (_, i) => h('li', null, filler(seed + i, 5)))));
+  const total = (L.thisWeek || 0) + (L.nextWeeks || 0) + (L.thisMonth || 0);
+  const block = (on, title, seed) => (on ? h('div', { class: 'rep-block' }, h('h3', null, title), h('p', { style: { margin: 0 } }, filler(seed, 18))) : null);
+  return h('section', { class: 'card' },
+    h('h2', null, '실행 계획'),
+    lockedBox(`실행 계획 ${total}개 항목 · 마케팅·예산·성과 확인 · 결제하면 열려요`,
+      h('div', { class: 'plan-cols' }, col('이번 주', L.thisWeek, 101), col('2~3주 차', L.nextWeeks, 202), col('한 달 안', L.thisMonth, 303)),
+      block(L.marketing, '마케팅 실행안', 404), block(L.budget, '예산', 505), block(L.check, '성과 확인 방법', 606)));
+}
+
+let payConsent = false;
+function packageItems(data) {
+  const z = packageSize(data);
+  return [
+    `개선안 ${z.solutions}개의 실행 방법 ${z.steps}단계와 확인 근거·기대 효과`,
+    '개선안마다 담당·비용과 기간·준비물·확인 지표',
+    `실행 계획 (이번 주·2~3주 차·한 달 안 ${z.planItems}개 항목, 마케팅·예산·성과 확인)`,
+    '수익 구조·메뉴·고객 경험 연결 분석',
+    'PDF 저장 (직원과 공유·인쇄)',
+    '결제일부터 90일 동안 다시 보기 링크 · 결제 영수증',
+  ];
+}
+function priceTag(big = false) {
+  const pct = salePct();
+  return h('div', { class: `price-tag${big ? ' big' : ''}` },
+    pct ? h('s', { class: 'price-list' }, `정가 ${won(PAY.list)}`) : null,
+    h('b', { class: 'price-now' }, won(PAY.amount)),
+    pct ? h('span', { class: 'price-off' }, `${pct}% 할인 중`) : null);
+}
+function focusPayCard() {
+  const card = document.getElementById('payCard');
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.remove('flash');
+  void card.offsetWidth;
+  card.classList.add('flash');
+}
+function payCard(data, { sample = false } = {}) {
+  const off = PAY.mode === 'off';
+  const agree = h('input', { type: 'checkbox', class: 'pay-agree' });
+  agree.checked = payConsent;
+  agree.addEventListener('change', () => {
+    payConsent = agree.checked;
+    document.querySelectorAll('.pay-agree').forEach((x) => { x.checked = payConsent; });
+  });
+  const go = h('button', { class: `btn primary block pay-go${sample ? ' go' : ''}`, type: 'button' }, sample ? '우리 가게 무료 진단 시작' : `${won(PAY.amount)} 결제하고 전체 보기`);
+  go.addEventListener('click', () => (sample ? goStart() : startPayment(data, go)));
+  return h('section', { class: 'card paycard', id: sample ? null : 'payCard' },
+    h('div', { class: 'paycard-kicker' }, sample ? '샘플 · 실제 보고서에서는 여기서 결제해요' : '맞춤 실행 패키지'),
+    h('h2', null, '여기서부터는 바로 실행할 자료예요'),
+    h('p', { class: 'small' }, '무료 진단에서 찾은 문제를 어떻게 고칠지, 누가·언제·얼마로·무엇을 확인하며 할지 정리했어요.'),
+    h('ul', { class: 'check-list' }, packageItems(data).map((x) => h('li', null, x))),
+    priceTag(true),
+    PAY.mode === 'test' && !sample ? h('p', { class: 'test-pay' }, '테스트 결제 모드예요. 실제로 돈이 나가지 않아요.') : null,
+    off && !sample ? h('p', { class: 'small muted' }, '결제는 준비 중이에요.') : null,
+    sample || off ? null : h('label', { class: 'consent pay-consent' }, agree,
+      h('span', null, '결제하면 바로 보고서가 열려 단순 변심 환불이 어려운 점을 확인했어요. 보고서가 열리지 않는 등의 오류는 환불해 드려요. ', h('a', { href: '#/refund' }, '환불 정책'))),
+    off && !sample ? null : go,
+    sample ? null : h('p', { class: 'tiny muted pay-fine' }, '토스페이먼츠 결제창에서 카드·간편결제로 결제해요. 카드 정보는 매출올려드림에 저장되지 않아요. ', h('a', { href: '#/terms' }, '이용약관')));
+}
+function payReminder(data) {
+  const z = packageSize(data);
+  return h('section', { class: 'card pay-reminder no-print' },
+    h('p', { class: 'strong' }, `아직 잠긴 실행 자료: 개선안 ${z.solutions}개 · 실행 방법 ${z.steps}단계 · 실행 계획 · PDF 저장`),
+    priceTag(),
+    h('button', { class: 'btn primary block', type: 'button', onclick: focusPayCard }, '결제 안내 보기'));
+}
+function paidCard(data) {
+  const p = data.payment || {};
+  let when = '';
+  try { when = p.approvedAt ? new Date(p.approvedAt).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }) : ''; } catch { /* 날짜 없음 */ }
+  const link = data.rid && data.token ? `${location.origin}/#/r/${data.rid}.${data.token}` : null;
+  return h('div', { class: 'card paid-card no-print' },
+    h('b', null, '맞춤 실행 패키지가 열렸어요'),
+    h('p', { class: 'small', style: { margin: '4px 0 10px' } }, [p.amount ? `결제 ${won(p.amount)}` : null, when, p.test ? '테스트 결제(실제 청구 없음)' : null].filter(Boolean).join(' · ')),
+    h('div', { class: 'btn-row' },
+      link ? h('button', { class: 'btn small', type: 'button', onclick: async () => { toast((await copyText(link)) ? '다시 보기 링크를 복사했어요.' : link, 6000); } }, '다시 보기 링크 복사') : null,
+      p.receiptUrl ? h('a', { class: 'btn small', href: p.receiptUrl, target: '_blank', rel: 'noopener noreferrer' }, '영수증 보기') : null),
+    h('p', { class: 'tiny muted', style: { margin: '10px 0 0' } }, '다시 보기 링크는 결제일부터 90일 동안 열려요. 링크를 가진 사람은 누구나 볼 수 있으니 필요한 사람에게만 보내 주세요.'));
+}
+
+// ───────── 결제: 주문 만들기 → 토스페이먼츠 결제창(같은 창에서 이동) → 돌아오면 서버 승인
+const TOSS_SDK = 'https://js.tosspayments.com/v2/standard';
+let payBusy = false;
+function guestKey() {
+  const a = new Uint8Array(18);
+  crypto.getRandomValues(a);
+  return `guest-${[...a].map((x) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'[x % 62]).join('')}`;
+}
+async function startPayment(data, button) {
+  if (payBusy) return;
+  if (PAY.mode === 'off') { toast('지금은 결제를 받지 않아요.'); return; }
+  if (!payConsent) {
+    focusPayCard();
+    document.querySelector('#payCard .pay-agree')?.focus({ preventScroll: true });
+    toast('결제 전에 환불 안내를 확인하고 체크해 주세요.', 4000);
+    return;
+  }
+  if (!data?.rid || !data?.token) { toast('보고서 번호가 없어요. 보고서를 다시 만든 뒤 결제해 주세요.', 5000); return; }
+  payBusy = true;
+  const label = button?.textContent;
+  if (button) { button.disabled = true; button.textContent = '결제창을 여는 중…'; }
+  try {
+    const o = await post('/api/pay', { action: 'order', rid: data.rid, token: data.token }, 20000);
+    if (o.paid) { await reopenReport(data); return; }
+    if (!window.TossPayments) await loadScript(TOSS_SDK);
+    if (!window.TossPayments) throw new Error('결제창을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+    const payment = window.TossPayments(o.clientKey).payment({ customerKey: window.TossPayments.ANONYMOUS || guestKey() });
+    S.pendingPay = { orderId: o.orderId, rid: data.rid, token: data.token, at: Date.now() };
+    save();
+    await payment.requestPayment({
+      method: 'CARD',
+      amount: { currency: 'KRW', value: o.amount },
+      orderId: o.orderId,
+      orderName: o.orderName,
+      successUrl: `${location.origin}/?pay=success`,
+      failUrl: `${location.origin}/?pay=fail`,
+      windowTarget: 'self',
+      card: { flowMode: 'DEFAULT', useEscrow: false, useCardPoint: false, useAppCardOnly: false },
+    });
+  } catch (e) {
+    console.error('[pay]', e);
+    const canceled = /CANCEL/i.test(String(e?.code || ''));
+    toast(canceled ? '결제를 취소했어요.' : e?.message || '결제창을 열지 못했어요. 잠시 후 다시 시도해 주세요.', 5000);
+  } finally {
+    payBusy = false;
+    if (button) { button.disabled = false; button.textContent = label; }
+  }
+}
+async function reopenReport(data) {
+  const fresh = await post('/api/pay', { action: 'view', rid: data.rid, token: data.token }, 20000);
+  if (S.report?.data?.rid === fresh.rid) { S.report.data = { ...fresh, token: data.token }; save(); }
+  route();
+}
+// 결제창에서 돌아왔을 때 (?pay=success|fail)
+async function handlePayReturn() {
+  const qs = new URLSearchParams(location.search);
+  const kind = qs.get('pay');
+  if (kind !== 'success' && kind !== 'fail') return false;
+  history.replaceState(null, '', `${location.pathname}#/report`);
+  if (kind === 'fail') {
+    const code = qs.get('code') || '';
+    S.pendingPay = null;
+    save();
+    route();
+    toast(/CANCEL/i.test(code) ? '결제를 취소했어요. 원할 때 다시 결제할 수 있어요.' : qs.get('message') || '결제를 마치지 못했어요.', 6000);
+    return true;
+  }
+  S.pendingPay = { ...(S.pendingPay || {}), paymentKey: qs.get('paymentKey'), orderId: qs.get('orderId'), amount: qs.get('amount') };
+  save();
+  await confirmPayment();
+  return true;
+}
+async function confirmPayment() {
+  const p = S.pendingPay;
+  if (!p?.paymentKey) { route(); return; }
+  document.body.dataset.page = 'report';
+  show(h('div', { class: 'card loading' },
+    h('div', { class: 'spinner', 'aria-hidden': 'true' }),
+    h('h2', null, '결제를 확인하고 있어요'),
+    h('p', { class: 'small' }, '창을 닫지 말고 잠시만 기다려 주세요.')));
+  setNavbar();
+  try {
+    let data;
+    for (let i = 0; ; i++) {
+      try {
+        data = await post('/api/pay', { action: 'confirm', paymentKey: p.paymentKey, orderId: p.orderId, amount: p.amount, rid: p.rid, token: p.token }, 45000);
+        break;
+      } catch (e) {
+        if (e.code === 'BUSY' && i < 6) { await new Promise((r) => setTimeout(r, 3000)); continue; }
+        throw e;
+      }
+    }
+    S.pendingPay = null;
+    const token = data.token || p.token;
+    if (S.report?.data?.rid && S.report.data.rid === data.rid) {
+      S.report.data = { ...data, token };
+      save();
+      route();
+    } else {
+      save();
+      location.hash = `#/r/${data.rid}.${token}`;
+    }
+    toast('결제가 완료됐어요. 맞춤 실행 패키지와 PDF 저장이 열렸어요.', 6000);
+  } catch (e) {
+    show(h('div', { class: 'card warn' },
+      h('h2', null, '결제를 확인하지 못했어요'),
+      h('p', null, e.message || '잠시 후 다시 확인해 주세요.'),
+      h('p', { class: 'small' }, '같은 결제는 두 번 빠져나가지 않아요. 계속 안 되면 결제 영수증의 주문번호와 함께 고객센터로 알려 주세요.'),
+      h('p', { class: 'tiny muted' }, `주문번호: ${p.orderId || '-'} · 오류 코드: ${e.code || '알 수 없음'}`)));
+    setNavbar(btn('보고서로', () => { S.pendingPay = null; save(); route(); }), btn('다시 확인', () => confirmPayment(), true));
+  }
+}
+
+// ───────── 보고서 화면
+function reportBody(data, { stale = false, sample = false, linked = false } = {}) {
   const r = data.report || {};
+  const locked = !!data.locked;
   const when = (() => {
     try { return new Date(data.createdAt).toLocaleString('ko-KR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Asia/Seoul' }); } catch { return ''; }
   })();
   const planCol = (title, items) => (items?.length ? h('div', { class: 'plan-col' }, h('h3', null, title), h('ul', null, items.map((x) => h('li', null, x)))) : null);
-  const analysis = [['수익 구조', r.analysis?.profit], ['메뉴', r.analysis?.menu], ['고객 경험', r.analysis?.customer], ['어떻게 이어지나요', r.analysis?.connection]].filter(([, t]) => t);
+  const analysis = locked ? [] : [['수익 구조', r.analysis?.profit], ['메뉴', r.analysis?.menu], ['고객 경험', r.analysis?.customer], ['어떻게 이어지나요', r.analysis?.connection]].filter(([, t]) => t);
   const b = data.bench;
-  show(
-    stale
+  const sols = r.solutions || [];
+  const freeSols = locked ? sols.slice(0, FREE_SOLUTIONS) : sols;
+  const lockedSols = locked ? sols.slice(FREE_SOLUTIONS) : [];
+  const mine = !sample && !linked;
+  return [
+    stale && mine
       ? h('div', { class: 'card warn no-print' },
           h('b', null, reportOutdated() ? '보고서가 더 자세해졌어요. ' : '답변이 바뀌었어요. '),
           reportOutdated() ? '이 보고서는 예전 형식(개선안 4~6개)이에요. ' : '이 보고서는 바뀌기 전 답변으로 만든 거예요. ',
           h('a', { href: '#/done' }, reportOutdated() ? '새 형식으로 다시 만들기' : '바뀐 답변으로 다시 만들기'))
       : null,
     data.mock ? h('div', { class: 'card note small' }, '(모의 응답) 실제 AI가 아니라 화면 점검용으로 만든 보고서예요.') : null,
+    data.paid && !sample ? paidCard(data) : null,
     h('div', { class: 'rep-head' },
-      h('div', { class: 'rep-kicker' }, 'AI 진단 보고서 · 베타'),
+      h('div', { class: 'rep-kicker' }, sample ? '샘플 보고서 · 예시 데이터' : locked ? 'AI 진단 보고서 · 무료 핵심 진단' : 'AI 진단 보고서 · 베타'),
       h('h1', { class: 'rep-title' }, `${data.store?.name || S.name} 진단 보고서`),
       h('p', { class: 'small muted' }, [when, data.store?.address].filter(Boolean).join(' · '))),
 
@@ -1336,23 +1656,29 @@ function drawReport(data, stale) {
         ? h('section', { class: 'card note small' }, h('ul', { class: 'note-list' }, data.cautions.map((x) => h('li', null, x))))
         : null,
 
-    analysis.length
-      ? h('section', { class: 'card' },
-          h('h2', null, '수익 구조·메뉴·고객 경험 연결 분석'),
-          analysis.map(([t, x]) => h('div', { class: 'analysis-item' }, h('h3', null, t), h('p', { style: { margin: 0 } }, x))))
-      : null,
+    locked
+      ? lockedAnalysis(r.analysis?.locked)
+      : analysis.length
+        ? h('section', { class: 'card' },
+            h('h2', null, '수익 구조·메뉴·고객 경험 연결 분석'),
+            analysis.map(([t, x]) => h('div', { class: 'analysis-item' }, h('h3', null, t), h('p', { style: { margin: 0 } }, x))))
+        : null,
 
-    h('h2', { class: 'section-title' }, `우선 개선안 ${r.solutions?.length || 0}개`),
-    h('p', { class: 'small muted' }, '★★★ 우선 개선 · ★★ 이번 주 실행 · ★ 조건부 실험 · 확인 필요. 근거 표시: 답변 = 사장님 답변, 계산 = 서버 계산, 공개 정보 = AI가 인터넷에서 찾은 정보, 추정 = AI의 판단. "인터넷 조사 반영"은 인터넷 후기·평판에서 찾은 개선점이에요.'),
-    h('div', { class: 'sol-list' }, (r.solutions || []).map(aiSolutionCard)),
+    h('h2', { class: 'section-title' }, `우선 개선안 ${sols.length}개`),
+    h('p', { class: 'small muted' }, `★★★ 우선 개선 · ★★ 이번 주 실행 · ★ 조건부 실험 · 확인 필요. 근거 표시: 답변 = 사장님 답변, 계산 = 서버 계산, 공개 정보 = AI가 인터넷에서 찾은 정보, 추정 = AI의 판단. "인터넷 조사 반영"은 인터넷 후기·평판에서 찾은 개선점이에요.${locked ? ` 무료 진단에서는 ${FREE_SOLUTIONS}순위 개선안을 전부 보여드리고, 나머지는 제목과 발견한 문제까지 보여드려요.` : ''}`),
+    h('div', { class: 'sol-list' }, freeSols.map(aiSolutionCard)),
+    locked ? payCard(data, { sample }) : null,
+    lockedSols.length ? h('div', { class: 'sol-list' }, lockedSols.map(lockedSolutionCard)) : null,
 
-    h('section', { class: 'card' },
-      h('h2', null, '실행 계획'),
-      h('div', { class: 'plan-cols' },
-        planCol('이번 주', r.plan?.thisWeek), planCol('2~3주 차', r.plan?.nextWeeks), planCol('한 달 안', r.plan?.thisMonth)),
-      r.plan?.marketing ? h('div', { class: 'rep-block' }, h('h3', null, '마케팅 실행안'), h('p', { style: { margin: 0 } }, r.plan.marketing)) : null,
-      r.plan?.budget ? h('div', { class: 'rep-block' }, h('h3', null, '예산'), h('p', { style: { margin: 0 } }, r.plan.budget)) : null,
-      r.plan?.check ? h('div', { class: 'rep-block' }, h('h3', null, '성과 확인 방법'), h('p', { style: { margin: 0 } }, r.plan.check)) : null),
+    locked
+      ? lockedPlan(r.plan?.locked)
+      : h('section', { class: 'card' },
+          h('h2', null, '실행 계획'),
+          h('div', { class: 'plan-cols' },
+            planCol('이번 주', r.plan?.thisWeek), planCol('2~3주 차', r.plan?.nextWeeks), planCol('한 달 안', r.plan?.thisMonth)),
+          r.plan?.marketing ? h('div', { class: 'rep-block' }, h('h3', null, '마케팅 실행안'), h('p', { style: { margin: 0 } }, r.plan.marketing)) : null,
+          r.plan?.budget ? h('div', { class: 'rep-block' }, h('h3', null, '예산'), h('p', { style: { margin: 0 } }, r.plan.budget)) : null,
+          r.plan?.check ? h('div', { class: 'rep-block' }, h('h3', null, '성과 확인 방법'), h('p', { style: { margin: 0 } }, r.plan.check)) : null),
 
     r.needCheck?.length
       ? h('section', { class: 'card note' }, h('h3', null, '더 정확한 진단을 위해 확인할 것'), h('ul', { class: 'note-list' }, r.needCheck.map((x) => h('li', null, x))))
@@ -1363,19 +1689,200 @@ function drawReport(data, stale) {
       data.truncated ? h('p', null, '보고서가 길어 끝부분이 잘렸을 수 있어요. 다시 만들면 나아질 수 있어요.') : null,
       h('p', { style: { margin: 0 } }, `만든 AI: ${data.model === 'mock' ? '모의 응답' : data.model || '-'}${data.cached ? ' · 저장된 보고서' : ''}`)),
 
+    locked && !sample && PAY.mode !== 'off' ? payReminder(data) : null,
+
     // 맨 아래 고정 안내 (AI가 만든 내용이 아니라 모든 보고서에 똑같이 붙는다. 내용은 promo.js)
     promoSection(),
-    stale ? null : h('p', { class: 'small no-print', style: { textAlign: 'center' } },
+
+    mine && !stale ? h('p', { class: 'small no-print', style: { textAlign: 'center' } },
       h('button', { class: 'btn small', type: 'button', onclick: () => {
-        if (!confirm('같은 답변으로 보고서를 새로 만들까요? 2~4분쯤 걸려요.')) return;
+        const warn = data.paid ? '\n\n결제한 이 보고서는 다시 보기 링크로 계속 볼 수 있어요. 새로 만든 보고서의 실행 패키지는 따로 결제해야 해요.' : '';
+        if (!confirm(`같은 답변으로 보고서를 새로 만들까요? 2~4분쯤 걸려요.${warn}`)) return;
         startReport({ refresh: true });
         route();
-      } }, '보고서 새로 만들기')),
-  );
+      } }, '보고서 새로 만들기')) : null,
+    !sample && data.rid && data.token ? h('p', { class: 'tiny no-print', style: { textAlign: 'center', margin: '4px 0 0' } },
+      h('button', { class: 'linklike', type: 'button', onclick: () => deleteServerCopy(data) }, '서버에 보관된 이 보고서 지우기')) : null,
+  ];
+}
+async function deleteServerCopy(data) {
+  const paidNote = data.paid ? ' 결제한 보고서라면 다시 보기 링크가 더 이상 열리지 않아요(결제 기록은 법에 따라 5년 보관해요).' : ' 지우면 이 보고서로는 결제할 수 없어요.';
+  if (!confirm(`서버에 보관된 이 보고서를 지울까요? 이 브라우저에 저장된 화면은 남아 있어요.${paidNote}`)) return;
+  try {
+    await post('/api/pay', { action: 'delete', rid: data.rid, token: data.token }, 20000);
+    if (S.report?.data?.rid === data.rid) {
+      const { rid, token, ...rest } = S.report.data;
+      S.report.data = rest;
+      save();
+    }
+    toast('서버에 보관된 보고서를 지웠어요.', 4000);
+    route();
+  } catch (e) {
+    toast(e.message || '지우지 못했어요. 잠시 후 다시 시도해 주세요.', 5000);
+  }
+}
+
+function drawReport(data, stale, opts = {}) {
+  show(...reportBody(data, { stale, ...opts }));
   const saveBtn = btn('저장하기', () => saveReportPdf(data, saveBtn), true);
+  const payBtn = h('button', { class: 'btn primary', type: 'button' }, `${won(PAY.amount)} 결제하기`);
+  payBtn.addEventListener('click', () => (payConsent ? startPayment(data, payBtn) : (focusPayCard(), toast('환불 안내를 확인하고 체크한 뒤 결제해 주세요.', 3500))));
   setNavbar(
-    btn('완료 화면', () => { location.hash = '#/done'; }),
-    saveBtn,
+    opts.linked ? btn('처음으로', () => { location.hash = '#/'; }) : btn('완료 화면', () => { location.hash = '#/done'; }),
+    data.locked ? (PAY.mode === 'off' ? null : payBtn) : saveBtn,
   );
 }
-route();
+
+// 다시 보기 링크 (#/r/보고서번호.토큰) : 다른 기기에서도 서버에 보관된 보고서를 연다
+async function renderLinked(rid, token) {
+  const seq = navSeq;
+  storeName.textContent = '';
+  show(h('div', { class: 'card loading' }, h('div', { class: 'spinner', 'aria-hidden': 'true' }), h('h2', null, '보고서를 불러오고 있어요')));
+  setNavbar();
+  try {
+    const data = await post('/api/pay', { action: 'view', rid, token }, 20000);
+    if (seq !== navSeq) return;
+    data.token = token;
+    if (S.report?.data?.rid === rid) {
+      S.report.data = { ...data, token: S.report.data.token || token };
+      save();
+    }
+    storeName.textContent = data.store?.name || '';
+    drawReport(data, false, { linked: true });
+  } catch (e) {
+    if (seq !== navSeq) return;
+    show(h('div', { class: 'card warn' }, h('h2', null, '보고서를 열지 못했어요'), h('p', null, e.message || '잠시 후 다시 시도해 주세요.')));
+    setNavbar(btn('처음으로', () => { location.hash = '#/'; }, true));
+  }
+}
+
+// ───────── 샘플 보고서 (실제 가게 '연어로' 보고서, 사장님 동의로 공개 · 예시 데이터)
+let sampleData = null;
+let sampleView = 'paid';
+async function renderSample() {
+  const seq = navSeq;
+  storeName.textContent = '샘플 보고서';
+  if (!sampleData) {
+    show(h('div', { class: 'card loading' }, h('div', { class: 'spinner', 'aria-hidden': 'true' }), h('h2', null, '샘플 보고서를 불러오고 있어요')));
+    setNavbar();
+    try {
+      const r = await fetch('/sample/report.json', { cache: 'no-cache' });
+      if (!r.ok) throw new Error(String(r.status));
+      sampleData = await r.json();
+    } catch {
+      if (seq !== navSeq) return;
+      show(h('div', { class: 'card warn' }, h('h2', null, '샘플 보고서를 불러오지 못했어요'), h('p', null, '잠시 후 다시 시도해 주세요.')));
+      setNavbar(btn('처음으로', () => { location.hash = '#/'; }, true));
+      return;
+    }
+    if (seq !== navSeq) return;
+  }
+  const data = sampleView === 'free' ? redactReport(sampleData) : sampleData;
+  const tab = (v, label) => h('button', { class: sampleView === v ? 'on' : '', type: 'button', 'aria-pressed': String(sampleView === v), onclick: () => { sampleView = v; renderSample(); } }, label);
+  const pdfBtn = h('button', { class: 'btn small', type: 'button' }, '샘플 PDF 저장');
+  pdfBtn.addEventListener('click', () => saveReportPdf(sampleData, pdfBtn, { sample: true, fileName: '매출올려드림_샘플보고서_연어로.pdf' }));
+  show(
+    h('div', { class: 'card sample-bar' },
+      h('div', { class: 'sample-badge' }, '샘플 보고서 · 예시 데이터'),
+      h('p', { class: 'small', style: { margin: '8px 0 12px' } }, '실제 가게(대구 동성로 연어로) 사장님 동의를 받아 공개한 예시예요. 숫자와 내용은 이 가게 기준이라 우리 가게와 달라요. 개인 연락처는 일부 가렸어요.'),
+      h('div', { class: 'seg no-print', role: 'group', 'aria-label': '보기 방식' }, tab('free', '무료 진단 화면'), tab('paid', '결제 후 전체 화면')),
+      h('p', { class: 'tiny muted no-print', style: { margin: '10px 0 0' } }, sampleView === 'free'
+        ? '무료 진단에서는 이렇게 1순위 개선안까지 보이고, 나머지 실행 자료는 흐리게 가려져요.'
+        : '맞춤 실행 패키지를 결제하면 이렇게 모든 개선안의 실행 방법과 실행 계획이 열리고 PDF로 저장할 수 있어요.'),
+      sampleView === 'paid' ? h('div', { class: 'no-print', style: { marginTop: '10px' } }, pdfBtn) : null),
+    ...reportBody(data, { sample: true }),
+  );
+  setNavbar(btn('처음으로', () => { location.hash = '#/'; }), btn('무료 진단 시작', goStart, true));
+}
+
+// ───────── 이용약관 · 개인정보처리방침 · 환불 정책
+const biz = (k, fallback = '사업자 정보 등록 후 표시') => String(BUSINESS[k] || '').trim() || fallback;
+const POLICY_DATE = '2026년 11월 9일';
+function policyDoc(title, intro, sections) {
+  return [
+    h('div', { class: 'policy-head' }, h('h1', null, title), h('p', { class: 'small muted' }, `시행일 ${POLICY_DATE}`), intro ? h('p', null, intro) : null),
+    sections.map(([t, ...items]) => h('section', { class: 'card policy' },
+      h('h2', null, t),
+      items.map((x) => (Array.isArray(x) ? h('ul', { class: 'note-list' }, x.map((y) => h('li', null, y))) : h('p', null, x))))),
+  ];
+}
+function operatorLine() {
+  return `운영자: ${biz('name', '매출올려드림 AI 운영자')} · 대표 ${biz('owner')} · 사업자등록번호 ${biz('bizNo')} · 주소 ${biz('address')} · 고객센터 ${biz('phone')} · 이메일 ${biz('email')}`;
+}
+function renderPolicy(kind) {
+  storeName.textContent = '';
+  const price = `${won(PAY.amount)}(정가 ${won(PAY.list)}, 할인 중)`;
+  const docs = {
+    terms: () => policyDoc('이용약관', null, [
+      ['제1조 (목적)', `이 약관은 ${biz('name', '매출올려드림 AI 운영자')}(이하 '운영자')가 제공하는 매출올려드림 AI(www.kkumsu.com, 이하 '서비스')를 이용하는 조건과 절차, 운영자와 이용자의 권리·의무를 정합니다.`],
+      ['제2조 (서비스 내용)',
+        ['무료 핵심 진단: 상호명·주소, 인터뷰 답변, 인터넷 공개 정보를 바탕으로 AI가 만든 진단 보고서 중 핵심 진단(한 줄 진단과 핵심 숫자, 가장 중요한 문제, 지금 바로 할 일, 위생·안전, 인터넷에서 본 우리 가게, 숫자로 본 우리 가게, 우선 개선안 목록과 1순위 개선안, 확인할 것)을 무료로 제공합니다.',
+          `맞춤 실행 패키지(유료, 보고서 1건 ${price}): 같은 보고서의 나머지 개선안별 확인 근거·실행 방법·기대 효과·담당·비용과 기간·준비물·확인 지표, 수익 구조·메뉴·고객 경험 연결 분석, 실행 계획, PDF 저장, 결제일부터 90일 동안의 다시 보기 링크를 제공합니다.`,
+          '보고서는 AI가 이용자의 답변과 인터넷 공개 정보로 만든 참고 자료예요. 매출·이익 증가 같은 결과를 보장하지 않으며, 중요한 결정 전에는 장부와 현장에서 확인해야 합니다.']],
+      ['제3조 (이용 방법)', '회원가입 없이 이용합니다. 진행 중인 답변과 보고서는 이용자의 브라우저에 저장되며, 브라우저 저장소를 지우면 다시 볼 수 없을 수 있습니다. 결제한 보고서는 다시 보기 링크로 결제일부터 90일 동안 열 수 있습니다.'],
+      ['제4조 (가격과 결제)', `맞춤 실행 패키지의 가격은 보고서 1건당 ${price}이며 부가세가 포함된 최종 결제 금액입니다. 결제는 토스페이먼츠 결제창(카드·간편결제)으로 하며, 결제가 승인되면 즉시 해당 보고서의 잠긴 내용이 열립니다. 가격이 바뀌어도 이미 결제한 건에는 영향이 없습니다.`],
+      ['제5조 (청약철회와 환불)', '맞춤 실행 패키지는 결제와 동시에 제공이 시작되는 디지털 콘텐츠예요. 단순 변심에 의한 청약철회 제한과 환불 기준은 환불 정책에 따릅니다. 이 내용은 결제 전에 안내하고 동의를 받습니다.'],
+      ['제6조 (이용자의 의무)', ['사실과 다른 정보로 다른 사람의 가게를 진단하거나, 서비스 운영을 방해하는 행위를 해서는 안 됩니다.', '받은 보고서를 다른 사람에게 판매하거나, 다시 보기 링크를 대가를 받고 배포해서는 안 됩니다.']],
+      ['제7조 (서비스 변경과 중단)', '운영자는 서비스 개선을 위해 화면과 기능을 바꿀 수 있습니다. 시스템 점검·장애 등으로 서비스를 일시 중단할 수 있으며, 이미 결제한 보고서를 볼 수 없게 된 경우에는 환불 정책에 따라 환불합니다.'],
+      ['제8조 (책임)', '운영자는 AI 진단 결과의 정확성이나 특정 사업 성과를 보장하지 않습니다. 다만 운영자의 고의 또는 과실로 이용자에게 손해가 생긴 경우에는 관련 법령에 따라 책임을 집니다.'],
+      ['제9조 (분쟁 해결)', '서비스 이용과 관련한 문의·불만은 고객센터로 접수해 주세요. 분쟁이 생기면 관련 법령과 소비자분쟁해결기준에 따라 해결하며, 소송은 민사소송법에 따른 관할 법원에 제기합니다.'],
+      ['운영자 정보', operatorLine()],
+    ]),
+    refund: () => policyDoc('환불 정책', '맞춤 실행 패키지는 결제가 승인되는 즉시 보고서의 잠긴 내용이 열리는 디지털 콘텐츠예요.', [
+      ['결제 전에 확인할 수 있어요', ['무료 핵심 진단으로 우리 가게 보고서의 핵심 내용과 1순위 개선안 전체를 먼저 볼 수 있어요.', '샘플 보고서(예시 데이터)로 결제 후 화면을 미리 볼 수 있어요.']],
+      ['단순 변심 환불', '결제 후 바로 열람이 시작되므로, 전자상거래 등에서의 소비자보호에 관한 법률 제17조 제2항 제5호에 따라 단순 변심에 의한 청약철회(환불)는 제한돼요. 이 사실은 결제 전에 안내하고 동의를 받아요.'],
+      ['전액 환불해 드려요', ['결제했는데 보고서가 열리지 않거나 보관 기간(결제일부터 90일) 안에 볼 수 없는 경우', '같은 보고서가 중복 결제된 경우', `보고서 내용이 서비스 안내와 현저히 다른 경우(예: 실행 방법이 비어 있음). 공급받은 날부터 3개월 이내, 그 사실을 안 날 또는 알 수 있었던 날부터 30일 이내에 요청할 수 있어요(같은 법 제17조 제3항).`]],
+      ['환불 요청 방법', `고객센터(${biz('email')} · ${biz('phone')})로 주문번호(결제 영수증에 있어요)와 사유를 알려 주세요. 환불이 결정되면 3영업일 안에 결제를 취소해요. 카드사 반영에는 영업일 기준 3~7일이 걸릴 수 있어요.`],
+      ['운영자 정보', operatorLine()],
+    ]),
+    privacy: () => policyDoc('개인정보처리방침', `${biz('name', '매출올려드림 AI 운영자')}(이하 '운영자')는 개인정보 보호법에 따라 이용자의 개인정보를 보호하고 관련 고충을 신속하게 처리하기 위해 이 방침을 둡니다. 회원가입이 없고, 쿠키를 쓰지 않아요.`, [
+      ['1. 처리하는 정보와 목적', [
+        '가게 찾기: 상호명과 주소를 받아 AI가 인터넷 공개 정보로 가게를 찾는 데 써요.',
+        'AI 진단 보고서: 이용자가 동의한 경우에만 인터뷰 답변(가게 운영 방식, 매출·비용, 사장님·가족 근무 시간 등)을 받아 보고서를 만드는 데 써요. 답변 원문은 서버에 따로 저장하지 않고, 답변으로 만든 보고서(계산값 포함)만 보관해요.',
+        '결제: 주문번호, 결제 고유번호(토스페이먼츠가 주는 값), 결제 금액, 결제 일시, 결제 수단 종류를 결제 확인·환불·분쟁 처리와 법정 기록 보존에 써요. 카드 번호 같은 결제 정보는 토스페이먼츠가 처리하며 운영자는 받지 않아요.',
+        '이용량 관리: 접속 IP 주소를 되돌릴 수 없게 바꾼 값(해시)으로 하루 이용 횟수를 세요.',
+        '브라우저 저장소: 진행 중인 답변과 보고서는 이용자 기기의 브라우저 저장소(localStorage)에만 저장돼요. 완료 화면의 \'처음부터 다시\' 또는 브라우저 데이터 삭제로 지울 수 있어요.']],
+      ['2. 보관 기간', [
+        '가게 찾기 결과와 인터넷 조사 결과: 3일',
+        '보고서: 만든 날부터 7일. 맞춤 실행 패키지를 결제하면 결제일부터 90일(다시 보기 링크)',
+        '결제 기록(주문번호·결제 고유번호·금액·일시·수단·보고서 번호): 5년 (전자상거래법의 대금결제 및 재화 등의 공급에 관한 기록). 보고서 내용은 포함하지 않아요.',
+        '이용량 집계(IP 해시): 2일',
+        '보관 기간이 지나면 저장소에서 자동으로 지워져요.']],
+      ['3. 처리 위탁과 국외 이전', [
+        'OpenRouter, Inc.(미국): AI 요청 중계. 상호명·주소·찾은 공개 정보, 동의한 경우 인터뷰 답변을 요청할 때마다 네트워크로 전송해요. 이용자 데이터를 수집·학습에 쓰지 않는 제공자로만 보내도록 설정해요.',
+        'Anthropic, PBC 등 OpenRouter가 연결하는 Claude 모델 제공자(미국): AI 진단 처리.',
+        'Vercel Inc.(미국): 웹사이트와 서버 운영. 서버 함수는 서울 지역에서 실행돼요.',
+        'Upstash, Inc.(미국 회사, 저장 위치: 일본 도쿄 AWS 데이터센터): 보고서·조사 결과·결제 기록 저장소.',
+        '토스페이먼츠(주)(대한민국): 결제 처리.',
+        '가게 찾기나 AI 보고서 기능을 쓰지 않으면 해외로 전송되지 않아요. 보고서 기능을 원하지 않으면 동의하지 않으면 돼요.']],
+      ['4. 이용자의 권리', ['언제든지 개인정보의 열람·정정·삭제·처리정지를 요청할 수 있어요.', '보고서 화면 맨 아래 \'서버에 보관된 이 보고서 지우기\'로 직접 지울 수 있어요. 결제 기록은 법정 보관 기간 동안 남아요.', `요청: ${biz('email')}`]],
+      ['5. 안전성 확보 조치', ['모든 통신은 HTTPS로 암호화해요.', '보고서는 추측할 수 없는 보고서 번호와 비밀 토큰이 있어야 열리고, 토큰은 서버에 해시로만 저장해요.', '결제 시크릿 키와 AI 키는 서버에만 두고 화면에 보내지 않아요.']],
+      ['6. 개인정보 보호책임자', `${String(BUSINESS.privacyOfficer || '').trim() || biz('owner')} · ${biz('email')} · ${biz('phone')}`],
+      ['7. 방침 변경', '이 방침을 바꾸면 시행일과 함께 이 화면에 알려드려요.'],
+      ['운영자 정보', operatorLine()],
+    ]),
+  };
+  show(h('div', { class: 'policy-page' }, docs[kind]()));
+  setNavbar(btn('처음으로', () => { location.hash = '#/'; }, true));
+}
+
+// ───────── 바닥글 (약관·개인정보처리방침·사업자 정보)
+function renderFooter() {
+  const el = document.getElementById('siteFoot');
+  if (!el) return;
+  const B = BUSINESS;
+  append(clear(el), [
+    h('nav', { class: 'foot-links', 'aria-label': '약관과 정책' },
+      h('a', { href: '#/terms' }, '이용약관'),
+      h('a', { href: '#/privacy' }, h('b', null, '개인정보처리방침')),
+      h('a', { href: '#/refund' }, '환불 정책'),
+      h('a', { href: '#/sample' }, '샘플 보고서')),
+    businessReady()
+      ? h('p', { class: 'foot-biz' }, [`상호 ${B.name}`, `대표 ${B.owner}`, `사업자등록번호 ${B.bizNo}`, B.mailOrderNo ? `통신판매업 신고 ${B.mailOrderNo}` : null, `주소 ${B.address}`, `고객센터 ${B.phone}`, `이메일 ${B.email}`, `호스팅 ${B.hosting}`].filter(Boolean).join(' · '))
+      : null,
+    h('p', { class: 'foot-copy' }, '© 매출올려드림 AI · AI 진단은 참고 자료이며 결과를 보장하지 않아요.'),
+  ]);
+}
+
+renderFooter();
+handlePayReturn().then((handled) => { if (!handled) route(); }, () => route());
