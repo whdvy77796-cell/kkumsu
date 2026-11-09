@@ -113,6 +113,11 @@ test('결제 모드: 키·환경·사업자 정보에 따라 off/test/live', () 
   assert.equal(payConfig(live, {}).reason, 'business_info');
   assert.equal(payConfig(live, BIZ).mode, 'live');
   assert.equal(payConfig({ ...live, TOSS_SECRET_KEY: 'test_sk_2' }, BIZ).reason, 'key_mismatch');
+  // 결제위젯(결제창형) 키: gck/gsk 짝
+  assert.equal(payConfig({ ...TEST_ENV, TOSS_CLIENT_KEY: 'test_gck_docs_a', TOSS_SECRET_KEY: 'test_gsk_docs_b' }).mode, 'test');
+  assert.equal(payConfig({ ...live, TOSS_CLIENT_KEY: 'live_gck_a', TOSS_SECRET_KEY: 'live_gsk_b' }, BIZ).mode, 'live');
+  assert.equal(payConfig({ ...TEST_ENV, TOSS_CLIENT_KEY: 'test_gck_a', TOSS_SECRET_KEY: 'test_sk_b' }).reason, 'key_mismatch', '위젯 키와 개별 연동 키를 섞으면 안 됨');
+  assert.equal(payConfig({ ...TEST_ENV, TOSS_CLIENT_KEY: 'test_ck_a', TOSS_SECRET_KEY: 'test_gsk_b' }).reason, 'key_mismatch');
   assert.equal(payConfig({ ...TEST_ENV, MAECHUL_PAYWALL: 'off' }).mode, 'off');
   assert.deepEqual([payConfig({}).amount, payConfig({}).list], [9900, 19900]);
   assert.deepEqual([payConfig({ MAECHUL_PRICE: '12900', MAECHUL_LIST_PRICE: '9000' }).amount, payConfig({ MAECHUL_PRICE: '12900', MAECHUL_LIST_PRICE: '9000' }).list], [12900, 12900], '정가가 판매가보다 낮을 수 없다');
