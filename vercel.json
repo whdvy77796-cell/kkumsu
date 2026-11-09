@@ -17,6 +17,9 @@
     },
     "api/pay.js": {
       "maxDuration": 60
+    },
+    "api/place-copy.js": {
+      "maxDuration": 60
     }
   },
   "headers": [

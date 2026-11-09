@@ -187,3 +187,19 @@
   .ap-preview-row { grid-template-columns: 65px minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) { .ap-progress-fill { transition: none; } }
+
+/* 선택형 AI 문구 제안 */
+.ap-ai-panel { margin:22px 0; padding:20px; border:1px solid #cbd9fc; border-radius:16px; background:#f5f8ff; }
+.ap-ai-panel h3 { margin:0 0 8px; color:#1b397e; font-size:18px; }
+.ap-ai-panel p { margin:0 0 10px; font-size:14px; line-height:1.65; color:#344052; }
+.ap-ai-note { color:#5a6575 !important; }
+.ap-ai-consent { display:flex; align-items:flex-start; gap:9px; margin:14px 0; color:#172b50; font-weight:650; font-size:14px; cursor:pointer; }
+.ap-ai-consent input { width:18px; height:18px; margin-top:3px; flex:none; }
+.ap-ai-button { min-height:44px; }
+.ap-ai-button:disabled { opacity:.5; cursor:wait; }
+.ap-ai-error { color:#ac3129 !important; margin:10px 0 0 !important; }
+.ap-ai-message { color:#147653 !important; margin:10px 0 0 !important; }
+.ap-ai-results { margin-top:16px; }
+.ap-ai-results > strong { display:block; margin-bottom:8px; font-size:14px; }
+.ap-ai-suggestion { background:white; border:1px solid #dce4f5; border-radius:12px; padding:12px; margin-top:8px; }
+.ap-ai-suggestion p { white-space:pre-wrap; overflow-wrap:anywhere; }

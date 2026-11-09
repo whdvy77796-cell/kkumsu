@@ -57,6 +57,26 @@ export function mountAiPlace(container, options = {}) {
   let error = '';
   let destroyed = false;
   let focusAfterRender = false;
+  const copyState = { consent: false, busy: false, suggestions: [], error: '', message: '', fingerprint: '' };
+  const copyFields = [
+    ['name', 'name', '가게 이름', 80], ['category', 'category', '업종', 60],
+    ['address', 'address', '주소', 160], ['highlight', 'highlights', '소개', 180],
+    ['keywords', 'keywords', '검색어', 120], ['menu', 'menus', '메뉴', 180],
+    ['parking', 'parking', '주차', 120], ['hours', 'hours', '영업시간', 120],
+  ];
+  function copyFacts() {
+    const facts = {}; const tooLong = [];
+    for (const [source, target, label, max] of copyFields) {
+      const value = data[source].trim();
+      if (value.length > max) tooLong.push(label + ' ' + max + '자');
+      else if (value) facts[target] = value;
+    }
+    return { facts, tooLong };
+  }
+  function invalidateCopy() {
+    copyState.consent = false; copyState.suggestions = []; copyState.fingerprint = '';
+    copyState.error = ''; copyState.message = '';
+  }
 
   function destroy() {
     if (destroyed) return;
@@ -80,7 +100,7 @@ export function mountAiPlace(container, options = {}) {
     const attrs = {
       id, name: key, placeholder: settings.placeholder || '', maxlength: settings.maxlength || 400,
       value: data[key], required: Boolean(settings.required),
-      on: { input: (event) => { data[key] = event.currentTarget.value; } },
+      on: { input: (event) => { data[key] = event.currentTarget.value; if (copyFields.some(([source]) => source === key)) invalidateCopy(); } },
     };
     const input = settings.multiline
       ? element('textarea', { ...attrs, rows: settings.rows || 3 })
@@ -191,7 +211,7 @@ export function mountAiPlace(container, options = {}) {
         element('span', {}, element('strong', {}, '사진을 사용할 권리가 있어요'),
           element('small', {}, '직접 촬영했거나 사용 허락을 받은 사진만 선택했습니다. 사진이 있을 때 확인해 주세요.'))),
       element('div', { class: 'ap-privacy' }, element('strong', {}, '개인정보와 권리를 지켜주세요'),
-        element('p', {}, '타인의 얼굴·연락처 등 개인정보나 허락받지 않은 저작물은 넣지 마세요. 이 모듈은 입력 내용과 사진을 서버로 보내거나 저장하지 않아요. 새로고침하거나 나가면 내용이 사라져요.'))];
+        element('p', {}, '타인의 얼굴·연락처 등 개인정보나 허락받지 않은 저작물은 넣지 마세요. 기본 시안과 사진은 서버로 보내지 않아요. AI 문구 제안을 선택하면 동의한 텍스트만 외부 AI에 전달해요. 새로고침하거나 나가면 내용이 사라져요.'))];
   }
   function button(label, className, action, attrs = {}) {
     return element('button', { type: 'button', class: className, ...attrs, on: { click: action } }, label);
@@ -209,6 +229,59 @@ export function mountAiPlace(container, options = {}) {
     }
     error = ''; return true;
   }
+  async function requestCopy() {
+    if (copyState.busy) return;
+    if (!copyState.consent) { copyState.error = '텍스트를 외부 AI에 전달하는 데 동의해 주세요.'; render(); return; }
+    const { facts, tooLong } = copyFacts();
+    if (tooLong.length) {
+      copyState.error = 'AI 제안을 받으려면 다음 항목을 줄여 주세요: ' + tooLong.join(', ') + ' 이하. 기본 시안은 그대로 볼 수 있어요.';
+      render(); return;
+    }
+    const fingerprint = JSON.stringify(facts);
+    copyState.busy = true; copyState.consent = false; copyState.error = ''; copyState.message = ''; copyState.suggestions = [];
+    render();
+    try {
+      const response = await fetch('/api/place-copy', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consent: true, facts }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'AI 문구를 가져오지 못했어요.');
+      if (destroyed) return;
+      if (copyFacts().tooLong.length || JSON.stringify(copyFacts().facts) !== fingerprint) {
+        copyState.error = '요청 중 입력이 바뀌어 결과를 적용하지 않았어요. 내용을 확인한 후 다시 요청해 주세요.';
+      } else {
+        copyState.suggestions = Array.isArray(result.suggestions) ? result.suggestions.filter(x => typeof x?.text === 'string') : [];
+        copyState.fingerprint = fingerprint;
+        if (!copyState.suggestions.length) copyState.error = '제안할 문구를 받지 못했어요.';
+      }
+    } catch (err) {
+      if (!destroyed) copyState.error = err?.message || 'AI 제안을 가져오지 못했어요. 기본 시안은 계속 볼 수 있어요.';
+    } finally {
+      if (!destroyed) { copyState.busy = false; render(); }
+    }
+  }
+  function copyPanel() {
+    const id = instanceId + '-ai-consent';
+    const consent = element('label', { class: 'ap-ai-consent', for: id },
+      element('input', { type: 'checkbox', id, checked: copyState.consent, on: { change: (event) => { copyState.consent = event.currentTarget.checked; } } }),
+      element('span', {}, '위 텍스트를 외부 AI로 보내 문구 조합을 제안받는 데 동의해요.'));
+    const suggestions = copyState.suggestions.map((item) => element('div', { class: 'ap-ai-suggestion' },
+      element('p', {}, item.text),
+      button('이 조합 사용', 'ap-edit-button', () => {
+        if (copyFacts().tooLong.length || JSON.stringify(copyFacts().facts) !== copyState.fingerprint) { invalidateCopy(); copyState.error = '입력 내용이 바뀌었어요. 확인 후 다시 요청해 주세요.'; render(); return; }
+        data.highlight = item.text; invalidateCopy(); copyState.message = '선택한 조합을 소개에 반영했어요. 정확한지 확인하고 필요하면 수정해 주세요.'; render();
+      })));
+    return element('section', { class: 'ap-ai-panel', 'aria-label': 'AI 문구 조합 제안' },
+      element('h3', {}, 'AI 문구 조합 제안'),
+      element('p', {}, '선택하면 가게 이름·주소·업종·소개·검색어·메뉴·영업시간·주차 중 입력한 텍스트를 OpenRouter를 거쳐 AI(Claude)에 전달해요. 사진과 별도 연락처 입력란은 보내지 않아요. 다른 항목에 적은 개인정보는 텍스트에 포함될 수 있으니 확인해 주세요.'),
+      element('p', { class: 'ap-ai-note' }, 'AI는 입력한 원문을 골라 조합해요. 검색 결과를 확인하지 않으며 자동 공개하지 않아요. 제안이 사실과 맥락에 맞는지 확인해 주세요.'),
+      consent,
+      button(copyState.busy ? 'AI 제안을 만드는 중…' : '동의하고 AI 문구 제안 받기', 'ap-button ap-button-secondary ap-ai-button', requestCopy, { disabled: copyState.busy }),
+      copyState.error ? element('p', { class: 'ap-ai-error', role: 'alert' }, copyState.error) : null,
+      copyState.message ? element('p', { class: 'ap-ai-message', role: 'status' }, copyState.message) : null,
+      suggestions.length ? element('div', { class: 'ap-ai-results' }, element('strong', {}, 'AI가 고른 원문 조합 · 확인 후 사용'), suggestions) : null);
+  }
   function infoRow(label, value) {
     return element('div', { class: 'ap-preview-row' }, element('dt', {}, label), element('dd', {}, value));
   }
@@ -217,7 +290,7 @@ export function mountAiPlace(container, options = {}) {
     const factsFilled = [data.hours, data.parking, data.reservations, data.contact].some((v) => v.trim());
     const faq = data.faq.filter((entry) => entry.question.trim() && entry.answer.trim());
     const extras = data.photos.slice(1);
-    return [heading('YOUR PREVIEW', '우리 가게 소개 시안', '입력한 답변으로 자동 구성한 비공개 시안이에요. AI 모델은 호출하지 않으며, 정보는 언제든 수정할 수 있어요.'),
+    return [heading('YOUR PREVIEW', '우리 가게 소개 시안', '입력한 답변으로 자동 구성한 비공개 시안이에요. 정보는 언제든 수정할 수 있고, 동의하면 AI 문구 조합도 제안받을 수 있어요.'),
       element('div', { class: 'ap-preview-tools' },
         element('div', {}, element('span', { class: 'ap-live-dot', 'aria-hidden': 'true' }),
           element('strong', {}, '내 브라우저에서만 보이는 시안'),
@@ -260,6 +333,7 @@ export function mountAiPlace(container, options = {}) {
           button('이용 정보 수정', 'ap-text-button', () => go(2)),
           button('사진 수정', 'ap-text-button', () => go(3))),
         data.keywords.trim() ? element('p', { class: 'ap-keywords' }, element('strong', {}, '입력한 검색어 · 편집 참고용'), element('span', {}, data.keywords.trim())) : null),
+      copyPanel(),
       element('div', { class: 'ap-final-note' }, element('strong', {}, '정식 제작 예정가 29,000원'),
         element('span', {}, '정식 공개와 결제는 준비 중이에요. AI 읽기·색인 자동 확인도 아직 제공하지 않아요. 이 화면에서 결제하거나 공개할 수 없어요.'))];
   }
@@ -285,7 +359,7 @@ export function mountAiPlace(container, options = {}) {
       element('div', { class: 'ap-hero' },
         element('div', {}, element('p', { class: 'ap-eyebrow' }, 'FOR YOUR BUSINESS'),
           element('h1', {}, '우리 가게를 소개하는', element('br'), '한 장의 페이지'),
-          element('p', { class: 'ap-hero-description' }, '입력한 답변으로 자동 구성한 비공개 시안이에요. AI 모델은 호출하지 않아요.')),
+          element('p', { class: 'ap-hero-description' }, '입력한 답변으로 자동 구성한 비공개 시안이에요. 원하면 동의 후 AI 문구 조합을 제안받을 수 있어요.')),
         element('div', { class: 'ap-price-box' }, element('span', {}, '정식 제작 예정가'),
           element('strong', {}, '29,000', element('small', {}, '원')),
           element('p', {}, '정식 공개 · 결제 준비 중'))),
