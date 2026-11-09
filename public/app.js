@@ -45,7 +45,9 @@ function setNavbar(...items) {
   append(clear(navbarInner), list);
   navbar.hidden = !list.length;
 }
-const btn = (label, onclick, primary = false) => h('button', { class: primary ? 'btn primary' : 'btn', type: 'button', onclick }, label);
+// 앞으로 가는 주요 버튼에는 화살표(→)를 붙인다 (모양만, 글자는 그대로)
+const GO_LABELS = ['다음', 'AI 보고서 만들기', '보고서 보기', '진행 상황 보기'];
+const btn = (label, onclick, primary = false) => h('button', { class: primary ? (GO_LABELS.includes(label) ? 'btn primary go' : 'btn primary') : 'btn', type: 'button', onclick }, label);
 const fmt = (n) => Number(n).toLocaleString('ko-KR');
 
 // ───────── 상태 (이 브라우저에만 저장)
@@ -107,6 +109,8 @@ let navSeq = 0;
 function route() {
   navSeq++;
   const hash = location.hash || '#/';
+  // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다 (home·find·survey·done·report)
+  document.body.dataset.page = ({ '#/find': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report' })[hash] || 'home';
   if (hash === '#/find') renderFind();
   else if (hash === '#/survey') renderSurvey();
   else if (hash === '#/done') renderDone();
@@ -163,7 +167,7 @@ function renderHome() {
 
   const started = Number.isInteger(S.chosen) && S.answers && Object.keys(S.answers).length;
   const resume = started
-    ? h('div', { class: 'card note' },
+    ? h('div', { class: 'card note resume' },
         h('b', null, S.doneAt ? '지난 진단 답변이 있어요' : '진행 중인 진단이 있어요'),
         h('p', { class: 'small', style: { margin: '4px 0 8px' } }, chosenStore()?.name || S.name),
         h('a', { class: 'btn small', href: S.doneAt ? '#/done' : '#/survey' }, S.doneAt ? '답변 보기' : '이어서 답하기'),
@@ -184,7 +188,7 @@ function renderHome() {
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '주소'), addrIn),
       h('p', { class: 'small muted' }, '다음을 누르면 AI(Claude)가 상호명과 주소로 인터넷에 공개된 가게 정보를 찾아요. 30초~1분쯤 걸려요.'),
       hint),
-    h('div', { class: 'card' },
+    h('div', { class: 'card steps-card' },
       h('h2', null, '이렇게 진행돼요'),
       h('ol', { class: 'steps-list' },
         h('li', null, h('b', null, '상호명·주소 입력 '), h('span', { class: 'muted small' }, '지금 이 화면')),
@@ -192,7 +196,7 @@ function renderHome() {
         h('li', null, h('b', null, '우리 가게가 맞는지 확인 '), h('span', { class: 'muted small' }, '아니면 다시 입력')),
         h('li', null, h('b', null, '가게 인터뷰 '), h('span', { class: 'muted small' }, '가장 큰 고민과 운영 방식에 맞춰 질문이 달라져요. AI가 찾은 정보는 미리 채워 두고, 모르는 건 "잘 모름"을 누르면 돼요.')),
         h('li', null, h('b', null, 'AI 진단 보고서 '), h('span', { class: 'muted small' }, '원할 때만, 동의 후에 만들어요. AI가 카카오맵·네이버·구글·블로그를 직접 찾아보고 답변과 합쳐 진단·솔루션·실행 계획을 만들어요 (2~4분)')))),
-    h('div', { class: 'card note small' },
+    h('div', { class: 'card note small privacy-card' },
       h('b', null, '입력한 정보는 이렇게 쓰여요'),
       h('ul', { class: 'note-list' },
         h('li', null, '상호명과 주소는 가게 정보를 찾기 위해 OpenRouter를 거쳐 AI(Anthropic Claude)에 전달돼요.'),
@@ -1069,7 +1073,10 @@ async function saveReportPdf(data, button) {
       });
     });
     await Promise.all([...box.querySelectorAll('img')].map((img) => (img.complete ? null : new Promise((r) => { img.onload = r; img.onerror = r; }))));
-    const { jsPDF } = window.jspdf;
+    // 그림으로 찍을 때는 보고서 상자만 복제한다. 화면의 다른 부분과, 브라우저 확장 프로그램이 페이지에 붙인
+    // 위젯(안쪽 CSS가 제목 굵기·목록 번호를 지워 버림)은 빼야 PDF가 화면과 같게 나온다.
+    const skipForPdf = (el) => (el.parentElement === document.body && el !== box)
+      || (el.parentElement === document.documentElement && el !== document.head && el !== document.body);    const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const PW = 210; const PH = 297; const M = 10; const W = PW - M * 2; const BOTTOM = PH - 12; const GAP = 3;
     let y = M;
@@ -1086,7 +1093,7 @@ async function saveReportPdf(data, button) {
       y += hmm + GAP;
     };
     for (const block of [...box.children]) {
-      const canvas = await window.html2canvas(block, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, windowWidth: 1024 });
+      const canvas = await window.html2canvas(block, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, windowWidth: 1024, ignoreElements: skipForPdf });
       if (!canvas.width || !canvas.height) continue;
       const pxPerMm = canvas.width / W;
       const hmm = canvas.height / pxPerMm;
