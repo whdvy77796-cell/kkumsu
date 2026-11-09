@@ -288,8 +288,9 @@ function renderHome() {
         h('li', null, '결제는 토스페이먼츠 결제창에서 해요. 카드 번호 같은 결제 정보는 저장하지 않고, 주문번호·결제 금액·일시·수단만 전자상거래법에 따라 5년 보관해요.')),
       h('p', { style: { margin: '8px 0 0' } }, h('a', { href: '#/privacy' }, '개인정보처리방침 자세히 보기'))),
   );
-  const navGo = btn('무료 진단 시작', () => (nameIn.value.trim() && addrIn.value.trim().length >= 4 ? go() : focusStart()), true);
-  setNavbar(navGo);
+  const navGeo = h('a', { class: 'btn primary', href: '#/ai-place' }, 'AI GEO 시작하기');
+  const navGo = btn('진단 시작하기', () => (nameIn.value.trim() && addrIn.value.trim().length >= 4 ? go() : focusStart()));
+  setNavbar(navGeo, navGo);
   if (wantStart) { wantStart = false; setTimeout(focusStart, 60); }
 }
 
