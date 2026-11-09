@@ -120,7 +120,8 @@ test('empty search offers clearly labeled name/address fallback with safe text a
   const links = nodes(container).filter(n => n.tagName === 'A'); assert.equal(links.length, 1);
   assert.equal(links[0].getAttribute('href'), 'https://example.com/'); assert.equal(links[0].textContent, attack);
   assert.equal(nodes(container).filter(n => n.tagName === 'H4' && n.textContent.includes('대표 상품')).length, 0);
-  assert.match(container.textContent, /대표 상품·서비스·메뉴·가격 미입력·미확인/);
+  assert.match(container.textContent, /대표 상품·서비스·메뉴 미입력·미확인/);
+  assert.match(container.textContent, /가격 미입력·미확인/);
   instance.destroy();
 });
 
@@ -209,5 +210,17 @@ test('AI 검색 실패 뒤에는 검색하지 않은 입력 정보만으로 명�
   click(container, '사진 없이 시안 만들기');
   assert.match(container.textContent, /AI 검색을 완료하지 못해 입력한 이름·주소만으로/);
   assert.match(container.textContent, /업종, 상품, 서비스, 가격 등을 추측하지 않았어요/);
+  instance.destroy();
+});
+
+
+test('상품 이름만 있고 가격이 없는 검색 결과는 가격을 확인 필요로 남긴다', async t => {
+  const { container } = environment(t);
+  const c = {...candidate(), menu:[{name:'도자기 수업', price:null}]};
+  const instance = mountGeoWizard(container, {search:async()=>result([c])});
+  await searchFlow(container); chooseAndConfirm(container, candidateButtonText(container,'강남점'));
+  click(container, '사진 없이 시안 만들기');
+  assert.match(container.textContent, /가격 미입력·미확인/);
+  assert.match(container.textContent, /서울특별시 강남구/);
   instance.destroy();
 });
