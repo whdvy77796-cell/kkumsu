@@ -198,30 +198,6 @@ export const QUESTIONS = [
     why: '정확한 매장을 확인하고 주변 상권·경쟁점·접근성을 살펴보는 기준이 돼요.',
   },
   {
-    id: 'a_channels', page: 'basic', type: 'channels',
-    title: '네이버 플레이스·카카오맵·인스타그램·배달앱 주소가 있나요?',
-    hint: (c) => (c.store?.channels?.length ? 'AI가 찾은 주소를 미리 넣었어요. 틀리거나 빠진 곳만 고쳐 주세요.' : null),
-    items: [
-      { key: 'naver', label: '네이버 플레이스', placeholder: 'https://naver.me/...' },
-      { key: 'kakao', label: '카카오맵', placeholder: 'https://place.map.kakao.com/...' },
-      { key: 'insta', label: '인스타그램', placeholder: '@계정 또는 주소' },
-      { key: 'delivery', label: '배달앱', placeholder: '앱 이름과 가게 이름' },
-      { key: 'other', label: '홈페이지·기타', placeholder: 'https://' },
-    ],
-    prefill: (c) => {
-      const out = {};
-      for (const ch of c.store?.channels || []) {
-        const t = `${ch.type} ${ch.url}`;
-        const key = /네이버|naver/i.test(t) ? 'naver' : /카카오|kakao/i.test(t) ? 'kakao' : /인스타|instagram/i.test(t) ? 'insta' : /배달|baemin|배민|쿠팡이츠|요기요|yogiyo|coupangeats/i.test(t) ? 'delivery' : 'other';
-        if (!out[key]) out[key] = ch.url;
-      }
-      return Object.keys(out).length ? out : null;
-    },
-    allow: ['na'],
-    naLabel: '운영하는 채널이 없어요',
-    why: '메뉴·가격·영업시간·사진이 채널마다 같은지 확인하고, 고칠 곳을 알려드려요.',
-  },
-  {
     id: 'a_intro', page: 'basic', type: 'text',
     title: '우리 가게를 한 문장으로 소개한다면 무엇인가요?',
     placeholder: '예: 직접 끓인 사골 육수로 만드는 동네 국밥집',
@@ -515,10 +491,11 @@ export const QUESTIONS = [
       { key: 'hours', label: '일주일에 쓸 수 있는 시간', type: 'choice', options: opts('1시간 미만', '1~3시간', '3시간 이상') },
     ],
     prefill: (c) => {
-      const ch = c.val('a_channels') || {};
+      // AI가 찾은 가게 정보의 온라인 채널로 미리 고른다
+      const found = (c.store?.channels || []).map((x) => `${x.type} ${x.url}`).join(' ');
       const list = [];
-      if (ch.insta) list.push('인스타그램');
-      if (/blog/i.test(Object.values(ch).join(' '))) list.push('블로그');
+      if (/인스타|instagram/i.test(found)) list.push('인스타그램');
+      if (/블로그|blog/i.test(found)) list.push('블로그');
       return list.length ? { channels: list } : null;
     },
     why: '손님과 잘 맞는 채널 1~2개를 먼저 고르고, 한 번 촬영해서 여러 게시물로 쓰는 계획을 만들어요. 모든 가게에 매일 게시를 권하지 않아요.',

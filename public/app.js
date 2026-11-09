@@ -421,7 +421,7 @@ function drawPage(store, keepScroll) {
       h('p', { class: 'small muted' }, page.desc),
       h('div', { class: 'bar' }, bar)),
     idx === 0 && store
-      ? h('div', { class: 'card note small' }, 'AI가 찾은 정보로 업종·채널·판매 방식·메뉴 등을 미리 채워 두었어요. 맞으면 그대로 두고, 틀린 곳만 고쳐 주세요.')
+      ? h('div', { class: 'card note small' }, 'AI가 찾은 정보로 업종·판매 방식·메뉴 등을 미리 채워 두었어요. 맞으면 그대로 두고, 틀린 곳만 고쳐 주세요.')
       : null,
     cards,
   );
