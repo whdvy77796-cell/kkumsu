@@ -197,7 +197,7 @@ function plansCard() {
         h('dl', { class: 'plan-facts' },
           h('dt', null, '제공'), h('dd', null, '결제 즉시 화면에서 열람 · PDF 저장 · 결제일부터 90일 다시 보기'),
           h('dt', null, '구매'), h('dd', null, '무료 진단을 받은 뒤 보고서 화면에서 결제 (회원가입 없음)'),
-          h('dt', null, '환불'), h('dd', null, '열람이 시작되면 단순 변심 환불은 제한, 오류·미제공은 전액 환불 · ', h('a', { href: '#/refund' }, '환불 정책'))))),
+          h('dt', null, '환불'), h('dd', null, '환불 기준과 신청 방법은 ', h('a', { href: '#/refund' }, '환불 정책'), '을 확인해 주세요.')))),
     h('p', { class: 'small plans-note' }, off
       ? '결제는 준비 중이에요. 준비가 끝나기 전에 만든 보고서는 실행 자료까지 전부 무료로 보여드려요.'
       : `무료 진단을 먼저 보고, 실행 패키지는 보고서 화면에서 원할 때만 결제해요. 토스페이먼츠 카드·간편결제.${PAY.mode === 'test' ? ' (지금은 테스트 결제 모드라 실제로 돈이 나가지 않아요.)' : ''}`),
@@ -1427,9 +1427,8 @@ function packageItems(data) {
 function priceTag(big = false) {
   const pct = salePct();
   return h('div', { class: `price-tag${big ? ' big' : ''}` },
-    pct ? h('s', { class: 'price-list' }, `정가 ${won(PAY.list)}`) : null,
     h('b', { class: 'price-now' }, won(PAY.amount)),
-    pct ? h('span', { class: 'price-off' }, `${pct}% 할인 중`) : null);
+    null);
 }
 function focusPayCard() {
   const card = document.getElementById('payCard');
@@ -1872,7 +1871,7 @@ function operatorLine() {
 }
 function renderPolicy(kind) {
   storeName.textContent = '';
-  const price = `${won(PAY.amount)}(정가 ${won(PAY.list)}, 할인 중)`;
+  const price = won(PAY.amount);
   const docs = {
     terms: () => policyDoc('이용약관', null, [
       ['제1조 (목적)', `이 약관은 ${biz('name', '매출올려드림 AI 운영자')}(이하 '운영자')가 제공하는 매출올려드림 AI(www.kkumsu.com, 이하 '서비스')를 이용하는 조건과 절차, 운영자와 이용자의 권리·의무를 정합니다.`],
