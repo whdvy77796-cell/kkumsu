@@ -37,7 +37,10 @@
   - `test`: `test_` 키, 미리보기에서만 (실제 청구 없음).
   - `live`: `live_` 키 + 사업자 정보(상호·대표자·사업자등록번호·주소·전화·이메일) 모두 입력.
 - 샘플 보고서: `public/sample/report.json` (실제 가게 '연어로', 사장님 동의로 공개, 개인 휴대폰 번호 일부 가림). `#/sample`에서 무료 화면·결제 후 화면 전환, 샘플 PDF 저장(바닥글 SAMPLE).
-- 이용약관 `#/terms`, 개인정보처리방침 `#/privacy`, 환불 정책 `#/refund`, 바닥글에 사업자 정보(입력 후 표시).
+- 이용약관 `#/terms`, 개인정보처리방침 `#/privacy`, 환불 정책 `#/refund`, 바닥글에 사업자 정보와 공정위 '사업자정보 확인' 링크.
+- 사업자 정보(`public/business.js`, 2026-11-09): 유즈풀쇼핑몰 · 대표 임종표 · 587-17-01601 · 간이과세자 · 통신판매업 2022-대구중구-0208 · 대구광역시 중구 달구벌대로447길 34-35, 101호(삼덕동3가) · 010-2995-8439 · whdvy778@naver.com (사업자등록증·쿠팡 판매자 정보와 같게).
+- 토스페이먼츠 심사 기간: 운영(Production)에 토스 문서용 테스트 키 + `MAECHUL_ALLOW_TEST_PAY=1` → 운영 사이트도 테스트 결제 모드(실제 청구 없음). 샘플 보고서 '무료 진단 화면'의 **결제 과정 체험하기**로 심사 담당자가 바로 결제창·결제 후 화면을 확인할 수 있음(`/api/pay` action `demo`, 테스트 모드에서만, 하루 보관).
+- **실제 판매로 바꾸기**: 계약이 끝나면 토스 개발자센터 '라이브' 탭의 결제위젯 키(`live_gck_…`/`live_gsk_…`)를 Vercel Production의 `TOSS_CLIENT_KEY`/`TOSS_SECRET_KEY`에 넣고, `MAECHUL_ALLOW_TEST_PAY`를 지운 뒤 다시 배포. 체험 버튼은 라이브에서 자동으로 사라짐.
    - 결제와 무료/유료 구분은 아직 없습니다(베타에서는 전체 공개).
 
 ## 인터뷰 설계 원칙 (운영 설계 문서 기준)
@@ -74,7 +77,9 @@ lib/report-calc.mjs   보고서 숫자 계산 (매출·비용·세 가지 이익
 public/vendor/        PDF 저장용 라이브러리 (html2canvas·jsPDF, MIT, 저장할 때만 불러옴)
 public/promo.js       보고서 맨 아래 고정 안내(매장 홍보 방법) 문구·링크
 public/paywall.js     무료 핵심 진단 / 맞춤 실행 패키지 나누기 (서버·화면 공용)
-public/business.js    사업자 정보 (실제 결제를 켜려면 채워야 함)
+public/business.js    사업자 정보 (사업자등록증과 같게, 실제 결제를 켜려면 필수)
+public/sample/package.jpg  상품 이미지 (결제하면 열리는 개선안 화면, 샘플)
+lib/sample-data.mjs   결제 과정 체험용 샘플 데이터 (public/sample/report.json 과 같음)
 public/pay-config.js  결제 공개 설정 (배포 때 자동 생성)
 public/sample/       샘플 보고서 데이터
 api/pay.js            결제 설정·주문·토스 승인·보고서 다시 열기·지우기
