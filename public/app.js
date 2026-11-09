@@ -9,6 +9,7 @@ import { PAY } from './pay-config.js';
 import { redactReport, packageSize, FREE_SOLUTIONS, isFreeSolution } from './paywall.js';
 import { BUSINESS, businessReady, bizCheckUrl } from './business.js';
 import { mountGeoWizard } from './geo-wizard.js';
+import { mountGeoDiagnosis } from './geo-diagnosis.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -113,18 +114,21 @@ async function post(path, body, timeoutMs) {
 // ───────── 화면 이동
 let navSeq = 0;
 let aiPlaceInstance = null;
+let geoDiagnosisInstance = null;
 function route() {
   if (aiPlaceInstance) { aiPlaceInstance.destroy(); aiPlaceInstance = null; }
+  if (geoDiagnosisInstance) { geoDiagnosisInstance.destroy(); geoDiagnosisInstance = null; }
   navSeq++;
   const hash = location.hash || '#/';
   const linked = /^#\/r\/([A-Za-z0-9_-]{16,32})\.([A-Za-z0-9_-]{16,100})$/.exec(hash);
   const policy = { '#/terms': 'terms', '#/privacy': 'privacy', '#/refund': 'refund' }[hash];
   // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다 (home·find·survey·done·report·policy)
-  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report', '#/ai-place': 'ai-place' })[hash] || 'home';
+  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report', '#/ai-place': 'ai-place', '#/geo-diagnosis': 'geo-diagnosis' })[hash] || 'home';
   if (linked) renderLinked(linked[1], linked[2]);
   else if (policy) renderPolicy(policy);
   else if (hash === '#/sample') renderSample();
   else if (hash === '#/ai-place') { storeName.textContent = ''; setNavbar(); aiPlaceInstance = mountGeoWizard(view, { onBack: () => { location.hash = '#/'; } }); }
+  else if (hash === '#/geo-diagnosis') { storeName.textContent = ''; setNavbar(); geoDiagnosisInstance = mountGeoDiagnosis(view, { onBack: () => { location.hash = '#/'; } }); }
   else if (hash === '#/find') renderFind();
   else if (hash === '#/survey') renderSurvey();
   else if (hash === '#/done') renderDone();
@@ -177,8 +181,8 @@ function goStart() {
 function plansCard() {
   const off = PAY.mode === 'off';
   return h('section', { class: 'card plans-card', id: 'plans' },
-    h('h2', null, '무료 진단과 맞춤 실행 패키지'),
-    h('p', { class: 'small muted' }, '설문을 시작하기 전에 무엇이 무료이고 무엇이 유료인지 먼저 알려드려요.'),
+    h('h2', null, '기존 매출·운영 진단과 맞춤 실행 패키지'),
+    h('p', { class: 'small muted' }, '아래는 기존 매출·운영 진단의 안내예요. 홈페이지 기술 점검과는 별도 보고서입니다.'),
     h('div', { class: 'plans' },
       h('div', { class: 'plan plan-free' },
         h('div', { class: 'plan-name' }, '무료 핵심 진단'),
@@ -248,7 +252,7 @@ function renderHome() {
       h('p', { class: 'hero-desc' }, '상호와 주소만 알려주시면 AI가 공개 정보를 찾아 가게에 맞는 소개 페이지 시안을 만들어요. 필요한 가게 진단도 따로 받을 수 있어요.'),
       h('div', { class: 'hero-actions' },
         h('a', { class: 'btn primary geo-hero-primary', href: '#/ai-place' }, 'AI가 우리 가게를 추천하도록 하기'),
-        h('button', { class: 'btn', type: 'button', onclick: focusStart }, '진단 시작하기')),
+        h('a', { class: 'btn', href: '#/geo-diagnosis' }, '진단 시작하기')),
       h('p', { class: 'hero-note' }, 'GEO는 검색과 AI가 가게 정보를 이해하기 쉽게 준비하는 작업이에요. 실제 색인이나 AI 추천은 보장되지 않아요.')), 
     resume,
     h('section', { class: 'card discovery-card' },
@@ -261,14 +265,20 @@ function renderHome() {
         h('li', null, '향후 공개 서비스: 페이지 공개와 검색·AI 읽기 확인 리포트')),
       h('p', { class: 'small muted' }, '시안은 이 기기에서만 보여요. 29,000원 결제·페이지 공개·AI 읽기 검사 및 구글 색인 확인은 준비 중이며, 현재 제공되지 않아요. 검색 결과와 AI 추천은 보장되지 않아요.'),
       h('a', { class: 'btn primary', href: '#/ai-place' }, '소개 페이지 시안 만들기')),
+    h('section', { class: 'card' },
+      h('h2', null, '공개 정보와 홈페이지 기술 진단'),
+      h('p', null, '가게 공개 정보와 홈페이지를 살펴보고, 실제로 확인한 기술 항목과 개선할 내용을 보여드려요.'),
+      h('p', { class: 'small muted' }, 'AI 답변에 실제 등장하는지는 별도 측정이 필요해요.'),
+      h('a', { class: 'btn primary', href: '#/geo-diagnosis' }, '홈페이지 진단 시작하기')),
     plansCard(),
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
-      h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료 진단 시작')),
-      h('h2', null, '가게 이름과 주소를 알려주세요'),
+      h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '기존 매출·운영 진단')),
+      h('h2', null, '기존 진단: 가게 이름과 주소를 알려주세요'),
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '상호명'), nameIn),
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '주소'), addrIn),
-      h('p', { class: 'small muted' }, '다음을 누르면 AI(Claude)가 상호명과 주소로 인터넷에 공개된 가게 정보를 찾아요. 30초~1분쯤 걸려요.'),
-      hint),
+      h('p', { class: 'small muted' }, '시작하면 AI(Claude)가 상호명과 주소로 인터넷에 공개된 가게 정보를 찾아요. 30초~1분쯤 걸려요.'),
+      hint,
+      h('button', { type: 'submit', class: 'btn' }, '기존 매출·운영 진단 시작')),
     h('div', { class: 'card steps-card' },
       h('h2', null, '이렇게 진행돼요'),
       h('ol', { class: 'steps-list' },
@@ -289,7 +299,7 @@ function renderHome() {
       h('p', { style: { margin: '8px 0 0' } }, h('a', { href: '#/privacy' }, '개인정보처리방침 자세히 보기'))),
   );
   const navGeo = h('a', { class: 'btn primary', href: '#/ai-place' }, 'AI GEO 시작하기');
-  const navGo = btn('진단 시작하기', () => (nameIn.value.trim() && addrIn.value.trim().length >= 4 ? go() : focusStart()));
+  const navGo = h('a', { class: 'btn', href: '#/geo-diagnosis' }, '진단 시작하기');
   setNavbar(navGeo, navGo);
   if (wantStart) { wantStart = false; setTimeout(focusStart, 60); }
 }
@@ -1917,17 +1927,19 @@ function renderPolicy(kind) {
         'AI 진단 보고서: 이용자가 동의한 경우에만 인터뷰 답변(가게 운영 방식, 매출·비용, 사장님·가족 근무 시간 등)을 받아 보고서를 만드는 데 써요. 답변 원문은 서버에 따로 저장하지 않고, 답변으로 만든 보고서(계산값 포함)만 보관해요.',
         '가게 소개 시안: 기본 시안과 사진은 브라우저에서만 처리해요. AI 문구 조합을 별도로 요청하고 동의하면 입력한 가게 정보 텍스트를 OpenRouter를 거쳐 Anthropic Claude에 전달합니다. 이 기능은 사진과 별도 연락처 입력란을 AI에 보내지 않으며, 입력·결과를 서버 캐시에 저장하지 않아요. 다른 텍스트에 적은 연락처 등은 전송될 수 있어요.',
         'GEO 가게 검색: 이용자가 동의하면 상호명과 주소를 OpenRouter를 거쳐 AI와 검색 제공업체에 보내고, 검색 결과를 서버에 최대 3일 보관해요. 시안과 사진은 브라우저에만 표시되며 새로고침하거나 나가면 사라져요.',
+        '공개 정보·홈페이지 진단: 동의한 상호·주소로 공개 정보를 검색하고, 입력한 공개 홈페이지 주소가 있으면 서버에서 실제 기술 항목을 검사해요. 검색 단서와 홈페이지 주소·검사 결과는 예상 질문과 비교 업체 분석을 위해 OpenRouter를 거쳐 AI에 전송되며 검색에 필요한 일부 정보는 검색 제공업체에도 전달될 수 있어요. 홈페이지 검사 결과는 최대 5분, 검색·추가 분석 결과는 최대 3일 서버에 보관해요.',
         '결제: 주문번호, 결제 고유번호(토스페이먼츠가 주는 값), 결제 금액, 결제 일시, 결제 수단 종류를 결제 확인·환불·분쟁 처리와 법정 기록 보존에 써요. 카드 번호 같은 결제 정보는 토스페이먼츠가 처리하며 운영자는 받지 않아요.',
         '이용량 관리: 접속 IP 주소를 되돌릴 수 없게 바꾼 값(해시)으로 하루 이용 횟수를 세요.',
         '브라우저 저장소: 진행 중인 답변과 보고서는 이용자 기기의 브라우저 저장소(localStorage)에만 저장돼요. 완료 화면의 \'처음부터 다시\' 또는 브라우저 데이터 삭제로 지울 수 있어요.']],
       ['2. 보관 기간', [
-        '가게 찾기 결과와 인터넷 조사 결과: 3일',
+        '가게 찾기 결과와 인터넷 조사·공개 정보 추가 분석 결과: 최대 3일',
+        '홈페이지 기술 검사 결과: 최대 5분',
         '보고서: 만든 날부터 7일. 맞춤 실행 패키지를 결제하면 결제일부터 90일(다시 보기 링크)',
         '결제 기록(주문번호·결제 고유번호·금액·일시·수단·보고서 번호): 5년 (전자상거래법의 대금결제 및 재화 등의 공급에 관한 기록). 보고서 내용은 포함하지 않아요.',
         '이용량 집계(IP 해시): 2일',
         '보관 기간이 지나면 저장소에서 자동으로 지워져요.']],
       ['3. 처리 위탁과 국외 이전', [
-        'OpenRouter, Inc.(미국): AI 요청 중계. 상호명·주소·찾은 공개 정보, 동의한 경우 인터뷰 답변을 요청할 때마다 네트워크로 전송해요. 이용자 데이터를 수집·학습에 쓰지 않는 제공자로만 보내도록 설정해요.',
+        'OpenRouter, Inc.(미국): AI 요청 중계. 상호명·주소·찾은 공개 정보, 동의한 홈페이지 주소와 기술 검사 결과, 동의한 경우 인터뷰 답변을 요청할 때마다 네트워크로 전송해요. 이용자 데이터를 수집·학습에 쓰지 않는 제공자로만 보내도록 설정해요.',
         'Anthropic, PBC 등 OpenRouter가 연결하는 Claude 모델 제공자(미국): AI 진단 처리.',
         'Vercel Inc.(미국): 웹사이트와 서버 운영. 서버 함수는 서울 지역에서 실행돼요.',
         'Upstash, Inc.(미국 회사, 저장 위치: 일본 도쿄 AWS 데이터센터): 보고서·조사 결과·결제 기록 저장소.',

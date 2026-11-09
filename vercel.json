@@ -23,6 +23,9 @@
     },
     "api/geo-search.js": {
       "maxDuration": 180
+    },
+    "api/geo-diagnosis.js": {
+      "maxDuration": 300
     }
   },
   "headers": [
