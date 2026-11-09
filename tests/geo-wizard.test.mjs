@@ -94,6 +94,9 @@ test('requires selection and identity confirmation, validates photos, resets rig
   chooseFiles(container, [photo('b.png')]); assert.equal(checkbox(container, '선택한 사진을 사용할 권리').checked, false);
   check(checkbox(container, '선택한 사진을 사용할 권리')); click(container, '시안 만들기');
   assert.match(container.textContent, /대표 상품 · 서비스 · 메뉴 · 미검증/);
+  assert.match(container.textContent, /질문과 답변 예시 · 확인 필요/);
+  assert.match(container.textContent, /서울특별시 강남구 공방/);
+  assert.match(container.textContent, /도자기 수업/);
   click(container, '가게 다시 확인'); click(container, candidateButtonText(container, '서초점'));
   assert.match(container.textContent, /이전 가게의 선택 사진과 수정 내용이 지워집니다/);
   check(checkbox(container, '선택한 가게와 주소가 제 가게')); click(container, '확인하고 계속');
