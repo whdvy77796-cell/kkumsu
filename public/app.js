@@ -4,6 +4,7 @@ import {
   buildCtx, visiblePages, isAnswered, splitCheck, parseNum, resolve, answerText,
 } from './questions.js';
 import { buildSolutions, LEVEL } from './solutions.js';
+import { PROMO } from './promo.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -1065,10 +1066,19 @@ async function saveReportPdf(data, button) {
       if (child.classList.contains('no-print') || child.classList.contains('warn') && child.querySelector('a[href="#/done"]')) continue;
       // 개선안 묶음은 카드마다 따로 배치해야 쪽 사이에서 잘리지 않는다
       if (child.classList.contains('sol-list')) { for (const c of child.children) box.append(c.cloneNode(true)); continue; }
+      // 맨 아래 홍보 안내도 항목마다 나눠 배치한다 (제목은 첫 항목과 붙여서 제목만 쪽 끝에 남지 않게)
+      if (child.classList.contains('promo')) {
+        const intro = child.querySelector(':scope > .promo-intro');
+        child.querySelectorAll(':scope > .promo-item').forEach((it, i) => {
+          box.append(h('section', { class: 'promo' }, i === 0 && intro ? intro.cloneNode(true) : null, it.cloneNode(true)));
+        });
+        continue;
+      }
       box.append(child.cloneNode(true));
     }
     box.querySelectorAll('details').forEach((d) => { d.open = true; });
     box.querySelectorAll('details.sources-box > summary').forEach((s) => { s.replaceWith(h('div', { class: 'sub-title' }, '출처')); });
+    box.querySelectorAll('.no-print').forEach((n) => n.remove());
     document.body.append(box);
     // 목록 번호·글머리표는 그림 도구가 그리지 못할 때가 있어 글자로 바꿔 넣는다
     box.querySelectorAll('ol, ul').forEach((list) => {
@@ -1086,11 +1096,21 @@ async function saveReportPdf(data, button) {
     // 그림으로 찍을 때는 보고서 상자만 복제한다. 화면의 다른 부분과, 브라우저 확장 프로그램이 페이지에 붙인
     // 위젯(안쪽 CSS가 제목 굵기·목록 번호를 지워 버림)은 빼야 PDF가 화면과 같게 나온다.
     const skipForPdf = (el) => (el.parentElement === document.body && el !== box)
-      || (el.parentElement === document.documentElement && el !== document.head && el !== document.body);    const { jsPDF } = window.jspdf;
+      || (el.parentElement === document.documentElement && el !== document.head && el !== document.body);
+    const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const PW = 210; const PH = 297; const M = 10; const W = PW - M * 2; const BOTTOM = PH - 12; const GAP = 3;
     let y = M;
-    const place = (canvas, sy, sh) => {
+    // 그림으로 들어가도 링크(출처·안내 링크)는 누를 수 있게, 링크 자리에 PDF 링크를 따로 붙인다
+    const linkRects = (el) => {
+      const top = el.getBoundingClientRect();
+      return [...el.querySelectorAll('a[href]')]
+        .filter((a) => /^https?:\/\//i.test(a.getAttribute('href') || ''))
+        .flatMap((a) => [...a.getClientRects()].map((r) => ({ url: a.getAttribute('href'), x: r.left - top.left, y: r.top - top.top, w: r.width, h: r.height })));
+    };
+    // 자를 곳과 링크 자리는 그림 도구가 실제로 그리는 복제본(PC 폭 1024)에서 잰다. 휴대폰 화면 기준으로 재면 그림과 어긋난다.
+    const measure = (el) => ({ width: el.getBoundingClientRect().width, cuts: cutPoints(el), links: linkRects(el) });
+    const place = (canvas, sy, sh, links = [], scale = 1) => {
       const part = document.createElement('canvas');
       part.width = canvas.width;
       part.height = sh;
@@ -1100,24 +1120,37 @@ async function saveReportPdf(data, button) {
       ctx.drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, canvas.width, sh);
       const hmm = (sh * W) / canvas.width;
       doc.addImage(part.toDataURL('image/jpeg', 0.86), 'JPEG', M, y, W, hmm, undefined, 'FAST');
+      const mmPerPx = W / canvas.width;
+      for (const l of links) {
+        const t = l.y * scale;
+        const b = (l.y + l.h) * scale;
+        if (t < sy - 2 || b > sy + sh + 2) continue; // 이 조각 안에 온전히 들어간 링크만
+        doc.link(M + l.x * scale * mmPerPx, y + Math.max(0, t - sy) * mmPerPx, l.w * scale * mmPerPx, (b - t) * mmPerPx, { url: l.url });
+      }
       y += hmm + GAP;
     };
     for (const block of [...box.children]) {
-      const canvas = await window.html2canvas(block, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, windowWidth: 1024, ignoreElements: skipForPdf });
+      let geo = null;
+      const canvas = await window.html2canvas(block, {
+        scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, windowWidth: 1024, ignoreElements: skipForPdf,
+        onclone: (_doc, el) => { try { geo = measure(el); } catch { geo = null; } },
+      });
       if (!canvas.width || !canvas.height) continue;
+      if (!geo?.width) geo = measure(block);
+      const scale = canvas.width / geo.width;
+      const links = geo.links;
       const pxPerMm = canvas.width / W;
       const hmm = canvas.height / pxPerMm;
       const room = BOTTOM - y;
-      if (hmm <= room) { place(canvas, 0, canvas.height); continue; }
+      if (hmm <= room) { place(canvas, 0, canvas.height, links, scale); continue; }
       if (hmm <= BOTTOM - M && room < (BOTTOM - M) * 0.4) {
         // 남은 자리가 적으면 카드를 통째로 다음 쪽에서 시작
         doc.addPage(); y = M;
-        place(canvas, 0, canvas.height);
+        place(canvas, 0, canvas.height, links, scale);
         continue;
       }
       // 남은 자리가 넉넉하거나 한 쪽보다 긴 카드: 빈 공간이 생기지 않게 글줄 경계에서 나눠 이어 붙인다
-      const scale = canvas.width / block.getBoundingClientRect().width;
-      const cuts = cutPoints(block).map((c) => Math.round(c * scale));
+      const cuts = geo.cuts.map((c) => Math.round(c * scale));
       let sy = 0;
       while (sy < canvas.height) {
         if (BOTTOM - y < 25) { doc.addPage(); y = M; }
@@ -1127,7 +1160,7 @@ async function saveReportPdf(data, button) {
           const ok = cuts.filter((c) => c > sy + 60 && c <= end);
           if (ok.length) end = ok[ok.length - 1];
         }
-        place(canvas, sy, end - sy);
+        place(canvas, sy, end - sy, links, scale);
         sy = end;
         if (sy < canvas.height) { doc.addPage(); y = M; }
       }
@@ -1193,6 +1226,57 @@ function researchSection(rs, pv) {
 }
 // 인쇄할 때는 출처 목록을 펼쳐서 함께 찍는다
 window.addEventListener('beforeprint', () => { document.querySelectorAll('details.sources-box').forEach((d) => { d.open = true; }); });
+
+// ───────── 보고서 맨 아래 고정 안내: 사장님이 직접 시작할 수 있는 매장 홍보 방법
+// AI가 만드는 내용이 아니라 모든 보고서에 똑같이 붙는다. 문구·링크는 promo.js 에서 고친다.
+async function copyText(text) {
+  try {
+    if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; }
+  } catch { /* 아래 방법으로 다시 */ }
+  const ta = h('textarea', { readonly: true, 'aria-hidden': 'true', style: { position: 'fixed', top: '0', left: '-9999px', opacity: '0' } });
+  ta.value = text;
+  document.body.append(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  ta.remove();
+  return ok;
+}
+function promoSection() {
+  const link = (l) => (l ? h('a', { class: 'promo-link', href: l.url, target: '_blank', rel: 'noopener noreferrer' }, l.text) : null);
+  const withLink = (text, l) => [text, l ? ' ' : null, link(l)];
+  const item = (it) => {
+    const prompt = it.prompt ? h('pre', { class: 'promo-prompt-text' }, it.prompt.text) : null;
+    const copy = async () => {
+      if (await copyText(it.prompt.text)) { toast('요청 문장을 복사했어요. AI 대화창에 붙여 넣고 [ ] 안을 채워 주세요.', 4000); return; }
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(prompt);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      toast('자동 복사가 안 돼서 문장을 선택해 두었어요. 길게 눌러 복사해 주세요.', 5000);
+    };
+    return h('div', { class: 'promo-item' },
+      h('div', { class: 'promo-head' }, h('span', { class: 'promo-no' }, it.no), h('h3', null, it.title)),
+      it.cost ? h('span', { class: 'promo-cost' }, it.cost) : null,
+      h('p', { class: 'promo-lead' }, withLink(it.lead, it.leadLink)),
+      h('ol', { class: 'promo-steps' }, it.steps.map((s, i) => h('li', null,
+        h('span', { class: 'promo-step-no', 'aria-hidden': 'true' }, String(i + 1)),
+        h('div', null, h('b', null, s.title), h('p', null, withLink(s.body, s.link)))))),
+      prompt
+        ? h('div', { class: 'promo-prompt' },
+            h('div', { class: 'promo-prompt-head' }, h('b', null, it.prompt.title), h('button', { class: 'btn small no-print', type: 'button', onclick: copy }, '복사하기')),
+            prompt)
+        : null,
+      it.note ? h('p', { class: 'promo-note' }, withLink(it.note, it.noteLink)) : null);
+  };
+  return h('section', { class: 'promo', 'aria-label': PROMO.title },
+    h('div', { class: 'promo-intro' },
+      h('div', { class: 'promo-kicker' }, PROMO.kicker),
+      h('h2', null, PROMO.title),
+      h('p', null, PROMO.lead)),
+    PROMO.items.map(item));
+}
 
 function drawReport(data, stale) {
   const r = data.report || {};
@@ -1278,6 +1362,9 @@ function drawReport(data, stale) {
       h('p', null, 'AI가 사장님 답변과 인터넷 공개 정보로 만든 진단이에요. 계산값은 사장님이 적은 숫자로 계산했고 추정이 섞여 있어요. 사진과 실제 장부는 보지 않았고, 카카오맵·네이버 플레이스·구글 지도 리뷰 본문은 자동으로 읽을 수 없어 검색 결과·블로그·리뷰 사이트에 나온 내용만 반영했어요. 중요한 결정 전에는 장부와 현장에서 꼭 확인해 주세요.'),
       data.truncated ? h('p', null, '보고서가 길어 끝부분이 잘렸을 수 있어요. 다시 만들면 나아질 수 있어요.') : null,
       h('p', { style: { margin: 0 } }, `만든 AI: ${data.model === 'mock' ? '모의 응답' : data.model || '-'}${data.cached ? ' · 저장된 보고서' : ''}`)),
+
+    // 맨 아래 고정 안내 (AI가 만든 내용이 아니라 모든 보고서에 똑같이 붙는다. 내용은 promo.js)
+    promoSection(),
     stale ? null : h('p', { class: 'small no-print', style: { textAlign: 'center' } },
       h('button', { class: 'btn small', type: 'button', onclick: () => {
         if (!confirm('같은 답변으로 보고서를 새로 만들까요? 2~4분쯤 걸려요.')) return;

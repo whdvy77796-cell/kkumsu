@@ -459,3 +459,50 @@ details.sources-box li { margin: 4px 0; word-break: break-all; }
 .pdf-render .pdf-list > li { display: flex; gap: 6px; }
 .pdf-render .pdf-mark { flex: none; min-width: 1.3em; text-align: right; }
 .pdf-render .pdf-li { flex: 1; min-width: 0; }
+
+/* ───────── 보고서 맨 아래 고정 안내: 사장님이 직접 시작할 수 있는 매장 홍보 방법 (내용은 promo.js) */
+.promo { margin: 28px 0 14px; padding: 22px 14px 14px; background: var(--brand-soft); border-radius: var(--radius-lg); }
+.promo-intro { padding: 0 6px 16px; }
+.promo-kicker { font-size: 13px; font-weight: 700; color: var(--brand); margin-bottom: 6px; letter-spacing: -0.005em; }
+.promo-intro h2 { font-size: 22px; line-height: 1.4; letter-spacing: -0.03em; margin: 0 0 6px; }
+.promo-intro p { margin: 0; color: var(--ink-2); }
+.promo-item { background: #fff; border: 1px solid var(--brand-line); border-radius: var(--radius); padding: 20px 18px; }
+.promo-item + .promo-item { margin-top: 12px; }
+.promo-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.promo-no { flex: none; font-size: 13px; font-weight: 800; line-height: 1; color: #fff; background: var(--brand); border-radius: 8px; padding: 6px 8px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.promo-head h3 { margin: 0; font-size: 18.5px; line-height: 1.45; letter-spacing: -0.025em; }
+.promo-cost { display: inline-block; font-size: 13px; font-weight: 700; color: var(--brand-ink); background: var(--brand-soft); border-radius: 999px; padding: 4px 11px; margin: 0 0 12px; }
+.promo-lead { margin: 0 0 12px; color: var(--ink-2); }
+.promo-steps { list-style: none; margin: 0; padding: 0; }
+.promo-steps li { display: flex; gap: 12px; padding: 13px 0; border-top: 1px solid var(--line-2); }
+.promo-step-no { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.promo-steps li > div { flex: 1; min-width: 0; }
+.promo-steps b { display: block; font-size: 16px; font-weight: 700; line-height: 1.5; color: var(--ink); margin-bottom: 3px; }
+.promo-steps p { margin: 0; font-size: 15px; line-height: 1.65; color: var(--ink-2); }
+.promo-link { font-weight: 600; white-space: nowrap; }
+.promo-prompt { margin: 6px 0 0; padding: 14px; background: var(--bg-soft); border-radius: 14px; }
+.promo-prompt-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.promo-prompt-head b { font-size: 15px; color: var(--ink); }
+.promo-prompt-head .btn { flex: none; }
+.promo-prompt-text { margin: 0; padding: 12px 14px; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-family: inherit; font-size: 14.5px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
+.promo-note { margin: 14px 0 0; font-size: 13px; line-height: 1.6; color: var(--muted); }
+@media (min-width: 768px) {
+  .promo { padding: 30px 28px 28px; }
+  .promo-intro { padding: 0 2px 18px; }
+  .promo-intro h2 { font-size: 24px; }
+  .promo-item { padding: 26px 28px; }
+  .promo-item + .promo-item { margin-top: 16px; }
+}
+/* PDF 저장: 바탕색 없이 항목 카드만 (항목마다 따로 배치) */
+.pdf-render .promo { margin: 0; padding: 0; background: none; border-radius: 0; }
+.pdf-render .promo-intro { padding: 12px 2px 14px; }
+@media print {
+  .promo { background: none; padding: 0; margin: 10px 0 0; }
+  .promo-intro { padding: 0 0 4px; }
+  .promo-item { border: 1px solid #cfcfcf; border-radius: 6px; padding: 8px 10px; break-inside: avoid; }
+  .promo-item + .promo-item { margin-top: 6px; }
+  .promo-head h3 { font-size: 10.5pt; }
+  .promo-steps li { padding: 3px 0; }
+  .promo-steps b, .promo-steps p, .promo-lead, .promo-prompt-text { font-size: 9pt; }
+  .promo-note, .promo-cost { font-size: 8pt; }
+}
