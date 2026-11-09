@@ -94,7 +94,8 @@ function displayTime(value) {
 }
 function regionOf(address) {
   const parts = address.split(/\s+/).map(s => s.replace(/[,()]/g, ''));
-  return parts.filter(s => s.length > 1 && /(?:특별자치시|특별시|광역시|특별자치도|도|시|군|구|읍|면|동)$/.test(s)).slice(-1)[0] || '';
+  const regions = parts.filter(s => s.length > 1 && (/(?:특별자치시|특별시|광역시|특별자치도|도|시|군|구|읍|면|동)$/.test(s) || /^(?:서울|부산|대구|인천|광주|대전|울산|세종|제주)$/.test(s)));
+  return regions.slice(-2).join(' ');
 }
 function deriveKeywords(data) {
   const region = regionOf(data.address), name = clean(data.name), category = clean(data.category);
@@ -224,7 +225,7 @@ export function mountGeoWizard(container, options = {}) {
       consentBox(state.consent, e => { state.consent = e.currentTarget.checked; }, '가게 정보 전송에 동의합니다 (필수)',
         '입력한 상호명과 주소가 OpenRouter, Claude 및 검색 제공업체에 전송되어 공개 정보 검색에 사용됩니다. 검색 결과는 서버에 최대 3일 보관될 수 있습니다. 사진은 전송하지 않습니다.'),
       el('div', { class: 'geo-note' }, el('span', { 'aria-hidden': 'true' }, 'i'), el('p', {},
-        'AI가 검색 스니펫을 바탕으로 정리하므로 다른 지점의 정보가 섞이거나 현재와 다를 수 있어요. 원문 열람이나 사실 확인을 보장하지 않습니다.')),
+        'AI가 공개 검색 결과에 나온 요약을 바탕으로 정리하므로 다른 지점의 정보가 섞이거나 현재와 다를 수 있어요. 원문 열람이나 사실 확인을 보장하지 않습니다.')),
       errorNode(),
       el('div', { class: 'geo-actions' },
         state.result && !state.busy ? button('이전 검색 결과 보기', () => go(1), 'secondary') : null,
@@ -359,6 +360,12 @@ export function mountGeoWizard(container, options = {}) {
   function previewBusiness() {
     const d = state.draft, menu = lineValues(d.menu), highlights = lineValues(d.highlights), channels = lineValues(d.channels);
     const anyFacts = d.address.trim() || d.hours.trim() || d.phone.trim();
+    const faq = [
+      d.address.trim() ? ['어디에 있나요?', d.address.trim()] : null,
+      d.hours.trim() ? ['영업시간은 어떻게 되나요?', d.hours.trim()] : null,
+      d.phone.trim() ? ['문의할 연락처는 무엇인가요?', d.phone.trim()] : null,
+      menu.length ? ['어떤 상품이나 서비스를 이용할 수 있나요?', menu.join(' · ')] : null,
+    ].filter(Boolean);
     return el('section', { class: 'geo-site', 'aria-label': '가게 페이지 디자인 미리보기' },
       el('div', { class: 'geo-browser-bar' }, el('span', { class: 'geo-dots', 'aria-hidden': 'true' }, '● ● ●'), el('span', {}, 'PRIVATE PREVIEW')),
       el('div', { class: `geo-cover${state.photos.length ? ' has-photo' : ''}` },
@@ -379,6 +386,10 @@ export function mountGeoWizard(container, options = {}) {
           el('p', { class: 'geo-small' }, '검색 응답 또는 사용자 수정 내용 · 사실 확인 필요'),
           highlights.length ? el('ul', { class: 'geo-highlights' }, highlights.map(item => el('li', {}, item))) : null,
           channels.length ? el('p', { class: 'geo-channels' }, '채널: ', channels.join(' · ')) : null) : null,
+        faq.length ? el('section', { class: 'geo-site-section' }, el('h4', {}, '질문과 답변 예시 · 확인 필요'),
+          el('p', { class: 'geo-small' }, '입력하거나 검색한 정보를 바탕으로 구성한 예시예요. 실제 내용과 맞는지 확인해 주세요.'),
+          el('div', { class: 'geo-faq' }, faq.map(([question, answer]) => el('div', { class: 'geo-faq-item' },
+            el('strong', {}, 'Q. ', question), el('p', {}, answer))))) : null,
         state.photos.length > 1 ? el('section', { class: 'geo-site-section' }, el('h4', {}, '사진'),
           el('div', { class: 'geo-gallery' }, state.photos.slice(1).map((photo, index) => el('img', { src: photo.url, alt: `선택한 가게 사진 ${index + 2}` })))) : null,
         el('div', { class: 'geo-site-footer' }, 'PRIVATE DRAFT · 실제 웹페이지가 아닙니다')));
@@ -433,7 +444,7 @@ export function mountGeoWizard(container, options = {}) {
         el('span', {}, String(index + 1).padStart(2, '0')), el('b', {}, name))));
     const views = [searchView, resultView, photosView, previewView];
     const card = el('div', { class: `geo-card${state.step === 3 ? ' geo-card-preview' : ''}` }, views[state.step]());
-    const footer = el('p', { class: 'geo-privacy-footer' }, '새로고침하거나 나가면 시안과 선택 사진이 사라집니다. 브라우저에 영구 저장하지 않아요. 검색 시 동의한 가게 이름과 주소만 전송되며, 검색 결과는 서버에 최대 3일 보관될 수 있습니다.');
+    const footer = el('p', { class: 'geo-privacy-footer' }, '새로고침하거나 나가면 시안과 선택 사진이 사라집니다. 브라우저에 영구 저장하지 않아요. 검색 시 입력 내용 중 동의한 가게 이름과 주소만 전송되며, 검색 결과는 서버에 최대 3일 보관될 수 있습니다.');
     root.replaceChildren(header, intro, progress, card, footer);
   }
   container.replaceChildren(root);

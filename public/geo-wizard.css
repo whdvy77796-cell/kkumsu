@@ -183,3 +183,8 @@
   .geo-preview-toolbar { align-items: flex-start; }
   .geo-preview-toolbar .geo-btn { padding: 0 10px; font-size: 11px; }
 }
+
+.geo-faq { display:grid; gap:10px; margin-top:12px; }
+.geo-faq-item { border:1px solid #e2e7ed; border-radius:12px; background:#fbfcfe; padding:12px 14px; }
+.geo-faq-item strong { color:#193766; font-size:14px; }
+.geo-faq-item p { margin:5px 0 0; font-size:14px; white-space:pre-line; overflow-wrap:anywhere; }
