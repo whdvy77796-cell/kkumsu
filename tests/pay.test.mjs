@@ -7,7 +7,7 @@ import { createHandler as reportHandler } from '../api/report.js';
 import { MemoryStore } from '../lib/guard.mjs';
 import { payConfig, publicPay, saveReport, RETENTION, orderKey, repKey, PRODUCT } from '../lib/pay.mjs';
 import { redactReport, packageSize, FREE_SOLUTIONS } from '../public/paywall.js';
-import { businessReady, REQUIRED_BUSINESS } from '../public/business.js';
+import { BUSINESS, businessReady, bizCheckUrl, REQUIRED_BUSINESS } from '../public/business.js';
 
 const SECRET = 'x'.repeat(32);
 const TEST_ENV = { SESSION_SECRET: SECRET, VERCEL: '1', VERCEL_ENV: 'preview', TOSS_CLIENT_KEY: 'test_ck_abc123', TOSS_SECRET_KEY: 'test_sk_def456', OPENROUTER_API_KEY: 'k' };
@@ -275,4 +275,37 @@ test('결제: 다른 브라우저로 돌아오면 새 열람 토큰, 이미 승�
   const g = await call(payHandler({ env: TEST_ENV }), { method: 'GET' });
   assert.deepEqual(Object.keys(g.json()).sort(), ['amount', 'clientKey', 'list', 'mode', 'ok', 'orderName', 'reason']);
   assert.ok(!g.body.includes('test_sk'));
+});
+
+test('사업자 정보: 사업자등록증과 같은 값, 하단 표시와 실제 결제 조건을 채운다', () => {
+  assert.equal(businessReady(), true);
+  assert.equal(BUSINESS.name, '유즈풀쇼핑몰');
+  assert.equal(BUSINESS.owner, '임종표');
+  assert.equal(BUSINESS.bizNo, '587-17-01601');
+  assert.equal(BUSINESS.address, '대구광역시 중구 달구벌대로447길 34-35, 101호(삼덕동3가)');
+  assert.equal(BUSINESS.mailOrderNo, '2022-대구중구-0208');
+  assert.equal(bizCheckUrl(), 'https://www.ftc.go.kr/bizCommPop.do?wrkr_no=5871701601');
+  // 사업자 정보가 채워졌으니 라이브 키만 넣으면 실제 결제가 켜진다
+  assert.equal(payConfig({ VERCEL_ENV: 'production', TOSS_CLIENT_KEY: 'live_gck_a', TOSS_SECRET_KEY: 'live_gsk_b' }).mode, 'live');
+});
+
+test('결제 과정 체험: 테스트 모드에서만 샘플을 잠긴 상태로 만들어 주고, 결제하면 열린다', async () => {
+  const store = new TtlStore();
+  const toss = fakeToss((url, init) => [200, DONE(JSON.parse(init.body).orderId)]);
+  const handler = payHandler({ env: TEST_ENV, store, fetcher: toss });
+  const d = (await call(handler, { body: { action: 'demo' } })).json();
+  assert.equal(d.locked, true);
+  assert.equal(d.demo, true);
+  assert.equal(d.store.name, '연어로');
+  assert.match(d.rid, /^[A-Za-z0-9_-]{16}$/);
+  assert.equal(store.ttl.get(repKey(d.rid)), RETENTION.demo);
+  assert.ok(!d.report.solutions[1].actions, '체험도 잠긴 내용은 안 보냄');
+  const o = (await call(handler, { body: { action: 'order', rid: d.rid, token: d.token } })).json();
+  const c = (await call(handler, { body: { action: 'confirm', paymentKey: 'tgen_demo_key_1', orderId: o.orderId, amount: 9900, rid: d.rid, token: d.token } })).json();
+  assert.equal(c.paid, true);
+  assert.ok(c.report.solutions[1].actions.length >= 1, '결제하면 열림');
+  // 결제를 안 받거나 실제 결제(live)일 때는 체험을 막는다 (샘플을 돈 받고 팔지 않게)
+  assert.equal((await call(payHandler({ env: { ...TEST_ENV, TOSS_CLIENT_KEY: '' }, store }), { body: { action: 'demo' } })).statusCode, 409);
+  const live = { ...TEST_ENV, VERCEL_ENV: 'production', TOSS_CLIENT_KEY: 'live_gck_1', TOSS_SECRET_KEY: 'live_gsk_2' };
+  assert.equal((await call(payHandler({ env: live, store }), { body: { action: 'demo' } })).statusCode, 409);
 });
