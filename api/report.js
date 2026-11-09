@@ -8,6 +8,18 @@ import { computeMetrics } from '../lib/report-calc.mjs';
 import { mockEnabled, mockReport, mockResearch } from '../lib/mock.mjs';
 import { status } from './store-search.js';
 import { getResearch } from './research.js';
+import { payConfig, publicPay, saveReport } from '../lib/pay.mjs';
+import { redactReport } from '../public/paywall.js';
+
+// 만든 보고서는 보고서 번호(rid)로 7일 보관하고, 결제를 받는 중이면 잠긴 부분을 빼고 보낸다.
+// rid·token 은 보고서를 만든 브라우저만 받는다(결제·다시 열기에 씀).
+async function deliver(store, env, result) {
+  const cfg = payConfig(env);
+  if (!store) return { ...result, rid: null, paid: false, pay: publicPay({ ...cfg, mode: 'off' }) };
+  const { rid, token } = await saveReport(store, env, result);
+  const body = cfg.mode === 'off' ? result : redactReport(result);
+  return { ...body, rid, token, paid: false, pay: publicPay(cfg) };
+}
 
 export async function makeReport({ env, fetcher, input, computed, research, meter }) {
   const model = env.MAECHUL_REPORT_MODEL || env.MAECHUL_AI_MODEL || DEFAULT_MODEL;
@@ -90,7 +102,8 @@ export function createHandler(deps = {}) {
       const computed = computeMetrics({ answers: input.answers }, input.store);
       if (mockEnabled(env)) {
         const research = await mockResearch(input, 0);
-        return send(res, 200, await mockReport(input, computed, deps.mockDelay, research));
+        const mockStore = deps.store || createStore(env, fetcher);
+        return send(res, 200, await deliver(mockStore, env, await mockReport(input, computed, deps.mockDelay, research)));
       }
       const store = deps.store || createStore(env, fetcher);
       // 1) 인터넷 조사: 화면이 먼저 /api/research 로 만들어 둔 결과를 쓰고, 없으면 여기서 조사한다.
@@ -110,7 +123,7 @@ export function createHandler(deps = {}) {
         lock: true,
         run: (meter) => makeReport({ env, fetcher, input, computed, research, meter }),
       });
-      return send(res, 200, result);
+      return send(res, 200, await deliver(store, env, result));
     } catch (err) {
       return sendError(res, err);
     }
