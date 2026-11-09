@@ -20,11 +20,12 @@ const split = (hall, takeout, delivery) => ({ hall: { on: hall, pct: '' }, takeo
 const ids = (S, store) => visibleQuestions(S, store).map((q) => q.id);
 function state(answers) { return { answers }; }
 
-test('AI가 찾은 정보로 업종·운영 기간·판매 방식·채널·메뉴를 미리 채운다', () => {
+test('AI가 찾은 정보로 업종·운영 기간·판매 방식·메뉴·SNS를 미리 채운다 (채널 주소 질문은 없음)', () => {
   const c = buildCtx(state({}), STORE);
   assert.deepEqual(QMAP.a_basic.prefill(c), { category: '국밥·탕·찌개', period: guessPeriod('2019년 개업') });
   assert.deepEqual(QMAP.a_split.prefill(c), split(true, true, true));
-  assert.deepEqual(QMAP.a_channels.prefill(c), { naver: 'https://naver.me/abc', insta: 'https://instagram.com/x' });
+  assert.equal(QMAP.a_channels, undefined, '네이버·카카오맵·인스타·배달앱 주소 질문은 뺐다');
+  assert.deepEqual(QMAP.f_sns.prefill(c), { channels: ['인스타그램'] }, 'SNS는 AI가 찾은 채널로 미리 고른다');
   assert.deepEqual(QMAP.c_menus.prefill(c), [
     { name: '얼큰 소고기국밥', price: 11000, qty: '' }, { name: '수육', price: 32000, qty: '' }, { name: '공깃밥', price: '', qty: '' },
   ]);
