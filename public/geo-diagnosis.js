@@ -32,6 +32,12 @@ function textOrUnknown(value) {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   return '확인 불가';
 }
+function recordedTime(value) {
+  if (typeof value !== 'string') return '확인 불가';
+  const time = new Date(value);
+  if (!Number.isFinite(time.getTime())) return '확인 불가';
+  return time.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' (한국 시간)';
+}
 function fieldValue(value) {
   if (!Array.isArray(value)) return element('span', { text: textOrUnknown(value) });
   if (!value.length) return element('span', { text: '확인 불가' });
@@ -136,7 +142,7 @@ function renderResults(data, submittedWebsite, prefix) {
   const result = element('div', { class: 'gd-results', 'aria-labelledby': prefix + '-results-title' },
     element('div', { class: 'gd-results-intro' }, element('div', {}, element('p', { class: 'gd-kicker', text: 'DIAGNOSIS REPORT' }), heading,
       element('p', { text: '공개 정보의 정확성과 출처를 직접 확인해 주세요.' })),
-      element('p', { class: 'gd-date' }, element('strong', { text: '기록된 시각 ' }), element('span', { text: textOrUnknown(data.scannedAt) }))),
+      element('p', { class: 'gd-date' }, element('strong', { text: '기록된 시각 ' }), element('span', { text: recordedTime(data.scannedAt) }))),
     renderBusiness(data.business, prefix + '-business'), renderTechnical(data.technicalScan, submittedWebsite, prefix + '-technical'),
     renderQuestions(data.suggestedQuestions, prefix + '-questions', data.notice, data.suggestedQuestionsMethod), renderCompetitors(data.competitors, prefix + '-competitors'), renderPriorities(data.priorities, prefix + '-priorities'),
     element('aside', { class: 'gd-disclaimer', 'aria-label': '진단 결과 안내' },
