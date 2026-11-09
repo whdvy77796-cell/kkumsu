@@ -396,9 +396,11 @@ export function mountGeoWizard(container, options = {}) {
   }
   function readiness() {
     const d = state.draft, keywords = deriveKeywords(d);
+    const hasPrice = lineValues(d.menu).some(line => /(?:\d[\d,]*(?:\.\d+)?\s*(?:원|krw)|₩\s*[\d,]+|[·:]\s*[\d,]+)\s*$/iu.test(line));
     const missing = [!d.name.trim() && '가게 이름', !d.address.trim() && '주소', !d.category.trim() && '업종',
-      !d.menu.trim() && '대표 상품·서비스·메뉴·가격', !d.hours.trim() && '영업시간', !d.phone.trim() && '연락처'].filter(Boolean);
-    const title = [d.name.trim(), d.category.trim()].filter(Boolean).join(' | ');
+      !d.menu.trim() && '대표 상품·서비스·메뉴', !hasPrice && '가격', !d.hours.trim() && '영업시간', !d.phone.trim() && '연락처',
+      !/주차/.test(d.highlights) && '주차 안내(해당 시)', !/예약/.test(d.highlights) && '예약 안내(해당 시)'].filter(Boolean);
+    const title = [d.name.trim(), regionOf(d.address), d.category.trim()].filter(Boolean).join(' | ');
     const description = [d.name.trim(), d.address.trim(), d.category.trim(), ...lineValues(d.menu).slice(0, 2)].filter(Boolean).join(' · ');
     const sources = state.result.sources;
     return el('aside', { class: 'geo-readiness' },
