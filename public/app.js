@@ -1073,7 +1073,10 @@ async function saveReportPdf(data, button) {
       });
     });
     await Promise.all([...box.querySelectorAll('img')].map((img) => (img.complete ? null : new Promise((r) => { img.onload = r; img.onerror = r; }))));
-    const { jsPDF } = window.jspdf;
+    // 그림으로 찍을 때는 보고서 상자만 복제한다. 화면의 다른 부분과, 브라우저 확장 프로그램이 페이지에 붙인
+    // 위젯(안쪽 CSS가 제목 굵기·목록 번호를 지워 버림)은 빼야 PDF가 화면과 같게 나온다.
+    const skipForPdf = (el) => (el.parentElement === document.body && el !== box)
+      || (el.parentElement === document.documentElement && el !== document.head && el !== document.body);    const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const PW = 210; const PH = 297; const M = 10; const W = PW - M * 2; const BOTTOM = PH - 12; const GAP = 3;
     let y = M;
@@ -1090,7 +1093,7 @@ async function saveReportPdf(data, button) {
       y += hmm + GAP;
     };
     for (const block of [...box.children]) {
-      const canvas = await window.html2canvas(block, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, windowWidth: 1024 });
+      const canvas = await window.html2canvas(block, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, windowWidth: 1024, ignoreElements: skipForPdf });
       if (!canvas.width || !canvas.height) continue;
       const pxPerMm = canvas.width / W;
       const hmm = canvas.height / pxPerMm;

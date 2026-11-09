@@ -123,7 +123,7 @@ main { padding: 28px 0 128px; }
   .navbar { padding-top: 14px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
   .navbar .wrap { gap: 12px; }
   .navbar .btn { flex: 0 0 auto; min-width: 128px; padding: 0 24px; }
-  .navbar .btn.primary { min-width: 200px; margin-left: auto; }
+  .navbar .btn.primary { flex: 0 0 auto; min-width: 200px; margin-left: auto; }
 }
 
 /* ───────── 질문 머리 · 입력칸 */
