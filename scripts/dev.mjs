@@ -15,6 +15,7 @@ const routes = {
   '/api/research': (await import('../api/research.js')).default,
   '/api/place-copy': (await import('../api/place-copy.js')).default,
   '/api/geo-search': (await import('../api/geo-search.js')).default,
+  '/api/geo-diagnosis': (await import('../api/geo-diagnosis.js')).default,
 };
 const MIME = {
   '.html': 'text/html; charset=utf-8',
