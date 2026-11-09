@@ -604,3 +604,12 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
 @media print {
   .site-foot, .paycard, .pay-reminder { display: none !important; }
 }
+
+/* 상품 안내(심사용): 상품 이미지·제공·구매·환불 */
+.plan-img { display: block; width: 100%; height: auto; max-height: 260px; object-fit: cover; object-position: top; border-radius: 12px; border: 1px solid var(--line); margin: 0 0 14px; background: #fff; }
+.plan-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 12px 0 4px; padding-top: 12px; border-top: 1px solid var(--line-2); font-size: 14px; line-height: 1.55; }
+.plan-facts dt { font-weight: 700; color: var(--ink-2); }
+.plan-facts dd { margin: 0; color: var(--ink-2); }
+.demo-box { margin-top: 10px; }
+.demo-go { border-color: var(--brand-line); color: var(--brand-ink); font-weight: 700; }
+.foot-biz a { color: var(--ink-2); font-weight: 600; }

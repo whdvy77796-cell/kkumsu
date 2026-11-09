@@ -7,7 +7,7 @@ import { buildSolutions, LEVEL } from './solutions.js';
 import { PROMO } from './promo.js';
 import { PAY } from './pay-config.js';
 import { redactReport, packageSize, FREE_SOLUTIONS } from './paywall.js';
-import { BUSINESS, businessReady } from './business.js';
+import { BUSINESS, businessReady, bizCheckUrl } from './business.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -186,13 +186,18 @@ function plansCard() {
           h('li', null, '숫자로 본 우리 가게 (매출·비용·이익 계산)'),
           h('li', null, '우선 개선안 목록과 1순위 개선안 전체'))),
       h('div', { class: 'plan plan-paid' },
+        h('img', { class: 'plan-img', src: '/sample/package.jpg', alt: '맞춤 실행 패키지를 결제하면 열리는 개선안 화면 (샘플 보고서 예시)', width: 935, height: 906, loading: 'lazy', decoding: 'async' }),
         h('div', { class: 'plan-name' }, '맞춤 실행 패키지', h('span', { class: 'plan-chip' }, '보고서 1건')),
         priceTag(),
         h('ul', { class: 'check-list' },
           h('li', null, '모든 개선안의 실행 방법·확인 근거·기대 효과'),
           h('li', null, '개선안마다 담당·비용과 기간·준비물·확인 지표'),
           h('li', null, '실행 계획과 수익 구조·메뉴·고객 경험 연결 분석'),
-          h('li', null, 'PDF 저장 · 90일 다시 보기 링크 · 결제 영수증')))),
+          h('li', null, 'PDF 저장 · 90일 다시 보기 링크 · 결제 영수증')),
+        h('dl', { class: 'plan-facts' },
+          h('dt', null, '제공'), h('dd', null, '결제 즉시 화면에서 열람 · PDF 저장 · 결제일부터 90일 다시 보기'),
+          h('dt', null, '구매'), h('dd', null, '무료 진단을 받은 뒤 보고서 화면에서 결제 (회원가입 없음)'),
+          h('dt', null, '환불'), h('dd', null, '환불 기준과 신청 방법은 ', h('a', { href: '#/refund' }, '환불 정책'), '을 확인해 주세요.')))),
     h('p', { class: 'small plans-note' }, off
       ? '결제는 준비 중이에요. 준비가 끝나기 전에 만든 보고서는 실행 자료까지 전부 무료로 보여드려요.'
       : `무료 진단을 먼저 보고, 실행 패키지는 보고서 화면에서 원할 때만 결제해요. 토스페이먼츠 카드·간편결제.${PAY.mode === 'test' ? ' (지금은 테스트 결제 모드라 실제로 돈이 나가지 않아요.)' : ''}`),
@@ -239,7 +244,7 @@ function renderHome() {
       h('div', { class: 'hero-actions' },
         h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료 진단 시작'),
         h('a', { class: 'btn', href: '#/sample' }, '샘플 보고서 보기')),
-      h('p', { class: 'hero-note' }, off ? '회원가입 없이 무료로 진단해요' : `회원가입 없이 무료로 진단해요 · 실행 패키지 ${won(PAY.amount)}는 진단을 본 뒤 원할 때만`)),
+      h('p', { class: 'hero-note' }, off ? '회원가입 없이 무료로 진단해요' : `회원가입 없이 무료로 진단해요 · 실행 패키지 ${won(PAY.amount)}은 진단을 본 뒤 원할 때만`)),
     resume,
     plansCard(),
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
@@ -1422,9 +1427,8 @@ function packageItems(data) {
 function priceTag(big = false) {
   const pct = salePct();
   return h('div', { class: `price-tag${big ? ' big' : ''}` },
-    pct ? h('s', { class: 'price-list' }, `정가 ${won(PAY.list)}`) : null,
     h('b', { class: 'price-now' }, won(PAY.amount)),
-    pct ? h('span', { class: 'price-off' }, `${pct}% 할인 중`) : null);
+    null);
 }
 function focusPayCard() {
   const card = document.getElementById('payCard');
@@ -1455,7 +1459,32 @@ function payCard(data, { sample = false } = {}) {
     sample || off ? null : h('label', { class: 'consent pay-consent' }, agree,
       h('span', null, '결제하면 바로 보고서가 열려 단순 변심 환불이 어려운 점을 확인했어요. 보고서가 열리지 않는 등의 오류는 환불해 드려요. ', h('a', { href: '#/refund' }, '환불 정책'))),
     off && !sample ? null : go,
+    sample && PAY.mode === 'test' ? demoBox() : null,
     sample ? null : h('p', { class: 'tiny muted pay-fine' }, '토스페이먼츠 결제창에서 카드·간편결제로 결제해요. 카드 정보는 매출올려드림에 저장되지 않아요. ', h('a', { href: '#/terms' }, '이용약관')));
+}
+// 결제 과정 체험 (테스트 결제 모드에서만): 샘플 보고서를 잠긴 상태로 받아 실제 결제창과 결제 후 화면까지 확인
+function demoBox() {
+  const b = h('button', { class: 'btn block demo-go', type: 'button' }, '결제 과정 체험하기 (테스트 결제 · 실제 청구 없음)');
+  b.addEventListener('click', () => startDemo(b));
+  return h('div', { class: 'demo-box' }, b,
+    h('p', { class: 'tiny muted', style: { margin: '6px 0 0' } }, '샘플 보고서로 결제창이 열리는 과정과 결제 후 열리는 화면을 그대로 확인할 수 있어요.'));
+}
+async function startDemo(button) {
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = '준비하는 중…';
+  try {
+    const data = await post('/api/pay', { action: 'demo' }, 20000);
+    storeName.textContent = '결제 과정 체험';
+    document.body.dataset.page = 'report';
+    drawReport(data, false, { linked: true });
+    window.scrollTo(0, 0);
+    toast('샘플 보고서로 결제 과정을 체험해요. 테스트 결제라 실제로 돈이 나가지 않아요.', 5000);
+  } catch (e) {
+    toast(e.message || '체험을 준비하지 못했어요. 잠시 후 다시 시도해 주세요.', 5000);
+    button.disabled = false;
+    button.textContent = label;
+  }
 }
 function payReminder(data) {
   const z = packageSize(data);
@@ -1646,7 +1675,7 @@ function reportBody(data, { stale = false, sample = false, linked = false } = {}
     data.mock ? h('div', { class: 'card note small' }, '(모의 응답) 실제 AI가 아니라 화면 점검용으로 만든 보고서예요.') : null,
     data.paid && !sample ? paidCard(data) : null,
     h('div', { class: 'rep-head' },
-      h('div', { class: 'rep-kicker' }, sample ? '샘플 보고서 · 예시 데이터' : locked ? 'AI 진단 보고서 · 무료 핵심 진단' : 'AI 진단 보고서 · 베타'),
+      h('div', { class: 'rep-kicker' }, sample || data.sample ? '샘플 보고서 · 예시 데이터' : locked ? 'AI 진단 보고서 · 무료 핵심 진단' : 'AI 진단 보고서 · 베타'),
       h('h1', { class: 'rep-title' }, `${data.store?.name || S.name} 진단 보고서`),
       h('p', { class: 'small muted' }, [when, data.store?.address].filter(Boolean).join(' · '))),
 
@@ -1842,7 +1871,7 @@ function operatorLine() {
 }
 function renderPolicy(kind) {
   storeName.textContent = '';
-  const price = `${won(PAY.amount)}(정가 ${won(PAY.list)}, 할인 중)`;
+  const price = won(PAY.amount);
   const docs = {
     terms: () => policyDoc('이용약관', null, [
       ['제1조 (목적)', `이 약관은 ${biz('name', '매출올려드림 AI 운영자')}(이하 '운영자')가 제공하는 매출올려드림 AI(www.kkumsu.com, 이하 '서비스')를 이용하는 조건과 절차, 운영자와 이용자의 권리·의무를 정합니다.`],
@@ -1909,7 +1938,7 @@ function renderFooter() {
       h('a', { href: '#/refund' }, '환불 정책'),
       h('a', { href: '#/sample' }, '샘플 보고서')),
     businessReady()
-      ? h('p', { class: 'foot-biz' }, [`상호 ${B.name}`, `대표 ${B.owner}`, `사업자등록번호 ${B.bizNo}`, B.mailOrderNo ? `통신판매업 신고 ${B.mailOrderNo}` : null, `주소 ${B.address}`, `고객센터 ${B.phone}`, `이메일 ${B.email}`, `호스팅 ${B.hosting}`].filter(Boolean).join(' · '))
+      ? h('p', { class: 'foot-biz' }, [`상호 ${B.name}`, `대표 ${B.owner}`, `사업자등록번호 ${B.bizNo}`, B.mailOrderNo ? `통신판매업 신고 ${B.mailOrderNo}` : null, `주소 ${B.address}`, `고객센터 ${B.phone}`, `이메일 ${B.email}`, `개인정보 보호책임자 ${B.privacyOfficer || B.owner}`, `호스팅 ${B.hosting}`].filter(Boolean).join(' · '), ' ', h('a', { href: bizCheckUrl(), target: '_blank', rel: 'noopener noreferrer' }, '사업자정보 확인'))
       : null,
     h('p', { class: 'foot-copy' }, '© 매출올려드림 AI · AI 진단은 참고 자료이며 결과를 보장하지 않아요.'),
   ]);
