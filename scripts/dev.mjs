@@ -13,6 +13,7 @@ const routes = {
   '/api/store-search': (await import('../api/store-search.js')).default,
   '/api/report': (await import('../api/report.js')).default,
   '/api/research': (await import('../api/research.js')).default,
+  '/api/place-copy': (await import('../api/place-copy.js')).default,
 };
 const MIME = {
   '.html': 'text/html; charset=utf-8',
