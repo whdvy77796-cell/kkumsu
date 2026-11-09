@@ -9,7 +9,9 @@
 //
 // 잠긴 부분은 서버가 아예 보내지 않는다. 화면은 개수만 받아서 흐리게 처리한 자리표시(가짜 글자)를 그린다.
 
-export const FREE_SOLUTIONS = 1; // 앞에서부터 이 개수만큼은 개선안을 전부 보여 준다
+export const FREE_SOLUTIONS = 1; // 기존 1순위는 그대로 무료
+// AI 검색 준비 안내도 별도의 무료 핵심으로 제공한다. 중요도 순위를 바꾸지는 않는다.
+export const isFreeSolution = (solution, index) => index < FREE_SOLUTIONS || solution?.aiVisibility === true;
 
 const count = (x) => (Array.isArray(x) ? x.length : 0);
 const ANALYSIS_KEYS = ['profit', 'menu', 'customer', 'connection'];
@@ -34,7 +36,7 @@ export function redactReport(full) {
       publicView: r.publicView,
       needCheck: r.needCheck,
       analysis: { locked: ANALYSIS_KEYS.filter((k) => a[k]) },
-      solutions: sols.map((s, i) => (i < FREE_SOLUTIONS ? s : {
+      solutions: sols.map((s, i) => (isFreeSolution(s, i) ? s : {
         stars: s.stars,
         area: s.area,
         title: s.title,
@@ -64,7 +66,7 @@ export function redactReport(full) {
 // 결제하면 열리는 분량 (안내 문구용). 잠긴 보고서·전체 보고서 모두 계산할 수 있다.
 export function packageSize(data) {
   const sols = data?.report?.solutions || [];
-  const paidSols = sols.slice(FREE_SOLUTIONS);
+  const paidSols = sols.filter((s, i) => !isFreeSolution(s, i));
   const steps = paidSols.reduce((t, s) => t + (s.locked ? s.locked.actions || 0 : count(s.actions)), 0);
   const p = data?.report?.plan || {};
   const pl = p.locked || { thisWeek: count(p.thisWeek), nextWeeks: count(p.nextWeeks), thisMonth: count(p.thisMonth) };

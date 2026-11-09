@@ -6,8 +6,9 @@ import {
 import { buildSolutions, LEVEL } from './solutions.js';
 import { PROMO } from './promo.js';
 import { PAY } from './pay-config.js';
-import { redactReport, packageSize, FREE_SOLUTIONS } from './paywall.js';
+import { redactReport, packageSize, FREE_SOLUTIONS, isFreeSolution } from './paywall.js';
 import { BUSINESS, businessReady, bizCheckUrl } from './business.js';
+import { mountAiPlace } from './ai-place.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -111,16 +112,19 @@ async function post(path, body, timeoutMs) {
 
 // ───────── 화면 이동
 let navSeq = 0;
+let aiPlaceInstance = null;
 function route() {
+  if (aiPlaceInstance) { aiPlaceInstance.destroy(); aiPlaceInstance = null; }
   navSeq++;
   const hash = location.hash || '#/';
   const linked = /^#\/r\/([A-Za-z0-9_-]{16,32})\.([A-Za-z0-9_-]{16,100})$/.exec(hash);
   const policy = { '#/terms': 'terms', '#/privacy': 'privacy', '#/refund': 'refund' }[hash];
   // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다 (home·find·survey·done·report·policy)
-  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
+  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report', '#/ai-place': 'ai-place' })[hash] || 'home';
   if (linked) renderLinked(linked[1], linked[2]);
   else if (policy) renderPolicy(policy);
   else if (hash === '#/sample') renderSample();
+  else if (hash === '#/ai-place') { storeName.textContent = ''; setNavbar(); aiPlaceInstance = mountAiPlace(view, { onBack: () => { location.hash = '#/'; } }); }
   else if (hash === '#/find') renderFind();
   else if (hash === '#/survey') renderSurvey();
   else if (hash === '#/done') renderDone();
@@ -184,7 +188,7 @@ function plansCard() {
           h('li', null, '가장 중요한 문제와 지금 바로 할 일'),
           h('li', null, '인터넷에서 본 우리 가게 (평점·후기·주변 경쟁점)'),
           h('li', null, '숫자로 본 우리 가게 (매출·비용·이익 계산)'),
-          h('li', null, '우선 개선안 목록과 1순위 개선안 전체'))),
+          h('li', null, '우선 개선안 목록·1순위 개선안과 AI 검색 정보 준비 안내 전체'))),
       h('div', { class: 'plan plan-paid' },
         h('img', { class: 'plan-img', src: '/sample/package.jpg', alt: '맞춤 실행 패키지를 결제하면 열리는 개선안 화면 (샘플 보고서 예시)', width: 935, height: 906, loading: 'lazy', decoding: 'async' }),
         h('div', { class: 'plan-name' }, '맞춤 실행 패키지', h('span', { class: 'plan-chip' }, '보고서 1건')),
@@ -238,14 +242,24 @@ function renderHome() {
 
   show(
     h('section', { class: 'hero' },
-      h('h1', null, '우리 가게, 매출이 달라질 방법을 찾다!'),
-      h('h2', { class: 'hero-sub' }, '우리 가게의 문제를 진단하고, 바로 실행할 자료까지 받아보세요'),
-      h('p', { class: 'hero-desc' }, '상호명과 주소를 넣고 가게 질문에 답하면, AI가 인터넷 평판과 사장님 숫자를 함께 살펴 무엇부터 고칠지 진단해요. 실행 방법과 계획은 맞춤 실행 패키지로 받아보세요.'),
+      h('h1', null, 'AI 시대, 우리 가게가 발견되는 방법'),
+      h('h2', { class: 'hero-sub' }, '가게를 진단하고, 검색과 AI가 읽기 쉬운 소개 페이지를 준비해요'),
+      h('p', { class: 'hero-desc' }, '우리 가게에 필요한 개선안을 찾거나, 고객과 AI가 참고할 수 있도록 가게·브랜드 정보를 정리해 보세요.'),
       h('div', { class: 'hero-actions' },
-        h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료 진단 시작'),
-        h('a', { class: 'btn', href: '#/sample' }, '샘플 보고서 보기')),
-      h('p', { class: 'hero-note' }, off ? '회원가입 없이 무료로 진단해요' : `회원가입 없이 무료로 진단해요 · 실행 패키지 ${won(PAY.amount)}은 진단을 본 뒤 원할 때만`)),
+        h('button', { class: 'btn primary', type: 'button', onclick: focusStart }, '진단 시작하기'),
+        h('a', { class: 'btn ai-place-hero-btn', href: '#/ai-place' }, 'AI가 우리 가게(브랜드)를 추천하도록 하기')),
+      h('p', { class: 'hero-note' }, '소개 페이지는 검색·AI가 읽기 쉽게 준비하는 서비스예요. 색인이나 AI 추천을 보장하지 않아요.')),
     resume,
+    h('section', { class: 'card discovery-card' },
+      h('div', { class: 'discovery-top' }, h('span', { class: 'discovery-tag' }, '가게·브랜드 검색 준비'), h('span', { class: 'discovery-price' }, '공개 서비스 29,000원 예정')),
+      h('h2', null, '우리 가게가 AI와 검색에 잘 이해되도록'),
+      h('p', null, '사장님이 알려주신 가게 정보와 사진으로 소개 페이지 시안을 만들어요. 메뉴·가격·위치와 자주 묻는 질문을 정리해 보세요.'),
+      h('ul', { class: 'check-list' },
+        h('li', null, '가게·브랜드와 원하는 검색 주제 설문'),
+        h('li', null, '답변을 바탕으로 소개 페이지 시안 확인'),
+        h('li', null, '향후 공개 서비스: 페이지 공개와 검색·AI 읽기 확인 리포트')),
+      h('p', { class: 'small muted' }, '시안은 이 기기에서만 보여요. 29,000원 결제·페이지 공개·AI 읽기 검사 및 구글 색인 확인은 준비 중이며, 현재 제공되지 않아요. 검색 결과와 AI 추천은 보장되지 않아요.'),
+      h('a', { class: 'btn primary', href: '#/ai-place' }, '소개 페이지 시안 만들기')),
     plansCard(),
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료 진단 시작')),
@@ -262,7 +276,7 @@ function renderHome() {
         h('li', null, h('b', null, '우리 가게가 맞는지 확인 '), h('span', { class: 'muted small' }, '아니면 다시 입력')),
         h('li', null, h('b', null, '가게 인터뷰 '), h('span', { class: 'muted small' }, '가장 큰 고민과 운영 방식에 맞춰 질문이 달라져요. AI가 찾은 정보는 미리 채워 두고, 모르는 건 "잘 모름"을 누르면 돼요.')),
         h('li', null, h('b', null, 'AI 진단 보고서 '), h('span', { class: 'muted small' }, off
-          ? '원할 때만, 동의 후에 만들어요. AI가 카카오맵·네이버·구글·블로그를 직접 찾아보고 답변과 합쳐 진단·개선안·실행 계획을 만들어요 (2~4분)'
+          ? '원할 때만 동의 후에 만들어요. 확인 가능한 검색 결과와 공개 자료를 답변과 함께 살펴 진단·개선안·실행 계획을 만들어요 (2~4분). 일부 지도·리뷰 페이지의 본문은 확인하지 못할 수 있어요.'
           : '원할 때만, 동의 후에 만들어요 (2~4분). 핵심 진단은 무료로 보고, 실행 방법·계획·PDF는 맞춤 실행 패키지로 열 수 있어요.')))),
     h('div', { class: 'card note small privacy-card' },
       h('b', null, '입력한 정보는 이렇게 쓰여요'),
@@ -802,10 +816,10 @@ function solutionCard(sol) {
   return h('div', { class: `card sol sol-${sol.stars}` },
     h('div', { class: 'sol-head' },
       h('span', { class: 'stars' }, sol.stars ? '★'.repeat(sol.stars) : '확인 필요'),
-      h('span', { class: 'sol-level' }, LEVEL[sol.stars]),
+      h('span', { class: 'sol-level' }, sol.aiVisibility ? '무료 핵심 안내' : LEVEL[sol.stars]),
       h('span', { class: 'sol-area' }, sol.area)),
     h('h3', null, sol.title),
-    h('p', { class: 'sol-row' }, h('b', null, '발견한 문제 '), sol.problem),
+    h('p', { class: 'sol-row' }, h('b', null, sol.aiVisibility ? '확인 필요 ' : '발견한 문제 '), sol.problem),
     sol.evidence.length ? h('p', { class: 'sol-row small muted' }, h('b', null, '확인 근거 '), `사장님 답변 · ${sol.evidence.join(' · ')}`) : null,
     h('div', { class: 'sub-title' }, '이렇게 해보세요'),
     h('ol', { class: 'sol-steps' }, sol.actions.map((x) => h('li', null, x))),
@@ -865,7 +879,7 @@ function answersKey() {
   return `${s.length}-${x.toString(36)}`;
 }
 // 보고서 형식 버전 (서버 lib/report.mjs 의 REPORT_VERSION 과 같게). 예전 형식 보고서는 다시 만들 수 있게 한다.
-const REPORT_V = 2;
+const REPORT_V = 3;
 const reportOutdated = () => !!S.report?.data && S.report.key === answersKey() && (S.report.data.v || 1) < REPORT_V;
 const reportFresh = () => !!S.report?.data && S.report.key === answersKey() && (S.report.data.v || 1) >= REPORT_V;
 let reportJob = null; // { key, started, done, error, promise }
@@ -1662,8 +1676,8 @@ function reportBody(data, { stale = false, sample = false, linked = false } = {}
   const analysis = locked ? [] : [['수익 구조', r.analysis?.profit], ['메뉴', r.analysis?.menu], ['고객 경험', r.analysis?.customer], ['어떻게 이어지나요', r.analysis?.connection]].filter(([, t]) => t);
   const b = data.bench;
   const sols = r.solutions || [];
-  const freeSols = locked ? sols.slice(0, FREE_SOLUTIONS) : sols;
-  const lockedSols = locked ? sols.slice(FREE_SOLUTIONS) : [];
+  const freeSols = locked ? sols.filter(isFreeSolution) : sols;
+  const lockedSols = locked ? sols.filter((s, i) => !isFreeSolution(s, i)) : [];
   const mine = !sample && !linked;
   return [
     stale && mine
@@ -1725,7 +1739,7 @@ function reportBody(data, { stale = false, sample = false, linked = false } = {}
         : null,
 
     h('h2', { class: 'section-title' }, `우선 개선안 ${sols.length}개`),
-    h('p', { class: 'small muted' }, `★★★ 우선 개선 · ★★ 이번 주 실행 · ★ 조건부 실험 · 확인 필요. 근거 표시: 답변 = 사장님 답변, 계산 = 서버 계산, 공개 정보 = AI가 인터넷에서 찾은 정보, 추정 = AI의 판단. "인터넷 조사 반영"은 인터넷 후기·평판에서 찾은 개선점이에요.${locked ? ` 무료 진단에서는 ${FREE_SOLUTIONS}순위 개선안을 전부 보여드리고, 나머지는 제목과 발견한 문제까지 보여드려요.` : ''}`),
+    h('p', { class: 'small muted' }, `★★★ 우선 개선 · ★★ 이번 주 실행 · ★ 조건부 실험 · 확인 필요. 근거 표시: 답변 = 사장님 답변, 계산 = 서버 계산, 공개 정보 = AI가 인터넷에서 찾은 정보, 추정 = AI의 판단. "인터넷 조사 반영"은 인터넷 후기·평판에서 찾은 개선점이에요.${locked ? ` 무료 진단에서는 ${FREE_SOLUTIONS}순위 개선안을 전부 보여드려요.${sols.some(s => s.aiVisibility) ? ' AI 검색 정보 준비 안내도 무료로 제공해요.' : ''} 그 밖의 개선안은 제목과 발견한 문제까지 보여드려요.` : ''}`),
     h('div', { class: 'sol-list' }, freeSols.map(aiSolutionCard)),
     locked ? payCard(data, { sample }) : null,
     lockedSols.length ? h('div', { class: 'sol-list' }, lockedSols.map(lockedSolutionCard)) : null,

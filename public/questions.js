@@ -255,6 +255,17 @@ export const QUESTIONS = [
     why: '손님 부족·이익 부족·재방문 부족·인력 부담 중 우선 목표를 정하고, 그에 맞는 질문을 이어서 드려요.',
   },
   {
+    id: 'a_ai_search', page: 'basic', type: 'group',
+    title: '손님이 AI에게 가게를 물어보는 검색을 들어 보셨나요?',
+    help: '예를 들어 손님이 AI에게 “이 동네에서 점심 먹을 곳을 알려줘”라고 묻는 방식이에요. 처음 들어도 괜찮아요. AI마다 답변은 달라질 수 있어요.',
+    fields: [
+      { key: 'awareness', label: '이런 AI 검색을 알고 계셨나요?', type: 'choice', options: opts(['used', '알고 있고 써봤어요'], ['heard', '들어봤지만 써보진 않았어요'], ['new', '처음 들어요']) },
+      { key: 'importance', label: '우리 가게에 이런 검색이 얼마나 중요할 것 같나요?', type: 'choice', options: opts(['high', '중요할 것 같아요'], ['medium', '조금 중요할 것 같아요'], ['low', '지금은 덜 중요해요'], ['unsure', '잘 모르겠어요']) },
+      { key: 'goal', label: '손님이 어떤 질문으로 우리 가게를 찾으면 좋겠나요?', type: 'text', optional: true, placeholder: '예: 이 동네에서 혼자 점심 먹기 좋은 곳' },
+    ],
+    why: '사장님이 알고 계신 정도와 원하시는 질문을 참고해, 가게 정보를 점검하는 방법을 안내해요. 답을 몰라도 괜찮아요.',
+  },
+  {
     id: 'a_budget', page: 'money', type: 'group',
     title: '개선에 쓸 수 있는 예산과 시간은 어느 정도인가요?',
     fields: [

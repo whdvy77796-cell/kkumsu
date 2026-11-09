@@ -67,7 +67,7 @@ export async function makeReport({ env, fetcher, input, computed, research, mete
   if (!looksLikeReport(parsed)) throw new HttpError(502, 'AI_FORMAT', 'AI가 만든 보고서를 정리하지 못했어요. 다시 시도해 주세요.');
   return {
     v: REPORT_VERSION,
-    report: normalizeReport(parsed, computed.metrics),
+    report: normalizeReport(parsed, computed.metrics, input),
     metrics: computed.metrics,
     cautions: computed.cautions,
     bench: computed.bench,

@@ -1,7 +1,7 @@
 // 인터뷰 질문 분기 점검 (설계 문서 원칙대로 질문이 바뀌는지)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { QUESTIONS, QMAP, PAGES, buildCtx, visibleQuestions, visiblePages, isAnswered, splitCheck, resolve, guessCategory, guessPeriod, guessServices, storeFlags, josa } from '../public/questions.js';
+import { QUESTIONS, QMAP, PAGES, buildCtx, visibleQuestions, visiblePages, isAnswered, answerText, splitCheck, resolve, guessCategory, guessPeriod, guessServices, storeFlags, josa } from '../public/questions.js';
 
 const STORE = {
   name: '얼큰집', address: '서울 마포구 망원로 1', category: '국밥 전문점', openedYear: '2019년 개업', floor: '2층',
@@ -127,6 +127,29 @@ test('답 확인: 잘 모름·해당 없음, 비중 합계, 메뉴 원가 분기
   assert.equal(isAnswered(QMAP.c_price, { s: 'ok', v: { change: 'up', expensive: '가격 자체 때문이에요' } }, c), false, '가격을 바꿨으면 이후 판매량도 답해야 함');
   assert.equal(isAnswered(QMAP.c_price, { s: 'ok', v: { change: 'none', expensive: '잘 모르겠어요' } }, c), true);
   assert.equal(isAnswered(QMAP.e_spend, { s: 'na' }, c), true);
+});
+
+test('AI 검색 질문은 모든 가게에 보이고 처음 듣거나 중요도를 몰라도 답할 수 있으며 목표는 선택이다', () => {
+  const q = QMAP.a_ai_search;
+  assert.equal(q.page, 'basic');
+  assert.equal(q.type, 'group');
+  assert.match(q.help, /처음 들어도 괜찮아요/);
+  const [awareness, importance, goal] = q.fields;
+  assert.equal(goal.optional, true);
+  assert.equal(goal.type, 'text');
+  assert.ok(awareness.options.some((o) => o.v === 'new' && /처음/.test(o.label)));
+  assert.ok(importance.options.some((o) => o.v === 'unsure' && /모르/.test(o.label)));
+  for (const problem of ['acquisition', 'profit', 'repeat', 'labor']) {
+    assert.ok(ids(state({ a_problem: ok(problem) }), null).includes(q.id));
+  }
+  const c = buildCtx(state({}), null);
+  const noGoal = ok({ awareness: 'new', importance: 'unsure' });
+  assert.equal(isAnswered(q, noGoal, c), true);
+  assert.equal(isAnswered(q, ok({ awareness: 'new' }), c), false, '중요도도 모름을 포함해 선택');
+  assert.match(answerText(q, noGoal, c), /처음 들어요/);
+  assert.match(answerText(q, noGoal, c), /잘 모르겠어요/);
+  const withGoal = ok({ ...noGoal.v, goal: '혼자 점심 먹기 좋은 곳' });
+  assert.match(answerText(q, withGoal, c), /혼자 점심 먹기 좋은 곳/);
 });
 
 test('모든 질문이 화면·형식·이유를 갖고 있다', () => {
