@@ -613,3 +613,11 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
 .demo-box { margin-top: 10px; }
 .demo-go { border-color: var(--brand-line); color: var(--brand-ink); font-weight: 700; }
 .foot-biz a { color: var(--ink-2); font-weight: 600; }
+
+/* AI 검색 준비 서비스 안내 */
+.discovery-card { background: linear-gradient(135deg,#eef4ff,#f8faff); border-color:#d2dfff; }
+.discovery-top { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.discovery-tag { color:#244ab5; background:#fff; border-radius:999px; padding:4px 12px; font-weight:700; font-size:13px; }
+.discovery-price { color:#244ab5; font-weight:700; font-size:14px; }
+.discovery-card .check-list { margin:12px 0; }
+.ai-place-hero-btn { border-color:#9eb3ee; color:#173a96; }
