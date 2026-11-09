@@ -1504,19 +1504,9 @@ async function startPayment(data, button) {
     if (o.paid) { await reopenReport(data); return; }
     if (!window.TossPayments) await loadScript(TOSS_SDK);
     if (!window.TossPayments) throw new Error('결제창을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
-    const payment = window.TossPayments(o.clientKey).payment({ customerKey: window.TossPayments.ANONYMOUS || guestKey() });
     S.pendingPay = { orderId: o.orderId, rid: data.rid, token: data.token, at: Date.now() };
     save();
-    await payment.requestPayment({
-      method: 'CARD',
-      amount: { currency: 'KRW', value: o.amount },
-      orderId: o.orderId,
-      orderName: o.orderName,
-      successUrl: `${location.origin}/?pay=success`,
-      failUrl: `${location.origin}/?pay=fail`,
-      windowTarget: 'self',
-      card: { flowMode: 'DEFAULT', useEscrow: false, useCardPoint: false, useAppCardOnly: false },
-    });
+    await openTossCheckout(o);
   } catch (e) {
     console.error('[pay]', e);
     const canceled = /CANCEL/i.test(String(e?.code || ''));
@@ -1525,6 +1515,47 @@ async function startPayment(data, button) {
     payBusy = false;
     if (button) { button.disabled = false; button.textContent = label; }
   }
+}
+// 토스페이먼츠 결제창 열기
+//  - 결제위젯 키(…_gck_…): 결제창형. 토스 결제창(팝업/오버레이)에서 결제수단을 고르고 결제하기를 누르면 결제 요청
+//  - API 개별 연동 키(…_ck_…): 결제창(구버전). 카드·간편결제 통합결제창으로 같은 창에서 이동
+// 어느 쪽이든 끝나면 successUrl(?pay=success)로 돌아오고, 서버가 금액을 확인한 뒤 승인한다.
+let tossWindow = null;
+async function openTossCheckout(o) {
+  const successUrl = `${location.origin}/?pay=success`;
+  const failUrl = `${location.origin}/?pay=fail`;
+  const tp = window.TossPayments(o.clientKey);
+  const customerKey = window.TossPayments.ANONYMOUS || guestKey();
+  if (/_gck_/.test(o.clientKey)) {
+    const widgets = tp.widgets({ customerKey });
+    await widgets.setAmount({ currency: 'KRW', value: o.amount });
+    try { await tossWindow?.destroy?.(); } catch { /* 이미 닫힘 */ }
+    tossWindow = await widgets.renderPaymentWindow({ orderName: o.orderName, variantKey: { paymentMethod: 'DEFAULT', agreement: 'AGREEMENT' } });
+    tossWindow.on('cancel', () => {
+      toast('결제를 취소했어요. 원할 때 다시 결제할 수 있어요.', 4000);
+      try { tossWindow?.destroy?.(); } catch { /* 이미 닫힘 */ }
+      tossWindow = null;
+    });
+    tossWindow.on('paymentRequest', async () => {
+      try {
+        await widgets.requestPayment({ orderId: o.orderId, orderName: o.orderName, successUrl, failUrl });
+      } catch (e) {
+        console.error('[pay]', e);
+        toast(/CANCEL/i.test(String(e?.code || '')) ? '결제를 취소했어요.' : e?.message || '결제를 요청하지 못했어요. 다시 시도해 주세요.', 5000);
+      }
+    });
+    return;
+  }
+  await tp.payment({ customerKey }).requestPayment({
+    method: 'CARD',
+    amount: { currency: 'KRW', value: o.amount },
+    orderId: o.orderId,
+    orderName: o.orderName,
+    successUrl,
+    failUrl,
+    windowTarget: 'self',
+    card: { flowMode: 'DEFAULT', useEscrow: false, useCardPoint: false, useAppCardOnly: false },
+  });
 }
 async function reopenReport(data) {
   const fresh = await post('/api/pay', { action: 'view', rid: data.rid, token: data.token }, 20000);
