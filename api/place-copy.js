@@ -1,6 +1,6 @@
 /*
- * Optional standalone POST /api/place-copy, not wired into the survey or the
- * local development router. A consumer must explain that the entered text is
+ * Optional POST /api/place-copy, used by the consent-gated survey and local
+ * development router. The consumer must explain that the entered text is
  * sent to an external AI provider and get a fresh affirmative consent before
  * each request. It must render all returned strings as text, not HTML.
  *
