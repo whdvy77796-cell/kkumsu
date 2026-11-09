@@ -621,3 +621,7 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
 .discovery-price { color:#244ab5; font-weight:700; font-size:14px; }
 .discovery-card .check-list { margin:12px 0; }
 .ai-place-hero-btn { border-color:#9eb3ee; color:#173a96; }
+
+/* GEO 서비스 중심 첫 화면 */
+.home-geo-label { display:inline-flex; background:#eaf1ff; color:#2449b5; padding:6px 12px; border-radius:999px; font-size:13px; font-weight:800; margin-bottom:14px; }
+@media(max-width:639px){ body[data-page="home"] .hero-actions { grid-template-columns:minmax(0,1.8fr) minmax(100px,1fr); align-items:stretch; } body[data-page="home"] .hero-actions .btn { min-height:60px; padding:9px 10px; font-size:14px; line-height:1.3; } }
