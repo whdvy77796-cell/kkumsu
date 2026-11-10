@@ -90,9 +90,14 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
         url: typeof x.sourceUrl === 'string' ? safeLink(x.sourceUrl) : null,
         kind: x.sourceKind === 'map_page' ? 'map_page' : 'third_party',
       })).filter((x) => x.url);
+    const query = [state.name, state.address].filter((x) => typeof x === 'string' && x.trim()).join(' ').trim();
+    const mapSearch = (platform) => !query ? null : platform === 'google_maps'
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+      : `https://map.kakao.com/link/search/${encodeURIComponent(query)}`;
     return h('div', { class: 'map-signals' },
       h('div', { class: 'sub-title' }, '지도별 공개 검색 단서'),
       h('p', { class: 'small muted' }, '기존 AI의 공개 웹 검색에서 AI가 제시한 단서예요. 지도 공식 API의 직접 응답이나 검증된 사실이 아니에요. 잘못된 지점, 오래된 정보, 작동하지 않는 링크일 수 있으니 직접 확인해 주세요.'),
+      h('p', { class: 'tiny muted' }, '직접 검색 링크를 누르면 입력하신 상호와 주소로 해당 지도에서 검색해요.'),
       groups.map(([platform, label]) => {
         const items = clean.filter((x) => x.platform === platform).slice(0, 5);
         return h('div', { class: 'map-signal-group', 'data-platform': platform },
@@ -101,7 +106,8 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
             ? h('ul', { class: 'plain-list' }, items.map((x) => h('li', null,
               h('a', { href: x.url, target: '_blank', rel: 'noopener noreferrer' }, x.text),
               h('span', { class: 'tiny muted' }, ' · ', x.title ? x.title + ' · ' : '', x.kind === 'map_page' ? 'AI 제시 지도 링크' : 'AI 제시 외부 링크'))))
-            : h('p', { class: 'small muted' }, '이번 결과에서 단서를 받지 못했어요. 지도에 정보가 없다는 뜻은 아니에요.'));
+            : h('p', { class: 'small muted' }, '이번 결과에서 단서를 받지 못했어요. 지도에 정보가 없다는 뜻은 아니에요.'),
+          mapSearch(platform) ? h('a', { href: mapSearch(platform), target: '_blank', rel: 'noopener noreferrer', class: 'small' }, `${label}에서 직접 검색`) : null);
       }));
   }
   function candidateCard(c, index, confirmed = false) {
