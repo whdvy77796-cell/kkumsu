@@ -54,7 +54,7 @@ export const PAGE_DRAFT_SYSTEM = `사장님이 확인하고 수정할 수 있는
 name/address는 사장님이 가게를 확인한 후 수정할 수 있는 기본정보입니다. fact0~fact7은 사장님이 직접 체크해 확인한 특징입니다. offer/difference/audience/visit은 사장님 답변입니다. 이것만 근거로 쓰세요. keywords는 희망 검색어일 뿐 사실 증거가 아닙니다. 희망 검색어를 실제 메뉴, 시설, 지역, 인증, 방문 경험인 것처럼 바꾸지 마세요.
 부정과 불확실성을 보존하세요. 주차 안 됨/모름/미확인은 주차 가능이나 무료주차가 아니며 반려견 동반 불가도 가능으로 바꾸면 안 됩니다.
 추측, 사실 발명, 매출/성과/순위/AI 노출 보장, 확인되지 않은 가격/영업시간/숫자, 과장 표현을 금지합니다. 항목마다 직접 뒷받침하는 입력 ID만 evidence에 넣으세요. name만으로 메뉴나 시설을 추측하지 마세요. 사실 근거가 없거나 keywords만 근거인 소개/제목/섹션/FAQ는 생략하세요. 숫자는 해당 항목이 인용한 사실 evidence 원문에 실제 있는 숫자만 사용하세요. keywords 숫자는 사실 숫자 근거가 아닙니다.
-읽기 쉽게 한 단락 한 주제로 쓰고, 제목·소개·가게만의 구체적인 가치·고객 상황·방문 정보에 집중하세요. FAQ는 질문에 바로 답하세요. 답변 근거 없는 질문은 만들지 마세요. 정상적인 문장과 자연스러운 바꿔쓰기는 허용하되 의미를 보태지 마세요. HTML/마크다운/링크/코드 없이 일반 텍스트만 씁니다.
+읽기 쉽게 한 단락 한 주제로 쓰고, 제목·소개·가게만의 구체적인 가치·고객 상황·방문 정보에 집중하세요. FAQ는 질문에 바로 답하세요. 답변 근거 없는 질문은 만들지 마세요. 이 글은 실제 손님이 가게 홈페이지에서 읽는 소개글입니다. '사장님이 알려주셨습니다', '입력하신 정보', '손님에게 알리고 싶은 곳', 'AI가 작성했습니다'처럼 설문이나 작성 과정을 설명하지 말고, 확인한 사실과 이용 상황을 손님에게 자연스럽게 직접 안내하세요. 정상적인 문장과 자연스러운 바꿔쓰기는 허용하되 의미를 보태지 마세요. HTML/마크다운/링크/코드 없이 일반 텍스트만 씁니다.
 형식: {"headline":{"text":"제목","evidence":["offer"]},"intro":{"text":"소개","evidence":["offer"]},"sections":[{"heading":"제목","body":"본문","evidence":["fact0"]}],"faqs":[{"question":"질문?","answer":"직접 답변","evidence":["visit"]}],"keywords":[{"text":"희망 검색어","evidence":["keywords"]}]}
 headline/intro는 근거 없으면 null, 나머지는 빈 배열로 둡니다. 최대 글자 수: 제목120, 소개800, 섹션 제목100/본문1000, FAQ 질문160/답700, 키워드80. 섹션 최대5개, FAQ 최대4개, 키워드 최대8개. 실제 제공되지 않은 evidence ID를 쓰지 마세요.`;
 
@@ -63,15 +63,21 @@ headline/intro는 근거 없으면 null, 나머지는 빈 배열로 둡니다. �
 export function numberTokens(text) {
   return String(text).normalize('NFKC').match(/\d+(?:,\d{3})*(?:\.\d+)?/g)?.map(s => s.replace(/,/g, '')) || [];
 }
+// Retain the unit with a number so an address or head count cannot by itself
+// justify reusing the same number as a price, opening time, duration or quantity.
+export function quantityTokens(text) {
+  const pattern = /(\d+(?:,\d{3})*(?:\.\d+)?)\s*(만원|시간|퍼센트|가지|개월|킬로그램|킬로|원|년|월|일|시|분|개|명|석|인|세|%|종|회|곳|대|평|층|kg|g)/gi;
+  return [...String(text).normalize('NFKC').matchAll(pattern)].map(match => `${match[1].replace(/,/g, '')}|${match[2].toLowerCase()}`);
+}
 const forbidden = (s) => /(?:매출|수익|성과|성공|상위\s*노출|검색\s*노출|AI\s*노출|순위)[^.!?\n]{0,24}(?:보장|확실|무조건)|(?:무조건|반드시)[^.!?\n]{0,20}(?:노출|매출|성공)|(?:기사|언론\s*보도|검색\s*결과)에\s*따르면|모델\s*(?:지식|기억)/i.test(s);
 
 export function contradictsOwner(text, sources) {
   const factual = Object.entries(sources).filter(([id]) => id !== 'keywords').map(([, s]) => s).join('\n');
-  for (const topic of ['주차', '반려(?:견|묘|동물)|애견', '예약', '포장', '배달']) {
-    const negative = new RegExp(`(?:${topic})[^.!?\\n,]{0,20}(?:안\\s*(?:돼|되|됩|받|하)|못\\s*(?:해|하|받)|불가|없|모르|모름|미확인|불확실|받지\\s*않|가능하지\\s*않|어려)`);
-    const positive = new RegExp(`(?:(?:${topic})[^.!?\\n,]{0,20}(?:가능|됩니다|돼요|환영|허용|제공|할\\s*수\\s*있|해\\s*주세요|받습니다|받아요))`);
-    const freeParking = topic === '주차' && /무료\s*주차/.test(text);
-    if (negative.test(factual) && (positive.test(text) || freeParking) && !negative.test(text)) return true;
+  const statements = String(text).split(/[.!?\n,;]+/);
+  for (const topic of ['주차', '반려(?:견|묘|동물)|애견', '예약', '포장', '배달', '영업|운영']) {
+    const negative = new RegExp(`(?:${topic})[^.!?\\n,]{0,28}(?:안\\s*(?:돼|되|됩|받|하)|못\\s*(?:해|하|받|했)|불가|없|모르|모름|미확인|불확실|받지\\s*않|하지\\s*않|되지\\s*않|확인하지\\s*못|가능하지\\s*않|어려)`);
+    const positive = new RegExp(`(?:(?:${topic})[^.!?\\n,]{0,24}(?:가능|됩니다|돼요|환영|허용|제공|할\\s*수\\s*있|해\\s*주세요|받습니다|받아요|합니다|해요|열어요))`);
+    if (negative.test(factual) && statements.some(part => (positive.test(part) || (topic === '주차' && /무료\s*주차/.test(part))) && !negative.test(part))) return true;
   }
   return false;
 }
@@ -111,11 +117,16 @@ export function normalizeDraft(raw, input) {
     }
     const text = Object.values(out).join('\n');
     const citedFacts = Object.fromEntries(facts.map(id => [id, sources[id]]));
-    if (!keyword && (contradictsOwner(text, sources) || unsupportedPracticalClaim(text, citedFacts))) { omittedCount++; return null; }
+    // A question about availability is not itself an affirmative claim; inspect it
+    // together with its answer to catch both "yes" and a correctly negative answer.
+    const claimText = out.question && out.answer ? `${out.question} ${out.answer}`.replace(/[,.!?;\n]+/g, ' ') : text;
+    if (!keyword && (contradictsOwner(claimText, sources) || unsupportedPracticalClaim(text, citedFacts))) { omittedCount++; return null; }
     // A keyword is a desired term, never a factual assertion. Permit its own numbers.
     const numericSources = keyword ? evidence : facts;
     const supported = new Set(numericSources.flatMap(id => numberTokens(sources[id])));
     if (numberTokens(text).some(n => !supported.has(n))) { omittedCount++; return null; }
+    const supportedQuantities = new Set(numericSources.flatMap(id => quantityTokens(sources[id])));
+    if (quantityTokens(text).some(q => !supportedQuantities.has(q))) { omittedCount++; return null; }
     // Name/address alone cannot substantiate invented offerings. Preserve simple identity
     // text; unrelated claims need an owner answer or checked fact.
     if (!keyword && facts.every(id => id === 'name' || id === 'address')) {
