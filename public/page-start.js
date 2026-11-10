@@ -89,7 +89,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
         title: typeof x.sourceTitle === 'string' && x.sourceTitle.trim() ? x.sourceTitle.trim().slice(0, 120) : '',
         url: typeof x.sourceUrl === 'string' ? safeLink(x.sourceUrl) : null,
         kind: x.sourceKind === 'map_page' ? 'map_page' : 'third_party',
-      })).filter((x) => x.url);
+      })).filter((x) => x.url && x.platform === 'google_maps' && x.kind === 'third_party');
     const query = [state.name, state.address].filter((x) => typeof x === 'string' && x.trim()).join(' ').trim();
     const mapSearch = (platform) => !query ? null : platform === 'google_maps'
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
@@ -102,11 +102,13 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
         const items = clean.filter((x) => x.platform === platform).slice(0, 5);
         return h('div', { class: 'map-signal-group', 'data-platform': platform },
           h('h4', null, label),
-          items.length
-            ? h('ul', { class: 'plain-list' }, items.map((x) => h('li', null,
-              h('a', { href: x.url, target: '_blank', rel: 'noopener noreferrer' }, x.text),
-              h('span', { class: 'tiny muted' }, ' · ', x.title ? x.title + ' · ' : '', x.kind === 'map_page' ? 'AI 제시 지도 링크' : 'AI 제시 외부 링크'))))
-            : h('p', { class: 'small muted' }, '이번 결과에서 단서를 받지 못했어요. 지도에 정보가 없다는 뜻은 아니에요.'),
+          platform === 'kakao_map'
+            ? h('p', { class: 'small muted' }, '카카오맵의 후기와 상세정보는 지도에서 직접 확인해 주세요.')
+            : items.length
+              ? h('ul', { class: 'plain-list' }, items.map((x) => h('li', null,
+                h('a', { href: x.url, target: '_blank', rel: 'noopener noreferrer' }, x.text),
+                h('span', { class: 'tiny muted' }, ' · ', x.title ? x.title + ' · ' : '', 'AI 제시 외부 링크'))))
+              : h('p', { class: 'small muted' }, '이번 결과에서 단서를 받지 못했어요. 지도에 정보가 없다는 뜻은 아니에요.'),
           mapSearch(platform) ? h('a', { href: mapSearch(platform), target: '_blank', rel: 'noopener noreferrer', class: 'small' }, `${label}에서 직접 검색`) : null);
       }));
   }
