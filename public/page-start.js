@@ -235,12 +235,12 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
       h('h2', null, '가게를 확인했어요'),
       h('p', null, '선택하신 가게의 공개 정보와 특징을 모아 두었어요.'),
       h('p', { class: 'small muted' }, '가게가 맞는지 확인하신 단계예요. 영업시간·메뉴·특징의 정확성은 아직 별도로 확인이 필요해요.')),
-      candidateCard(chosen, state.confirmedIndex, true),
-      sourceCard(state.result),
       h('div', { class: 'card page-next-note' }, h('h3', null, '질문 5개로 소개 초안을 만들어요'),
         h('p', null, '대표 메뉴·서비스만 필수예요. 알고 계신 내용만 적어 주세요.'),
         h('p', { class: 'small muted' }, '비공개 미리보기만 제공해요. 결제·공개·QR 기능은 아직 없어요.'),
-        h('button', { type: 'button', class: 'btn primary block', onclick: () => { location.hash = '#/page-questions'; } }, '질문 답하기')));
+        h('button', { type: 'button', class: 'btn primary block', onclick: () => { location.hash = '#/page-questions'; } }, '질문 답하기')),
+      candidateCard(chosen, state.confirmedIndex, true),
+      sourceCard(state.result));
     setNavbar(btn('다른 가게 확인', () => { location.hash = '#/page-search'; }), btn('처음으로', home, true));
   }
 
