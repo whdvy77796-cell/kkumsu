@@ -8,6 +8,7 @@ import { PROMO } from './promo.js';
 import { PAY } from './pay-config.js';
 import { redactReport, packageSize, FREE_SOLUTIONS } from './paywall.js';
 import { BUSINESS, businessReady } from './business.js';
+import { makePageStart } from './page-start.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -51,7 +52,7 @@ function setNavbar(...items) {
   document.body.classList.toggle('has-navbar', list.length > 0);
 }
 // 앞으로 가는 주요 버튼에는 화살표(→)를 붙인다 (모양만, 글자는 그대로)
-const GO_LABELS = ['다음', 'AI 보고서 만들기', '보고서 보기', '진행 상황 보기', '무료 진단 시작'];
+const GO_LABELS = ['다음', 'AI 보고서 만들기', '보고서 보기', '진행 상황 보기', '무료 진단 시작', '무료로 페이지 만들기'];
 const btn = (label, onclick, primary = false) => h('button', { class: primary ? (GO_LABELS.includes(label) ? 'btn primary go' : 'btn primary') : 'btn', type: 'button', onclick }, label);
 const fmt = (n) => Number(n).toLocaleString('ko-KR');
 
@@ -117,10 +118,12 @@ function route() {
   const linked = /^#\/r\/([A-Za-z0-9_-]{16,32})\.([A-Za-z0-9_-]{16,100})$/.exec(hash);
   const policy = { '#/terms': 'terms', '#/privacy': 'privacy', '#/refund': 'refund' }[hash];
   // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다 (home·find·survey·done·report·policy)
-  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
+  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/page-search': 'find', '#/page-confirmed': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
   if (linked) renderLinked(linked[1], linked[2]);
   else if (policy) renderPolicy(policy);
   else if (hash === '#/sample') renderSample();
+  else if (hash === '#/page-search') pageStartFlow.renderSearch();
+  else if (hash === '#/page-confirmed') pageStartFlow.renderConfirmed();
   else if (hash === '#/find') renderFind();
   else if (hash === '#/survey') renderSurvey();
   else if (hash === '#/done') renderDone();
@@ -152,6 +155,8 @@ function showError(e, retry) {
   setNavbar(btn('처음으로', () => { location.hash = '#/'; }), stop ? null : btn('다시 시도', retry, true));
 }
 
+const pageStartFlow = makePageStart({ h, show, setNavbar, btn, post, storeName });
+
 // ───────── 1. 첫 화면: 상호명·주소
 // 첫 화면의 '무료 진단 시작': 가게 입력 칸으로 이동해 바로 입력하게 한다
 let wantStart = false;
@@ -160,8 +165,8 @@ function focusStart() {
   if (!card) return;
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   setTimeout(() => {
-    const empty = [...card.querySelectorAll('input')].find((x) => !x.value.trim());
-    (empty || card.querySelector('input'))?.focus({ preventScroll: true });
+    const empty = [...card.querySelectorAll('input[type="text"]')].find((x) => !x.value.trim());
+    (empty || card.querySelector('input[type="text"]'))?.focus({ preventScroll: true });
   }, 420);
 }
 function goStart() {
@@ -201,75 +206,70 @@ function plansCard() {
 
 function renderHome() {
   storeName.textContent = '';
-  let nameIn;
-  let addrIn;
-  const hint = h('div', { class: 'hint', role: 'alert' },
-    S.rejected ? '상호명이나 주소를 조금 더 자세히 적어 주세요. 지점명이나 도로명 주소를 넣으면 더 정확해요.' : '');
+  const existing = pageStartFlow.info();
+  const hint = h('div', { class: 'hint', role: 'alert' }, '');
+  const nameIn = h('input', { type: 'text', name: 'name', value: existing.name, maxlength: 60, placeholder: '예: 골목분식', autocomplete: 'organization', enterkeyhint: 'next' });
+  const addrIn = h('input', { type: 'text', name: 'address', value: existing.address, maxlength: 120, placeholder: '예: 서울 마포구 망원로 12', autocomplete: 'street-address', enterkeyhint: 'go' });
+  const consent = h('input', { type: 'checkbox', id: 'pageSearchConsent' });
   const go = () => {
     const name = nameIn.value.trim().replace(/\s+/g, ' ');
     const address = addrIn.value.trim().replace(/\s+/g, ' ');
-    if (!name) { hint.textContent = '상호명을 입력해 주세요.'; focusStart(); return; }
+    if (!name) { hint.textContent = '상호명을 입력해 주세요.'; nameIn.focus(); return; }
     if (address.length < 4) { hint.textContent = '주소를 입력해 주세요. 동·도로명까지 적으면 더 정확해요.'; addrIn.focus(); return; }
-    const same = S.name === name && S.address === address;
-    if (same && S.search?.result && !S.rejected) { location.hash = '#/find'; return; }
-    S = { name, address, refresh: same && !!S.rejected };
-    save();
-    location.hash = '#/find';
+    if (!consent.checked) { hint.textContent = '가게 정보를 찾기 위한 외부 전송에 동의해 주세요.'; consent.focus(); return; }
+    if (pageStartFlow.busy()) { hint.textContent = '이미 가게 정보를 찾고 있어요. 잠시만 기다려 주세요.'; return; }
+    hint.textContent = '';
+    pageStartFlow.begin(name, address);
   };
-  nameIn = h('input', { type: 'text', name: 'name', value: S.name || '', maxlength: 60, placeholder: '예: 골목분식', autocomplete: 'organization', enterkeyhint: 'next' });
-  addrIn = h('input', { type: 'text', name: 'address', value: S.address || '', maxlength: 120, placeholder: '예: 서울 마포구 망원로 12', autocomplete: 'street-address', enterkeyhint: 'go' });
   nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addrIn.focus(); } });
   addrIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); go(); } });
-
-  const started = Number.isInteger(S.chosen) && S.answers && Object.keys(S.answers).length;
-  const resume = started
-    ? h('div', { class: 'card note resume' },
-        h('b', null, S.doneAt ? '지난 진단 답변이 있어요' : '진행 중인 진단이 있어요'),
-        h('p', { class: 'small', style: { margin: '4px 0 8px' } }, chosenStore()?.name || S.name),
-        h('a', { class: 'btn small', href: S.doneAt ? '#/done' : '#/survey' }, S.doneAt ? '답변 보기' : '이어서 답하기'),
-        S.doneAt && S.report?.data ? h('a', { class: 'btn small', href: '#/report', style: { marginLeft: '6px' } }, '보고서 보기') : null)
-    : null;
-  const off = PAY.mode === 'off';
+  const prior = Number.isInteger(S.chosen) && S.answers && Object.keys(S.answers).length;
+  const oldResume = prior ? h('div', { class: 'card note resume' },
+    h('b', null, '이전에 작성한 진단이 있어요'),
+    h('p', { class: 'small', style: { margin: '4px 0 8px' } }, chosenStore()?.name || S.name),
+    h('a', { class: 'btn small', href: S.doneAt ? '#/done' : '#/survey' }, S.doneAt ? '이전 결과 보기' : '이전 답변 이어보기'),
+    S.doneAt && S.report?.data ? h('a', { class: 'btn small', href: '#/report', style: { marginLeft: '6px' } }, '이전 보고서 보기') : null) : null;
+  const pageResume = ['result', 'confirmed'].includes(existing.status)
+    ? h('div', { class: 'card note resume' }, h('b', null, '확인하던 가게 정보가 있어요'),
+        h('p', { class: 'small', style: { margin: '4px 0 8px' } }, existing.name),
+        h('a', { class: 'btn small', href: existing.status === 'confirmed' ? '#/page-confirmed' : '#/page-search' }, '가게 정보 이어보기'))
+    : existing.status === 'pending' && !pageStartFlow.busy()
+      ? h('div', { class: 'card note small' }, '이전 요청의 완료 여부를 확인하지 못했어요. 자동으로 다시 보내지 않았어요.') : null;
 
   show(
     h('section', { class: 'hero' },
       h('h1', null, 'AI 시대,', h('br'), "우리 가게가 '추천' 되는 방법."),
       h('h2', { class: 'hero-sub' }, '가게 이름과 주소를 알려주세요.', h('br'), '몇 가지 질문에 답하면, 우리 가게의 특징을', h('br'), '고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.'),
       h('p', { class: 'hero-desc' }, '여기봐AI는 가게 정보와 사장님의 답변을 바탕으로 우리 가게만의 매력을 정리합니다. 소개글은 물론, 구조화 데이터와 검색 접근성을 고려한 기술적 설계까지 적용해 AI가 정보를 수집하고 참고하기 쉬운 페이지로 제작·배포합니다.', h('br'), '완성된 페이지는 QR코드와 SNS용 소개글로도 활용할 수 있습니다.'),
-      h('div', { class: 'hero-actions' },
-        h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료 진단 시작'),
-        h('a', { class: 'btn', href: '#/sample' }, '샘플 보고서 보기')),
-      h('p', { class: 'hero-note' }, off ? '회원가입 없이 무료로 진단해요' : `회원가입 없이 무료로 진단해요 · 실행 패키지 ${won(PAY.amount)}는 진단을 본 뒤 원할 때만`)),
-    resume,
-    plansCard(),
+      h('div', { class: 'hero-actions' }, h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료로 페이지 만들기')),
+      h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
+      h('p', { class: 'small muted page-stage-note' }, '현재는 가게 정보 확인까지 이용할 수 있어요. 질문과 소개 페이지 제작·결제·배포는 준비 중이에요.')),
+    pageResume, oldResume,
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
-      h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료 진단 시작')),
+      h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
       h('h2', null, '가게 이름과 주소를 알려주세요'),
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '상호명'), nameIn),
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '주소'), addrIn),
-      h('p', { class: 'small muted' }, '다음을 누르면 AI(Claude)가 상호명과 주소로 인터넷에 공개된 가게 정보를 찾아요. 30초~1분쯤 걸려요.'),
-      hint),
+      h('p', { class: 'small muted' }, '동의 후 AI가 인터넷에 공개된 가게 정보와 특징을 찾아요. 보통 30초~1분 정도 걸려요.'),
+      h('label', { class: 'page-consent' }, consent,
+        h('span', null, '상호명과 주소를 OpenRouter, 연결된 AI와 웹 검색 제공자에게 전송하는 데 동의합니다.')),
+      h('p', { class: 'tiny muted page-consent-note' }, '조회 결과는 서버에 최대 3일, 이 브라우저 탭의 임시 저장소에 보관될 수 있어요. 사진이나 인터뷰 답변은 보내지 않아요.'),
+      hint,
+      h('button', { class: 'btn primary block go page-next-button', type: 'submit' }, '다음')),
     h('div', { class: 'card steps-card' },
       h('h2', null, '이렇게 진행돼요'),
       h('ol', { class: 'steps-list' },
-        h('li', null, h('b', null, '상호명·주소 입력 '), h('span', { class: 'muted small' }, '지금 이 화면')),
-        h('li', null, h('b', null, 'AI가 가게 정보 찾기 '), h('span', { class: 'muted small' }, '지도·리뷰·SNS 등 인터넷 공개 정보 (30초~1분)')),
-        h('li', null, h('b', null, '우리 가게가 맞는지 확인 '), h('span', { class: 'muted small' }, '아니면 다시 입력')),
-        h('li', null, h('b', null, '가게 인터뷰 '), h('span', { class: 'muted small' }, '가장 큰 고민과 운영 방식에 맞춰 질문이 달라져요. AI가 찾은 정보는 미리 채워 두고, 모르는 건 "잘 모름"을 누르면 돼요.')),
-        h('li', null, h('b', null, 'AI 진단 보고서 '), h('span', { class: 'muted small' }, off
-          ? '원할 때만, 동의 후에 만들어요. AI가 카카오맵·네이버·구글·블로그를 직접 찾아보고 답변과 합쳐 진단·개선안·실행 계획을 만들어요 (2~4분)'
-          : '원할 때만, 동의 후에 만들어요 (2~4분). 핵심 진단은 무료로 보고, 실행 방법·계획·PDF는 맞춤 실행 패키지로 열 수 있어요.')))),
+        h('li', null, h('b', null, '가게 정보 입력 '), h('span', { class: 'muted small' }, '상호명과 주소를 알려주세요.')),
+        h('li', null, h('b', null, '가게 정보 확인 '), h('span', { class: 'muted small' }, 'AI가 찾은 공개 정보와 특징을 확인해요.')),
+        h('li', null, h('b', null, '맞춤 질문 3~5개 '), h('span', { class: 'muted small' }, '준비 중')),
+        h('li', null, h('b', null, '완성본 확인·수정 '), h('span', { class: 'muted small' }, '준비 중')),
+        h('li', null, h('b', null, '결제 후 배포·QR·소개글 활용 '), h('span', { class: 'muted small' }, '준비 중')))),
     h('div', { class: 'card note small privacy-card' },
       h('b', null, '입력한 정보는 이렇게 쓰여요'),
-      h('ul', { class: 'note-list' },
-        h('li', null, '상호명과 주소는 가게 정보를 찾기 위해 OpenRouter를 거쳐 AI(Anthropic Claude)에 전달돼요. 찾은 공개 정보와 인터넷 조사 결과는 서버에 3일 동안 임시 보관돼요.'),
-        h('li', null, '인터뷰 답변은 이 브라우저에 저장돼요. AI 진단 보고서를 만들 때만, 사장님이 동의하면 OpenRouter를 거쳐 AI(Anthropic Claude)에 전달돼요.'),
-        h('li', null, '만든 보고서는 서버에 7일 동안 보관했다가 자동으로 지워요. 맞춤 실행 패키지를 결제하면 다시 보기 링크를 위해 결제일부터 90일 보관해요. 보고서 화면에서 직접 지울 수도 있어요.'),
-        h('li', null, '결제는 토스페이먼츠 결제창에서 해요. 카드 번호 같은 결제 정보는 저장하지 않고, 주문번호·결제 금액·일시·수단만 전자상거래법에 따라 5년 보관해요.')),
+      h('p', null, '동의하신 상호명과 주소로 공개 정보를 찾고, 결과를 현재 탭에서 확인해요. AI가 정리한 내용은 실제와 다를 수 있어 사장님이 직접 확인해 주세요.'),
       h('p', { style: { margin: '8px 0 0' } }, h('a', { href: '#/privacy' }, '개인정보처리방침 자세히 보기'))),
   );
-  const navGo = btn('무료 진단 시작', () => (nameIn.value.trim() && addrIn.value.trim().length >= 4 ? go() : focusStart()), true);
-  setNavbar(navGo);
+  setNavbar(btn('무료로 페이지 만들기', focusStart, true));
   if (wantStart) { wantStart = false; setTimeout(focusStart, 60); }
 }
 
@@ -1906,12 +1906,11 @@ function renderFooter() {
     h('nav', { class: 'foot-links', 'aria-label': '약관과 정책' },
       h('a', { href: '#/terms' }, '이용약관'),
       h('a', { href: '#/privacy' }, h('b', null, '개인정보처리방침')),
-      h('a', { href: '#/refund' }, '환불 정책'),
-      h('a', { href: '#/sample' }, '샘플 보고서')),
+      h('a', { href: '#/refund' }, '환불 정책')),
     businessReady()
       ? h('p', { class: 'foot-biz' }, [`상호 ${B.name}`, `대표 ${B.owner}`, `사업자등록번호 ${B.bizNo}`, B.mailOrderNo ? `통신판매업 신고 ${B.mailOrderNo}` : null, `주소 ${B.address}`, `고객센터 ${B.phone}`, `이메일 ${B.email}`, `호스팅 ${B.hosting}`].filter(Boolean).join(' · '))
       : null,
-    h('p', { class: 'foot-copy' }, '© 매출올려드림 AI · AI 진단은 참고 자료이며 결과를 보장하지 않아요.'),
+    h('p', { class: 'foot-copy' }, '© 여기봐 AI · 검색 결과는 참고 자료이며 AI 추천을 보장하지 않아요.'),
   ]);
 }
 
