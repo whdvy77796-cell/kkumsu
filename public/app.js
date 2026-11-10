@@ -233,8 +233,8 @@ function renderHome() {
 
   show(
     h('section', { class: 'hero' },
-      h('h1', null, 'AI 시대,', h('br'), '우리 가게가 발견되는 방법.'),
-      h('h2', { class: 'hero-sub' }, '가게 이름과 주소를 알려주세요.', h('br'), '몇 가지 질문에 답하면, 우리 가게의 매력을', h('br'), '고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.'),
+      h('h1', null, 'AI 시대,', h('br'), "우리 가게가 '추천' 되는 방법."),
+      h('h2', { class: 'hero-sub' }, '가게 이름과 주소를 알려주세요.', h('br'), '몇 가지 질문에 답하면, 우리 가게의 특징을', h('br'), '고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.'),
       h('p', { class: 'hero-desc' }, '여기봐AI는 가게 정보와 사장님의 답변을 바탕으로 우리 가게만의 매력을 정리합니다. 소개글은 물론, 구조화 데이터와 검색 접근성을 고려한 기술적 설계까지 적용해 AI가 정보를 수집하고 참고하기 쉬운 페이지로 제작·배포합니다.', h('br'), '완성된 페이지는 QR코드와 SNS용 소개글로도 활용할 수 있습니다.'),
       h('div', { class: 'hero-actions' },
         h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료 진단 시작'),
