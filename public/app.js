@@ -233,7 +233,7 @@ function renderHome() {
 
   show(
     h('section', { class: 'hero' },
-      h('h1', null, '우리 가게, 매출이 달라질 방법을 찾다!'),
+      h('h1', null, 'AI 시대,', h('br'), '우리 가게가 발견되는 방법.'),
       h('h2', { class: 'hero-sub' }, '우리 가게의 문제를 진단하고, 바로 실행할 자료까지 받아보세요'),
       h('p', { class: 'hero-desc' }, '상호명과 주소를 넣고 가게 질문에 답하면, AI가 인터넷 평판과 사장님 숫자를 함께 살펴 무엇부터 고칠지 진단해요. 실행 방법과 계획은 맞춤 실행 패키지로 받아보세요.'),
       h('div', { class: 'hero-actions' },
