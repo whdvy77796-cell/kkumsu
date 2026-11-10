@@ -123,6 +123,12 @@ test('map signals render grouped, safe links only, with caveats and empty states
   ctx.state.rendered.forEach(walk);
   assert.ok(links.includes('https://www.google.com/maps/place/x'));
   assert.ok(!links.some((l) => /javascript|127\.0\.0\.1/.test(l)));
+  const googleSearch = links.find((l) => l.startsWith('https://www.google.com/maps/search/?api=1&query='));
+  const kakaoSearch = links.find((l) => l.startsWith('https://map.kakao.com/link/search/'));
+  assert.ok(googleSearch && kakaoSearch);
+  assert.match(decodeURIComponent(googleSearch), /테스트가게 서울 마포구 망원로 12/);
+  assert.match(decodeURIComponent(kakaoSearch), /테스트가게 서울 마포구 망원로 12/);
+  assert.match(t, /직접 검색 링크를 누르면/);
   assert.doesNotMatch(t, /위험 단서/);
   const kakao = findRendered(ctx.state, (n) => n.attrs?.['data-platform'] === 'kakao_map');
   assert.match(text(kakao), /이번 결과에서 단서를 받지 못했어요\. 지도에 정보가 없다는 뜻은 아니에요\./);
