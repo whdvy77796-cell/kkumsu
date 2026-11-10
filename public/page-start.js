@@ -34,7 +34,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
       h('div', { class: 'spinner', 'aria-hidden': 'true' }),
       h('h2', null, '가게 정보를 찾고 있어요'),
       h('p', null, h('b', null, state.name), h('br'), h('span', { class: 'muted' }, state.address)),
-      h('p', { class: 'small muted' }, '동의하신 상호명과 주소로 공개된 가게 정보와 특징을 살펴보고 있어요. 보통 30초~1분 정도 걸려요.'),
+      h('p', { class: 'small muted' }, state.retry?.status === 'pending' ? '동의하신 가게 정보와 참고 사이트 주소로 공개 정보를 다시 찾아보고 있어요. 보통 30초~1분 정도 걸려요.' : '동의하신 상호명과 주소로 공개된 가게 정보와 특징을 살펴보고 있어요. 보통 30초~1분 정도 걸려요.'),
       h('p', { class: 'tiny muted' }, '요청을 중복해서 보내지 않아요.')));
     setNavbar(btn('처음으로', home));
   }
@@ -160,6 +160,64 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
       h('br'),
       h('a', { href: `https://map.kakao.com/link/search/${q}`, target: '_blank', rel: 'noopener noreferrer', class: 'small' }, '카카오맵에서 직접 검색'));
   }
+  function referenceUrl(value) {
+    if (typeof value !== 'string' || value.length > 300 || /[\u0000-\u001f\u007f]/.test(value)) return null;
+    const raw = value.trim();
+    if (!raw) return '';
+    const link = safeLink(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : 'https://' + raw);
+    if (!link || link.length > 300 || /\s/.test(raw)) return null;
+    const u = new URL(link);
+    return u.search || u.hash || u.port ? null : u.href;
+  }
+  function openRetry(index) {
+    if (busy || draftBusy) return;
+    const prior = state.retry && state.retry.index === index ? state.retry : {};
+    state.retry = { index, siteUrl: typeof prior.siteUrl === 'string' ? prior.siteUrl : '', status: prior.status === 'uncertain' ? 'uncertain' : 'editing', message: prior.status === 'uncertain' ? prior.message : '' };
+    save(); showResults();
+  }
+  function retryForm(index) {
+    const r = state.retry;
+    if (!r || r.index !== index) return null;
+    let consent = false;
+    const error = h('p', { class: 'page-error', role: 'alert', 'aria-live': 'polite' });
+    return h('form', { class: 'page-retry-form', novalidate: true, onsubmit: e => { e.preventDefault(); return searchAgain(consent, error); } },
+      h('h4', null, '가게를 다시 찾아볼게요'),
+      h('p', { class: 'small muted' }, '운영 중인 공개 사이트가 있으면 참고 주소를 적어 주세요. 없어도 다시 찾을 수 있어요. 사이트가 검색되지 않으면 참고하지 못할 수 있고, 같은 후보가 다시 나올 수도 있어요.'),
+      field('page-retry-url-' + (index + 1), '운영 중인 사이트 주소 (선택)', r.siteUrl, 300, value => { r.siteUrl = value; save(); }, { help: '예: https://example.com. 로그인 주소, 개인정보와 ? 뒤의 정보는 넣지 마세요.' }),
+      h('p', { class: 'tiny muted' }, '상호명·주소, 아니라고 표시한 후보의 이름과 주소, 입력한 사이트 주소를 OpenRouter와 연결된 AI·웹 검색 제공자에게 전달해요. 사이트는 직접 확인된 공식 주소가 아닐 수 있어요.'),
+      h('p', { class: 'tiny muted' }, '입력 주소는 이 탭에 임시 저장되고, 조회 결과는 서버에 최대 3일 보관될 수 있어요. 외부 제공자의 보관 정책은 별도로 적용돼요. 다시 찾기에는 AI 이용 비용이 들 수 있어요.'),
+      r.message ? h('p', { class: 'small page-retry-status', role: 'status' }, r.message) : null,
+      h('label', { class: 'page-consent', for: 'page-retry-consent-' + (index + 1) },
+        h('input', { id: 'page-retry-consent-' + (index + 1), type: 'checkbox', onchange: e => { consent = !!e.target.checked; } }),
+        '위 정보의 전송과 보관 안내를 확인했고 AI가 다시 찾는 데 동의합니다.'),
+      error,
+      h('button', { class: 'btn primary block', type: 'submit' }, '동의하고 다시 찾기'));
+  }
+  async function searchAgain(consent, error) {
+    if (busy || draftBusy || !state.retry || !state.result) return;
+    const r = state.retry;
+    const siteUrl = referenceUrl(r.siteUrl || '');
+    if (siteUrl === null) { error.textContent = '공개된 사이트 주소만 입력해 주세요. 로그인 정보나 ? 뒤의 값은 빼 주세요.'; return; }
+    if (!consent) { error.textContent = 'AI가 다시 찾기 전에 정보 전송에 별도로 동의해 주세요.'; return; }
+    if (hasDraftWork() && !askBeforeDiscard('다시 찾은 결과로 바뀌면 이 탭에 작성하던 소개와 수정 내용이 지워져요. 계속할까요?')) return;
+    const previous = Array.isArray(state.result.candidates) && r.index >= 0 ? state.result.candidates[r.index] : null;
+    const payload = { name: state.name, address: state.address, consent: true, retry: true, siteUrl,
+      rejected: { name: typeof previous?.name === 'string' ? previous.name.slice(0, 80) : '', address: typeof previous?.address === 'string' ? previous.address.slice(0, 160) : '' },
+      previousSearchAt: typeof state.result.searchedAt === 'string' ? state.result.searchedAt : '' };
+    busy = true; r.status = 'pending'; r.message = ''; state.status = 'pending'; save(); showLoading();
+    try {
+      const result = await post('/api/page-search', payload, 190000);
+      if (!result || typeof result !== 'object' || !Array.isArray(result.candidates) || !['confirmed', 'citation_only', 'mock'].includes(result.webEvidence?.status)) throw new Error('AI의 재검색 결과를 확인하지 못했어요. 이전 결과는 보존했어요.');
+      const name = state.name, address = state.address;
+      state = { name, address, status: 'result', result };
+      save();
+      if (location.hash === '#/page-search') showResults();
+    } catch (err) {
+      state.status = 'result'; r.status = ['TIMEOUT', 'NETWORK', 'AI_TIMEOUT'].includes(err?.code) ? 'uncertain' : 'error';
+      r.message = r.status === 'uncertain' ? '응답을 확인하지 못했어요. 요청이 이미 처리됐을 수 있고 자동 재시도하지 않았어요. 다시 요청하면 비용이 들 수 있어요.' : (err?.message || '다시 찾지 못했어요.') + ' 자동 재시도하지 않았어요.';
+      save(); if (location.hash === '#/page-search') showResults();
+    } finally { busy = false; }
+  }
   function candidateCard(c, index, confirmed = false) {
     const rows = [
       ['주소', c?.address], ['업종', c?.category], ['영업시간', c?.hours], ['전화', c?.phone],
@@ -181,7 +239,9 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
       showLegacy && strengths.length ? [h('div', { class: 'sub-title' }, isNew ? '살펴볼 강점 (개별 출처가 연결되지 않은 AI 요약)' : '공개 정보에서 살펴볼 강점'), isNew ? h('p', { class: 'small muted' }, '개별 출처가 연결되지 않은 AI 요약이에요. 사실 여부를 직접 확인해 주세요.') : null, h('ul', { class: 'plain-list' }, strengths.map((s) => h('li', null, s)))] : null,
       showLegacy && !features.length && !strengths.length ? h('p', { class: 'small muted' }, '가게의 특징은 공개 정보에서 충분히 확인하지 못했어요.') : null,
       isNew ? directCheckSection() : mapSignalSection(c),
-      !confirmed ? h('button', { class: 'btn primary block page-choose', type: 'button', onclick: () => choose(index) }, '이 가게가 맞아요') : null);
+      !confirmed ? h('button', { class: 'btn primary block page-choose', type: 'button', onclick: () => choose(index) }, '이 가게가 맞아요') : null,
+      !confirmed ? h('button', { class: 'btn block page-reject', type: 'button', onclick: () => openRetry(index) }, '아니에요') : null,
+      !confirmed ? retryForm(index) : null);
   }
   function choose(index) {
     const candidates = Array.isArray(state.result?.candidates) ? state.result.candidates : [];
@@ -210,7 +270,8 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
       show(h('div', { class: 'card' }, h('h2', null, '일치하는 가게를 확인하지 못했어요'),
         h('p', null, '이번 조회에서 가게를 확인하지 못했어요. 실제로 정보가 없다는 뜻은 아니에요.'),
         h('p', { class: 'small muted' }, `${cached} · ${dateLabel(result.searchedAt)}`),
-        h('p', { class: 'small muted' }, evidenceNote)), sourceCard(result));
+        h('p', { class: 'small muted' }, evidenceNote),
+        h('button', { class: 'btn block page-reject', type: 'button', onclick: () => openRetry(-1) }, '다시 찾아보기'), retryForm(-1)), sourceCard(result));
       setNavbar(btn('다시 입력', home, true));
       return;
     }
@@ -222,6 +283,11 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
   }
   function renderSearch() {
     if (busy) { showLoading(); return; }
+    if (state.result && state.status === 'pending' && state.retry?.status === 'pending') {
+      state.status = 'result'; state.retry.status = 'uncertain';
+      state.retry.message = '이전 재검색의 응답을 확인하지 못했어요. 요청이 이미 처리됐을 수 있고 자동으로 다시 보내지 않았어요. 다시 요청하면 비용이 들 수 있어요.';
+      save(); showResults(); return;
+    }
     if (state.status === 'result' && state.result) { showResults(); return; }
     if (state.result && state.status !== 'pending') { showResults(); return; }
     if (state.status === 'pending' || state.status === 'uncertain') { showInterrupted('이전 요청의 결과를 확인하지 못했어요. 요청은 이미 처리됐을 수 있으며 자동으로 다시 보내지 않았어요. 같은 가게를 다시 검색하면 비용이 중복될 수 있어요.'); return; }
