@@ -66,6 +66,13 @@ test('strict origin, forwarded-host spoof protection and host namespace isolatio
  assert.equal((await invoke(preview,create(),previewOptions)).statusCode,201);
  assert.equal((await invoke(h,undefined,get())).statusCode,404);
  assert.notEqual(requestScope(request(),{...ENV,VERCEL_ENV:'preview'}).namespace,scope.namespace);
+ for (const host of ['www.kkumsu.com','www.kkumsu.net','kkumsu-rho.vercel.app']) {
+   const aliasScope=requestScope(request(undefined,{headers:{host}}),ENV);
+   assert.equal(aliasScope.namespace,scope.namespace,'all promoted aliases share durable production pages');
+   assert.equal(aliasScope.ttl,0,'a production-alias page must not expire as a preview');
+ }
+ const deployScope=requestScope(request(undefined,{headers:{host:'kkumsu-8u3oifqwm-kkkkkum.vercel.app'}}),ENV);
+ assert.notEqual(deployScope.namespace,scope.namespace);assert.equal(deployScope.ttl,7200);
  assert.equal((await invoke(preview,undefined,{method:'GET',url:'/api/stores?view=page&id='+ID,...previewOptions})).headers['x-robots-tag'],'noindex, nofollow');
  assert.equal((await invoke(h,create())).statusCode,201,'prod does not collide with same preview id');
 });
