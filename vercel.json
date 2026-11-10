@@ -6,6 +6,9 @@
     "icn1"
   ],
   "functions": {
+    "api/page-search.js": {
+      "maxDuration": 180
+    },
     "api/store-search.js": {
       "maxDuration": 180
     },
