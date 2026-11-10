@@ -7,9 +7,67 @@ import { validateSearchInput, normalizeStoreResult, safeUrl, clean } from '../li
 import { mockEnabled, mockSearch } from '../lib/mock.mjs';
 import { searchTool } from './store-search.js';
 
-export const CACHE_NAMESPACE = 'page-search-v1';
+export const CACHE_NAMESPACE = 'page-search-v2';
 const ALLOWED = new Set(['name', 'address', 'consent']);
 const NOTE = '검색 도구가 돌려준 인용(provider_annotation)과 모델이 직접 적은 링크(model_generated)는 구분해서 보여줘요. 어느 쪽도 개별 항목이 사실을 입증한다는 뜻은 아니에요.';
+
+// 기존 진단 프롬프트는 건드리지 않고 소개 페이지 검색에만 지도 관련 공개 검색을 더한다.
+// 검색 횟수, 토큰 한도, 기존 예산·호출 제한은 변경하지 않는다.
+export const PAGE_SEARCH_SYSTEM = `${SEARCH_SYSTEM}
+추가 조사 지침:
+- 허용된 최대 3회 검색 안에서 상호와 주소를 함께 넣어 1회는 가게 기본정보·공식 안내, 1회는 Google Maps/구글 지도와 가게 특징, 1회는 카카오맵과 가게 특징을 살펴보세요. 자료가 부족하면 확인하지 못한 채로 둡니다.
+- 이 요청은 지도 공식 API 응답이 아닙니다. 접근하거나 검색 결과에서 실제로 확인할 수 없는 지도 내용·후기·평점·리뷰 수를 읽었다고 가장하지 마세요. 한 플랫폼의 내용을 다른 플랫폼에서 봤다고 쓰지 마세요.
+- 각 후보에 mapSignals 배열을 추가하세요. Google 지도나 카카오맵 자체의 공개 검색 단서 또는 그 지도를 명시적으로 언급한 외부 공개 자료에서, 상호와 주소가 이 지점에 맞는다는 근거까지 살핀 뒤 확인 가능한 가게 특징만 짧게 요약합니다. 개인 후기 원문이나 개인정보는 복사하지 마세요.
+- 지도별 단서마다 platform은 google_maps 또는 kakao_map, text는 특징, sourceTitle은 실제 검색 결과 제목, sourceUrl은 해당 내용을 뒷받침하는 실제 검색 결과의 전체 URL을 적습니다. 하나라도 확인하지 못하면 그 항목을 넣지 말고 각 지도당 최대 3개만 적습니다. URL을 추측하거나 만들어내지 마세요.
+- 외부 글에서 지도 정보를 간접적으로 언급한 경우에는 그 외부 글의 URL을 적고, 그 글에서 직접 확인한 범위만 씁니다. 광고·블로그 자체 평가를 지도 후기나 평점으로 바꾸지 마세요.
+- 각 지도에서 확인 가능한 단서가 없거나 해당 지점이 불명확하면 mapSignals를 빈 배열로 둡니다. 이는 실제 정보가 없다는 뜻이 아닙니다.`;
+
+export function pageSearchUser(input) {
+  return `${searchUser(input)}\n\n각 candidates 항목에는 다음 mapSignals도 포함하세요. 실제 공개 검색 결과와 해당 지점이 확인된 경우만 적으며, 확인하지 못하면 []입니다.\n"mapSignals": [{ "platform": "google_maps 또는 kakao_map", "text": "검색 결과에서 확인한 가게 특징", "sourceTitle": "실제로 표시된 출처 제목", "sourceUrl": "실제 검색 결과 URL" }]`;
+}
+
+// 링크는 브라우저에서만 열고 서버는 가져오지 않는다. AI가 제시한 출처라는 점은 화면에 남긴다.
+function publicSourceUrl(value) {
+  const raw = safeUrl(value);
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase().replace(/\.$/, '');
+    if (u.username || u.password || !host.includes('.') || /(^|\.)(localhost|local|internal|home\.arpa)$/i.test(host) || /^[\d.]+$/.test(host) || host.includes(':')) return null;
+    return u.href;
+  } catch { return null; }
+}
+
+function mapUrlPlatform(value) {
+  const u = new URL(value);
+  const host = u.hostname.toLowerCase().replace(/\.$/, '');
+  if (/^(?:www\.)?google\.(?:com|co\.kr)$/.test(host) && /^\/maps(?:\/|$)/.test(u.pathname)) return 'google_maps';
+  if (/^maps\.google\.(?:com|co\.kr)$/.test(host)) return 'google_maps';
+  if (host === 'place.map.kakao.com' || host === 'map.kakao.com' || host === 'map.daum.net') return 'kakao_map';
+  return null;
+}
+
+export function normalizeMapSignals(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  const counts = { google_maps: 0, kakao_map: 0 };
+  for (const item of raw) {
+    const platform = item?.platform;
+    if (!(platform === 'google_maps' || platform === 'kakao_map') || counts[platform] >= 3) continue;
+    const text = clean(item?.text, 160);
+    const sourceUrl = publicSourceUrl(item?.sourceUrl);
+    if (!text || !sourceUrl) continue;
+    const detected = mapUrlPlatform(sourceUrl);
+    if (detected && detected !== platform) continue;
+    const dedup = `${platform}\n${text.toLowerCase()}`;
+    if (seen.has(dedup)) continue;
+    seen.add(dedup);
+    counts[platform]++;
+    out.push({ platform, text, sourceTitle: clean(item?.sourceTitle, 100) || new URL(sourceUrl).hostname, sourceUrl, sourceKind: detected === platform ? 'map_page' : 'third_party' });
+  }
+  return out;
+}
 
 export function validatePageInput(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'BAD_JSON', '요청 형식이 올바르지 않아요.');
@@ -61,8 +119,8 @@ export async function pageSearch({ env, fetcher, input, meter }) {
   try {
     r = await chat({
       env, fetcher, model,
-      system: SEARCH_SYSTEM,
-      user: searchUser(input),
+      system: PAGE_SEARCH_SYSTEM,
+      user: pageSearchUser(input),
       tools: [searchTool(env)],
       maxToolCalls: 4,
       maxTokens: 5000,
@@ -84,8 +142,10 @@ export async function pageSearch({ env, fetcher, input, meter }) {
   if (webEvidence.status === 'unverified') {
     throw new HttpError(502, 'SEARCH_UNVERIFIED', 'AI의 웹 검색 실행 여부를 확인하지 못했어요. 자동으로 다시 보내지 않았어요.');
   }
+  const rawCandidates = parsed.candidates.filter((c) => c && typeof c === 'object' && clean(c.name, 80)).slice(0, 3);
+  const candidates = norm.candidates.map((c, i) => ({ ...c, mapSignals: normalizeMapSignals(rawCandidates[i]?.mapSignals) }));
   return {
-    candidates: norm.candidates,
+    candidates,
     summary: norm.summary,
     notFoundReason: norm.notFoundReason,
     absenceConfirmed: false, // 후보 없음은 "없다"는 확인이 아니다
@@ -101,7 +161,7 @@ export async function pageSearch({ env, fetcher, input, meter }) {
 export async function mockPageSearch(input, delay) {
   const m = await mockSearch(input, delay);
   return {
-    candidates: m.candidates,
+    candidates: (m.candidates || []).map((c) => ({ ...c, mapSignals: [] })),
     summary: m.summary,
     notFoundReason: m.notFoundReason,
     absenceConfirmed: false,
