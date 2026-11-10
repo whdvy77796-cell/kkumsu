@@ -104,7 +104,8 @@ test('reloading during a pending request never retries automatically', () => {
 
 test('map signals render grouped, safe links only, with caveats and empty states', async () => {
   const signals = [
-    { platform: 'google_maps', text: '구글 단서', sourceTitle: '구글 페이지', sourceUrl: 'https://www.google.com/maps/place/x', sourceKind: 'map_page' },
+    { platform: 'google_maps', text: '구글 단서', sourceTitle: '외부 공개 글', sourceUrl: 'https://blog.example.org/google', sourceKind: 'third_party' },
+    { platform: 'google_maps', text: '지도 원문', sourceTitle: '구글 지도', sourceUrl: 'https://www.google.com/maps/place/x', sourceKind: 'map_page' },
     { platform: 'google_maps', text: '위험 단서', sourceTitle: '나쁨', sourceUrl: 'javascript:alert(1)', sourceKind: 'third_party' },
     { platform: 'google_maps', text: '<img src=x onerror=alert(1)>', sourceTitle: '', sourceUrl: 'http://127.0.0.1/a', sourceKind: 'third_party' },
     { platform: 'unknown', text: '알 수 없는 플랫폼', sourceUrl: 'https://example.com', sourceKind: 'third_party' },
@@ -116,12 +117,14 @@ test('map signals render grouped, safe links only, with caveats and empty states
   assert.match(t, /지도별 공개 검색 단서/);
   assert.match(t, /공식 API의 직접 응답이나 검증된 사실이 아니에요/);
   assert.match(t, /직접 확인해 주세요/);
-  assert.match(t, /AI 제시 지도 링크/);
+  assert.match(t, /AI 제시 외부 링크/);
+  assert.doesNotMatch(t, /지도 원문/);
   assert.doesNotMatch(t, /알 수 없는 플랫폼/);
   const links = [];
   const walk = (n) => { if (!n || typeof n !== 'object') return; if (n.tag === 'a') links.push(n.attrs.href); (n.children || []).forEach(walk); };
   ctx.state.rendered.forEach(walk);
-  assert.ok(links.includes('https://www.google.com/maps/place/x'));
+  assert.ok(links.includes('https://blog.example.org/google'));
+  assert.ok(!links.includes('https://www.google.com/maps/place/x'));
   assert.ok(!links.some((l) => /javascript|127\.0\.0\.1/.test(l)));
   const googleSearch = links.find((l) => l.startsWith('https://www.google.com/maps/search/?api=1&query='));
   const kakaoSearch = links.find((l) => l.startsWith('https://map.kakao.com/link/search/'));
@@ -131,18 +134,18 @@ test('map signals render grouped, safe links only, with caveats and empty states
   assert.match(t, /직접 검색 링크를 누르면/);
   assert.doesNotMatch(t, /위험 단서/);
   const kakao = findRendered(ctx.state, (n) => n.attrs?.['data-platform'] === 'kakao_map');
-  assert.match(text(kakao), /이번 결과에서 단서를 받지 못했어요\. 지도에 정보가 없다는 뜻은 아니에요\./);
+  assert.match(text(kakao), /카카오맵의 후기와 상세정보는 지도에서 직접 확인해 주세요/);
   const choose = findRendered(ctx.state, (n) => n.tag === 'button' && text(n).includes('이 가게가 맞아요'));
   assert.ok(choose);
 });
 
 test('third-party label, empty array and legacy candidates without mapSignals', async () => {
-  const third = { ...candidate, mapSignals: [{ platform: 'kakao_map', text: '카카오 단서', sourceTitle: '블로그', sourceUrl: 'https://blog.example.com/p', sourceKind: 'third_party' }] };
+  const third = { ...candidate, mapSignals: [{ platform: 'google_maps', text: '구글 관련 외부 단서', sourceTitle: '블로그', sourceUrl: 'https://blog.example.com/p', sourceKind: 'third_party' }] };
   let ctx = createContext(async () => ({ ...response(), candidates: [third, { ...candidate, mapSignals: [] }, { ...candidate, mapSignals: 'bad' }, candidate] }));
   await ctx.flow.begin('테스트가게', '서울 마포구 망원로 12');
   assert.match(allText(ctx.state), /AI 제시 외부 링크/);
   const empties = allText(ctx.state).match(/이번 결과에서 단서를 받지 못했어요/g) || [];
-  assert.equal(empties.length, 3);
+  assert.equal(empties.length, 1);
   const before = JSON.stringify(ctx.state.rendered.length);
   assert.ok(before);
   assert.equal('mapSignals' in candidate, false);

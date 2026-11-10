@@ -113,7 +113,7 @@ test('success: confirmed evidence, separated sources, one call, cache hit keeps 
   assert.equal(j2.cached, true);
   assert.equal(j2.searchedAt, j.searchedAt);
   const store2 = new MemoryStore();
-  const oldKey = hashKey('page-search-v2', OK.name, OK.address);
+  const oldKey = hashKey('page-search-v3', OK.name, OK.address);
   await store2.setJson(oldKey, { candidates: [{ name: 'old' }] });
   assert.equal((await call(OK, { store: store2, fetcher: fakeFetch(aiReply(JSON_OUT)) })).json().cached, false);
   assert.equal((await store2.getJson(oldKey)).candidates[0].name, 'old');
@@ -219,27 +219,25 @@ test('map signals only keep bounded, attributed public links and classify actual
   const g = (text, sourceUrl, extra = {}) => ({ platform: 'google_maps', text, sourceUrl, ...extra });
   const k = (text, sourceUrl, extra = {}) => ({ platform: 'kakao_map', text, sourceUrl, ...extra });
   const signals = normalizeMapSignals([
-    g('가'.repeat(121), 'https://www.google.com/maps/place/cafe'),
-    k('연결된 블로그의 별도 설명입니다', 'https://place.map.kakao.com/123'),
-    g('좌석', 'https://www.google.com/maps/place/cafe', { sourceTitle: '지도', sourceKind: 'third_party' }),
-    g('좌석', 'https://www.google.com/maps/place/other'),
-    g('주차', 'https://public.example.org/post', { sourceKind: 'map_page' }),
-    g('음식', 'https://maps.google.com/?cid=123'),
+    g('가'.repeat(121), 'https://public.example.org/long'),
+    g('지도 원문', 'https://www.google.com/maps/place/cafe'),
+    g('내부', 'http://127.0.0.1/secret'),
+    g('계정정보', 'https://u:p@example.org/path'),
+    g('스크립트', 'javascript:alert(1)'),
+    k('카카오 상세', 'https://place.map.kakao.com/123'),
+    k('카카오 외부 주장', 'https://blog.example.org/story'),
+    g('좌석', 'https://public.example.org/seat', { sourceTitle: '공개 글', sourceKind: 'map_page' }),
+    g('좌석', 'https://public.example.org/duplicate'),
+    g('주차', 'https://public.example.org/parking'),
+    g('음식', 'https://public.example.org/menu'),
     g('초과', 'https://public.example.org/extra'),
-    k('매장', 'https://place.map.kakao.com/123'),
-    k('분위기', 'https://blog.example.org/story'),
-    k('플랫폼 불일치', 'https://www.google.com/maps/place/cafe'),
-    k('스크립트', 'javascript:alert(1)'),
-    k('내부', 'http://127.0.0.1/secret'),
-    k('계정정보', 'https://u:p@example.org/path'),
     { platform: 'unknown', text: 'unknown', sourceUrl: 'https://example.org/' },
     { platform: 'google_maps', text: '', sourceUrl: 'https://example.org/' },
     { platform: 'google_maps', text: '출처 누락' }, null,
   ]);
-  assert.equal(signals.length, 5);
+  assert.equal(signals.length, 3);
   assert.deepEqual(signals.map((s) => [s.platform, s.sourceKind]), [
-    ['google_maps', 'map_page'], ['google_maps', 'third_party'], ['google_maps', 'map_page'],
-    ['kakao_map', 'map_page'], ['kakao_map', 'third_party'],
+    ['google_maps', 'third_party'], ['google_maps', 'third_party'], ['google_maps', 'third_party'],
   ]);
   assert.ok(signals.every((s) => s.sourceUrl.startsWith('http') && s.text && s.sourceTitle));
   assert.deepEqual(normalizeMapSignals(null), []);
@@ -262,8 +260,26 @@ test('dedicated map search instructions use the same provider call and search li
 });
 
 test('map notes remain attached to the correct candidate after filtering invalid names', async () => {
-  const make = (name, note) => ({ name, address: '서울 마포구', mapSignals: [{ platform: 'kakao_map', text: note, sourceUrl: 'https://place.map.kakao.com/123' }] });
+  const make = (name, note) => ({ name, address: '서울 마포구', mapSignals: [{ platform: 'google_maps', text: note, sourceUrl: 'https://blog.example.org/place' }] });
   const content = JSON.stringify({ candidates: [make('', 'skip'), null, make('하나', 'one'), make('둘', 'two'), make('셋', 'three'), make('넷', 'four')] });
   const out = (await call(OK, { store: new MemoryStore(), fetcher: fakeFetch(aiReply(content)) })).json();
   assert.deepEqual(out.candidates.map((c) => [c.name, c.mapSignals[0].text]), [['하나', 'one'], ['둘', 'two'], ['셋', 'three']]);
+});
+
+
+test('Kakao map details are not returned as extracted data', async () => {
+  const content = JSON.stringify({ candidates: [{
+    name: '골목분식', address: '서울 마포구', hours: '카카오맵 기준 8시',
+    rating: '카카오맵 4.6', reviewCount: 'Kakao Map 후기 100건',
+    features: ['카카오맵 주차 가능', '별도 공개 홈페이지 안내'],
+    strengths: ['카카오맵 후기의 친절', '별도 공개 글의 특징'],
+    mapSignals: [{ platform: 'kakao_map', text: '매장 특징', sourceUrl: 'https://place.map.kakao.com/123' }],
+  }] });
+  const out = (await call(OK, { store: new MemoryStore(), fetcher: fakeFetch(aiReply(content)) })).json().candidates[0];
+  assert.equal(out.hours, null);
+  assert.equal(out.rating, null);
+  assert.equal(out.reviewCount, null);
+  assert.deepEqual(out.features, ['별도 공개 홈페이지 안내']);
+  assert.deepEqual(out.strengths, ['별도 공개 글의 특징']);
+  assert.deepEqual(out.mapSignals, []);
 });
