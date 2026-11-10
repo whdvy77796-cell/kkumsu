@@ -77,6 +77,33 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
       h('p', { class: 'small muted' }, '링크가 열리지 않거나 해당 정보의 근거가 아닐 수 있어요. 내용을 직접 확인해 주세요.'),
       h('ol', { class: 'sources' }, links.map((s) => h('li', null, h('a', { href: s.url, target: '_blank', rel: 'noopener noreferrer' }, s.title), h('span', { class: 'tiny muted' }, s.origin === 'provider_annotation' ? ' · 제공자 인용' : s.origin === 'mock' ? ' · 모의 링크' : ' · AI 제시 링크')))));
   }
+  function mapSignalSection(c) {
+    // 이전 버전 결과는 지도별 조사를 하지 않았으므로 빈 결과로 단정하지 않는다.
+    if (!Array.isArray(c?.mapSignals)) return null;
+    const raw = c.mapSignals;
+    const groups = [['google_maps', '구글 지도'], ['kakao_map', '카카오맵']];
+    const clean = raw.filter((x) => x && typeof x === 'object' && !Array.isArray(x) && typeof x.text === 'string' && x.text.trim())
+      .map((x) => ({
+        platform: x.platform,
+        text: x.text.trim().slice(0, 300),
+        title: typeof x.sourceTitle === 'string' && x.sourceTitle.trim() ? x.sourceTitle.trim().slice(0, 120) : '',
+        url: typeof x.sourceUrl === 'string' ? safeLink(x.sourceUrl) : null,
+        kind: x.sourceKind === 'map_page' ? 'map_page' : 'third_party',
+      })).filter((x) => x.url);
+    return h('div', { class: 'map-signals' },
+      h('div', { class: 'sub-title' }, '지도별 공개 검색 단서'),
+      h('p', { class: 'small muted' }, '기존 AI의 공개 웹 검색에서 AI가 제시한 단서예요. 지도 공식 API의 직접 응답이나 검증된 사실이 아니에요. 잘못된 지점, 오래된 정보, 작동하지 않는 링크일 수 있으니 직접 확인해 주세요.'),
+      groups.map(([platform, label]) => {
+        const items = clean.filter((x) => x.platform === platform).slice(0, 5);
+        return h('div', { class: 'map-signal-group', 'data-platform': platform },
+          h('h4', null, label),
+          items.length
+            ? h('ul', { class: 'plain-list' }, items.map((x) => h('li', null,
+              h('a', { href: x.url, target: '_blank', rel: 'noopener noreferrer' }, x.text),
+              h('span', { class: 'tiny muted' }, ' · ', x.title ? x.title + ' · ' : '', x.kind === 'map_page' ? 'AI 제시 지도 링크' : 'AI 제시 외부 링크'))))
+            : h('p', { class: 'small muted' }, '이번 결과에서 단서를 받지 못했어요. 지도에 정보가 없다는 뜻은 아니에요.'));
+      }));
+  }
   function candidateCard(c, index, confirmed = false) {
     const rows = [
       ['주소', c?.address], ['업종', c?.category], ['영업시간', c?.hours], ['전화', c?.phone],
@@ -93,6 +120,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
       features.length ? [h('div', { class: 'sub-title' }, 'AI가 정리한 가게 특징'), h('ul', { class: 'plain-list' }, features.map((f) => h('li', null, f)))] : null,
       strengths.length ? [h('div', { class: 'sub-title' }, '공개 정보에서 살펴볼 강점'), h('ul', { class: 'plain-list' }, strengths.map((s) => h('li', null, s)))] : null,
       !features.length && !strengths.length ? h('p', { class: 'small muted' }, '가게의 특징은 공개 정보에서 충분히 확인하지 못했어요.') : null,
+      mapSignalSection(c),
       !confirmed ? h('button', { class: 'btn primary block page-choose', type: 'button', onclick: () => choose(index) }, '이 가게가 맞아요') : null);
   }
   function choose(index) {
