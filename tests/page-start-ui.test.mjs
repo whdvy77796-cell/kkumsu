@@ -552,13 +552,13 @@ test('an example cannot silently overwrite an answer and the user can deliberate
   const old = globalThis.confirm; let prompts = [];
   try {
     globalThis.confirm = s => { prompts.push(s); return false; };
-    suggestion(ctx, 'difference', 0).attrs.onclick();
+    suggestion(ctx, 'difference', 1).attrs.onclick();
     assert.equal(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.answers.difference, '오래 작성한 내 답변');
     globalThis.confirm = s => { prompts.push(s); return true; };
-    suggestion(ctx, 'difference', 0).attrs.onclick();
-    assert.match(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.answers.difference, /\[가게의 특징\]/);
+    suggestion(ctx, 'difference', 1).attrs.onclick();
+    assert.match(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.answers.difference, /\[재료·공간·서비스의 특징\]/);
     assert.equal(prompts.length, 2); assert.match(prompts[0], /기존에 작성한 답변/);
-    reload(ctx); ctx.flow.renderQuestions(); assert.match(getNode(ctx, 'page-answer-difference').attrs.value, /\[가게의 특징\]/);
+    reload(ctx); ctx.flow.renderQuestions(); assert.match(getNode(ctx, 'page-answer-difference').attrs.value, /\[재료·공간·서비스의 특징\]/);
   } finally { if (old === undefined) delete globalThis.confirm; else globalThis.confirm = old; }
 });
 
@@ -579,7 +579,7 @@ test('AI-found menus require explicit confirmation and never auto-select facts o
 
 test('example placeholders in any answer block transmission until the user fills or removes them', async () => {
   const ctx = await ready(); input(ctx, 'page-answer-offer', '따뜻한 차'); check(ctx, 'page-draft-consent');
-  suggestion(ctx, 'visit', 0).attrs.onclick(); await submit(ctx);
+  suggestion(ctx, 'visit', 1).attrs.onclick(); await submit(ctx);
   assert.equal(ctx.calls.length, 0); assert.match(allText(ctx.state), /\[ \] 부분을 실제 가게 내용으로 바꾸거나 지워/);
   input(ctx, 'page-answer-visit', '주차는 방문 전 확인해 주세요.'); await submit(ctx);
   assert.equal(ctx.calls.length, 1); assert.equal(ctx.calls[0].data.answers.visit, '주차는 방문 전 확인해 주세요.');
@@ -591,4 +591,22 @@ test('keyword suggestions use currently entered store identity and remain nonfac
   assert.equal(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.answers.keywords, '새 가게, 대전 중구 새 가게');
   reload(ctx); ctx.flow.renderQuestions(); assert.equal(getNode(ctx, 'page-answer-keywords').attrs.value, '새 가게, 대전 중구 새 가게');
   assert.match(allText(ctx.state), /희망 검색어는 사실 근거로 사용하지 않아요/); assert.equal(ctx.calls.length, 0);
+});
+
+
+test('concrete answer examples require confirmation that they match the actual store', async () => {
+  const ctx = await ready(); const old = globalThis.confirm; let prompt = '';
+  try {
+    globalThis.confirm = s => { prompt = s; return false; };
+    for (const key of ['difference', 'audience', 'visit']) {
+      const b = suggestion(ctx, key, 0); assert.match(text(b), /참고 예시 · 실제와 맞는지 확인/); b.attrs.onclick();
+      assert.equal(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.answers[key], '');
+      assert.match(prompt, /실제로 맞는 내용인지 확인/);
+    }
+    globalThis.confirm = () => true;
+    suggestion(ctx, 'difference', 0).attrs.onclick(); suggestion(ctx, 'audience', 0).attrs.onclick(); suggestion(ctx, 'visit', 0).attrs.onclick();
+    const saved = JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft;
+    assert.match(saved.answers.difference, /직접 만들어/); assert.match(saved.answers.audience, /가족이나 친구/); assert.match(saved.answers.visit, /포장이 가능/);
+    assert.deepEqual(saved.store.verifiedFacts, []); assert.equal(ctx.calls.length, 0);
+  } finally { if (old === undefined) delete globalThis.confirm; else globalThis.confirm = old; }
 });
