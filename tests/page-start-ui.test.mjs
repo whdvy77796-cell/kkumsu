@@ -370,7 +370,8 @@ test('sparse results never invent FAQ, prices or opening hours', async () => {
   const ctx = await ready(async () => ({ draft: { headline: { text: '차를 파는 가게', evidence: ['answers.offer'] }, omittedCount: 3 }, cached: false, mock: false }));
   input(ctx, 'page-answer-offer', '차 음료'); check(ctx, 'page-draft-consent'); await submit(ctx);
   assert.match(allText(ctx.state), /차를 파는 가게/); assert.match(allText(ctx.state), /3개를 제외/);
-  assert.doesNotMatch(allText(ctx.state), /자주 묻는 질문|24시간|무료|예약은 어떻게/);
+  const previewArticle = findRendered(ctx.state, n => n.tag === 'article' && n.attrs?.class === 'card page-draft-content');
+  assert.ok(previewArticle); assert.doesNotMatch(text(previewArticle), /자주 묻는 질문|24시간|무료|예약은 어떻게/);
   ctx.flow.renderEdit(); assert.equal(findRendered(ctx.state, n => n.attrs?.id === 'page-edit-faq-0-question'), null);
   await submit(ctx); assert.equal(ctx.calls.length, 1); assert.match(allText(ctx.state), /3개를 제외/);
 });
@@ -609,4 +610,59 @@ test('concrete answer examples require confirmation that they match the actual s
     assert.match(saved.answers.difference, /직접 만들어/); assert.match(saved.answers.audience, /가족이나 친구/); assert.match(saved.answers.visit, /포장이 가능/);
     assert.deepEqual(saved.store.verifiedFacts, []); assert.equal(ctx.calls.length, 0);
   } finally { if (old === undefined) delete globalThis.confirm; else globalThis.confirm = old; }
+});
+
+function fillPublish(ctx) {
+  const pw = getNode(ctx, 'publish-password'), again = getNode(ctx, 'publish-password-again'), consent = getNode(ctx, 'publish-consent');
+  pw.value = 'sample-test-secret'; again.value = 'sample-test-secret'; consent.checked = true;
+  pw.focus = again.focus = consent.focus = () => {};
+}
+
+test('publication requires separate consent and never persists password or private draft fields', async () => {
+  const ctx = await ready(async (url, body) => url === '/api/stores' ? { id: body.id } : draftResult());
+  fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  ctx.flow.renderPublish(); fillPublish(ctx); getNode(ctx, 'publish-consent').checked = false;
+  await submit(ctx); assert.equal(ctx.calls.length, 1);
+  getNode(ctx, 'publish-consent').checked = true; await submit(ctx);
+  assert.equal(ctx.calls.length, 2); assert.equal(location.hash, '#/page-published');
+  const payload = ctx.calls[1].data;
+  assert.equal(payload.consent, true); assert.deepEqual(Object.keys(payload.data), ['name', 'address', 'headline', 'intro', 'sections', 'faqs']);
+  assert.ok(!sessionStorage.getItem('yeogibwa.page.start.v1').includes('sample-test-secret'));
+  assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
+});
+
+test('definitive first validation rejection can be edited and does not freeze the old payload', async () => {
+  let reject = true;
+  const ctx = await ready(async (url, body) => {
+    if (url !== '/api/stores') return draftResult();
+    if (reject) { reject = false; throw Object.assign(new Error('입력을 확인해 주세요.'), { code: 'FIELDS' }); }
+    return { id: body.id };
+  });
+  fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  ctx.flow.renderPublish(); fillPublish(ctx); await submit(ctx);
+  assert.ok(!JSON.parse(sessionStorage.getItem('yeogibwa.page.start.v1')).pageDraft.publishAttempt);
+  ctx.flow.renderEdit(); input(ctx, 'page-edit-intro', '확인한 새 소개'); await submit(ctx);
+  ctx.flow.renderPublish(); assert.match(allText(ctx.state), /확인한 새 소개/); fillPublish(ctx); await submit(ctx);
+  assert.equal(ctx.calls.at(-1).data.data.intro, '확인한 새 소개');
+  assert.equal(location.hash, '#/page-published');
+});
+
+test('pending or uncertain publication cannot be discarded and retries the same id and content only', async () => {
+  let resolvePending; let requests = 0;
+  const ctx = await ready(async (url, body) => {
+    if (url !== '/api/stores') return draftResult();
+    requests++;
+    if (requests === 1) return new Promise((resolve, reject) => { resolvePending = () => reject(Object.assign(new Error('network'), { code: 'NETWORK' })); });
+    return { id: body.id };
+  });
+  fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  ctx.flow.renderPublish(); fillPublish(ctx); const pending = submit(ctx);
+  assert.equal(ctx.flow.busy(), true); const before = ctx.calls.length;
+  await ctx.flow.begin('새가게', '서울 새주소 10'); assert.equal(ctx.calls.length, before);
+  resolvePending(); await pending; assert.equal(ctx.flow.busy(), true);
+  const saved = JSON.parse(sessionStorage.getItem('yeogibwa.page.start.v1')).pageDraft.publishAttempt;
+  assert.equal(saved.status, 'uncertain');
+  ctx.flow.renderPublish(); assert.match(allText(ctx.state), /요청한 주소 관리하기/); fillPublish(ctx); await submit(ctx);
+  assert.equal(ctx.calls.at(-1).data.id, saved.id); assert.deepEqual(ctx.calls.at(-1).data.data, saved.data);
+  assert.equal(location.hash, '#/page-published'); assert.equal(ctx.flow.busy(), false);
 });

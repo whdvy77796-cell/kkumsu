@@ -23,6 +23,9 @@
     },
     "api/pay.js": {
       "maxDuration": 60
+    },
+    "api/stores.js": {
+      "maxDuration": 30
     }
   },
   "headers": [
@@ -59,6 +62,16 @@
           "value": "default-src 'self'; script-src 'self' https://js.tosspayments.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.tosspayments.com https://static.toss.im; connect-src 'self' https://*.tosspayments.com; frame-src https://*.tosspayments.com https://*.toss.im; font-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://*.tosspayments.com https://*.toss.im"
         }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/stores",
+      "destination": "/api/stores?view=directory"
+    },
+    {
+      "source": "/stores/:id",
+      "destination": "/api/stores?view=page&id=:id"
     }
   ]
 }

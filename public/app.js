@@ -9,6 +9,7 @@ import { PAY } from './pay-config.js';
 import { redactReport, packageSize, FREE_SOLUTIONS } from './paywall.js';
 import { BUSINESS, businessReady } from './business.js';
 import { makePageStart } from './page-start.js';
+import { makeStoreTools } from './store-tools.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -117,9 +118,13 @@ function route() {
   const hash = location.hash || '#/';
   const linked = /^#\/r\/([A-Za-z0-9_-]{16,32})\.([A-Za-z0-9_-]{16,100})$/.exec(hash);
   const policy = { '#/terms': 'terms', '#/privacy': 'privacy', '#/refund': 'refund' }[hash];
+  const manage = /^#\/manage\/([A-Za-z0-9_-]{22})$/.exec(hash);
+  const reportStore = /^#\/report-store\/([A-Za-z0-9_-]{22})$/.exec(hash);
   // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다 (home·find·survey·done·report·policy)
   document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/page-search': 'find', '#/page-confirmed': 'find', '#/page-questions': 'find', '#/page-preview': 'find', '#/page-edit': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
   if (linked) renderLinked(linked[1], linked[2]);
+  else if (manage) storeTools.renderManage(manage[1]);
+  else if (reportStore) storeTools.renderReport(reportStore[1]);
   else if (policy) renderPolicy(policy);
   else if (hash === '#/sample') renderSample();
   else if (hash === '#/page-search') pageStartFlow.renderSearch();
@@ -127,6 +132,8 @@ function route() {
   else if (hash === '#/page-questions') pageStartFlow.renderQuestions();
   else if (hash === '#/page-preview') pageStartFlow.renderPreview();
   else if (hash === '#/page-edit') pageStartFlow.renderEdit();
+  else if (hash === '#/page-publish') pageStartFlow.renderPublish();
+  else if (hash === '#/page-published') pageStartFlow.renderPublished();
   else if (hash === '#/find') renderFind();
   else if (hash === '#/survey') renderSurvey();
   else if (hash === '#/done') renderDone();
@@ -158,7 +165,8 @@ function showError(e, retry) {
   setNavbar(btn('처음으로', () => { location.hash = '#/'; }), stop ? null : btn('다시 시도', retry, true));
 }
 
-const pageStartFlow = makePageStart({ h, show, setNavbar, btn, post, storeName });
+const storeTools = makeStoreTools({ h, show, setNavbar, btn, post });
+const pageStartFlow = makePageStart({ h, show, setNavbar, btn, post, storeName, onPublished: (id, data) => storeTools.renderPublished(id, data) });
 
 // ───────── 1. 첫 화면: 상호명·주소
 // 첫 화면의 '무료 진단 시작': 가게 입력 칸으로 이동해 바로 입력하게 한다
@@ -220,7 +228,7 @@ function renderHome() {
     if (!name) { hint.textContent = '상호명을 입력해 주세요.'; nameIn.focus(); return; }
     if (address.length < 4) { hint.textContent = '주소를 입력해 주세요. 동·도로명까지 적으면 더 정확해요.'; addrIn.focus(); return; }
     if (!consent.checked) { hint.textContent = '가게 정보를 찾기 위한 외부 전송에 동의해 주세요.'; consent.focus(); return; }
-    if (pageStartFlow.busy()) { hint.textContent = '이미 가게 정보를 찾고 있어요. 잠시만 기다려 주세요.'; return; }
+    if (pageStartFlow.busy()) { hint.textContent = '진행 중인 요청 또는 확인되지 않은 공개 요청을 먼저 확인해 주세요.'; return; }
     hint.textContent = '';
     pageStartFlow.begin(name, address);
   };
@@ -232,7 +240,7 @@ function renderHome() {
     h('p', { class: 'small', style: { margin: '4px 0 8px' } }, chosenStore()?.name || S.name),
     h('a', { class: 'btn small', href: S.doneAt ? '#/done' : '#/survey' }, S.doneAt ? '이전 결과 보기' : '이전 답변 이어보기'),
     S.doneAt && S.report?.data ? h('a', { class: 'btn small', href: '#/report', style: { marginLeft: '6px' } }, '이전 보고서 보기') : null) : null;
-  const draftResume = ['#/page-questions', '#/page-preview', '#/page-edit'].includes(existing.resumeHash) ? existing.resumeHash : '';
+  const draftResume = ['#/page-questions', '#/page-preview', '#/page-edit', '#/page-publish', '#/page-published'].includes(existing.resumeHash) ? existing.resumeHash : '';
   const pageResume = ['result', 'confirmed'].includes(existing.status)
     ? h('div', { class: 'card note resume' }, h('b', null, draftResume ? '작성하던 가게 소개가 있어요' : '확인하던 가게 정보가 있어요'),
         h('p', { class: 'small', style: { margin: '4px 0 8px' } }, existing.name),
@@ -244,10 +252,10 @@ function renderHome() {
     h('section', { class: 'hero' },
       h('h1', null, 'AI 시대,', h('br'), "우리 가게가 '추천' 되는 방법."),
       h('h2', { class: 'hero-sub' }, '가게 이름과 주소를 알려주세요.', h('br'), '몇 가지 질문에 답하면, 우리 가게의 특징을', h('br'), '고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.'),
-      h('p', { class: 'hero-desc' }, '여기봐AI는 사장님이 확인한 가게 정보와 답변을 바탕으로 우리 가게만의 매력을 정리해요. 소개와 질문·답변을 읽기 쉽게 구성한 비공개 페이지 초안을 만들고 직접 수정할 수 있어요.', h('br'), '페이지 공개와 QR코드·SNS 소개글 활용은 준비 중이에요.'),
+      h('p', { class: 'hero-desc' }, '여기봐AI는 사장님이 확인한 가게 정보와 답변을 바탕으로 소개 페이지 초안을 만들어요. 내용을 직접 확인하고 수정한 뒤 공개하면 QR코드와 공유 소개글도 이용할 수 있어요.'),
       h('div', { class: 'hero-actions' }, h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료로 페이지 만들기')),
       h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
-      h('p', { class: 'small muted page-stage-note' }, '현재는 비공개 소개 페이지 확인·수정까지 이용할 수 있어요. 결제와 페이지 공개·QR·소개글 활용은 준비 중이에요.')),
+      h('p', { class: 'small muted page-stage-note' }, '베타 기간에는 공개와 QR·소개글을 무료로 이용할 수 있어요. 검색 노출과 AI 추천은 보장하지 않아요.')),
     pageResume, oldResume,
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
@@ -267,7 +275,7 @@ function renderHome() {
         h('li', null, h('b', null, '가게 정보 확인 '), h('span', { class: 'muted small' }, 'AI가 찾은 공개 정보와 특징을 확인해요.')),
         h('li', null, h('b', null, '가게에 관한 질문 5개 '), h('span', { class: 'muted small' }, '대표 메뉴와 우리 가게의 특징을 알려주세요.')),
         h('li', null, h('b', null, '완성본 확인·수정 '), h('span', { class: 'muted small' }, '비공개 초안을 확인하고 직접 고쳐요.')),
-        h('li', null, h('b', null, '결제 후 배포·QR·소개글 활용 '), h('span', { class: 'muted small' }, '준비 중')))),
+        h('li', null, h('b', null, '무료 공개·QR·소개글 활용 '), h('span', { class: 'muted small' }, '베타 기간 0원')))),
     h('div', { class: 'card note small privacy-card' },
       h('b', null, '입력한 정보는 이렇게 쓰여요'),
       h('p', null, '동의하신 상호명과 주소로 공개 정보를 찾아요. 질문 답변과 확인한 정보를 AI에 보내 초안을 만들 때는 별도로 동의받아요. 초안은 비공개이며 AI가 정리한 내용은 사장님이 직접 확인해 주세요.'),
@@ -1832,7 +1840,7 @@ async function renderSample() {
 
 // ───────── 이용약관 · 개인정보처리방침 · 환불 정책
 const biz = (k, fallback = '사업자 정보 등록 후 표시') => String(BUSINESS[k] || '').trim() || fallback;
-const POLICY_DATE = '2026년 11월 9일';
+const POLICY_DATE = '2026년 11월 11일';
 function policyDoc(title, intro, sections, effectiveDate = POLICY_DATE) {
   return [
     h('div', { class: 'policy-head' }, h('h1', null, title), h('p', { class: 'small muted' }, `시행일 ${effectiveDate}`), intro ? h('p', null, intro) : null),
@@ -1851,19 +1859,19 @@ function renderPolicy(kind) {
     terms: () => policyDoc('이용약관', null, [
       ['제1조 (목적)', `이 약관은 ${biz('name', '매출올려드림 AI 운영자')}(이하 '운영자')가 제공하는 매출올려드림 AI(www.kkumsu.com, 이하 '서비스')를 이용하는 조건과 절차, 운영자와 이용자의 권리·의무를 정합니다.`],
       ['제2조 (서비스 내용)',
-        ['가게 소개 초안: 가게 정보와 사장님의 답변을 별도 동의 후 AI로 정리해 비공개 미리보기와 직접 수정 기능을 제공합니다. 소개 페이지 공개·결제·QR·SNS 소개글 기능은 아직 준비 중입니다.',
+        ['가게 소개: 별도 동의 후 가게 정보와 답변으로 비공개 초안을 만들고 수정할 수 있습니다. 게시 권한과 내용을 확인하고 공개에 별도 동의하면 가게 소개 페이지를 공개할 수 있으며 베타 기간에는 0원입니다. 실제 결제는 진행하지 않습니다. QR과 공유 문구도 제공합니다. 검색 수집·노출과 AI 추천은 보장하지 않습니다.',
           '무료 핵심 진단: 상호명·주소, 인터뷰 답변, 인터넷 공개 정보를 바탕으로 AI가 만든 진단 보고서 중 핵심 진단(한 줄 진단과 핵심 숫자, 가장 중요한 문제, 지금 바로 할 일, 위생·안전, 인터넷에서 본 우리 가게, 숫자로 본 우리 가게, 우선 개선안 목록과 1순위 개선안, 확인할 것)을 무료로 제공합니다.',
           `맞춤 실행 패키지(유료, 보고서 1건 ${price}): 같은 보고서의 나머지 개선안별 확인 근거·실행 방법·기대 효과·담당·비용과 기간·준비물·확인 지표, 수익 구조·메뉴·고객 경험 연결 분석, 실행 계획, PDF 저장, 결제일부터 90일 동안의 다시 보기 링크를 제공합니다.`,
           '보고서는 AI가 이용자의 답변과 인터넷 공개 정보로 만든 참고 자료예요. 매출·이익 증가 같은 결과를 보장하지 않으며, 중요한 결정 전에는 장부와 현장에서 확인해야 합니다.']],
       ['제3조 (이용 방법)', '회원가입 없이 이용합니다. 진행 중인 답변과 보고서는 이용자의 브라우저에 저장되며, 브라우저 저장소를 지우면 다시 볼 수 없을 수 있습니다. 결제한 보고서는 다시 보기 링크로 결제일부터 90일 동안 열 수 있습니다.'],
       ['제4조 (가격과 결제)', `맞춤 실행 패키지의 가격은 보고서 1건당 ${price}이며 부가세가 포함된 최종 결제 금액입니다. 결제는 토스페이먼츠 결제창(카드·간편결제)으로 하며, 결제가 승인되면 즉시 해당 보고서의 잠긴 내용이 열립니다. 가격이 바뀌어도 이미 결제한 건에는 영향이 없습니다.`],
       ['제5조 (청약철회와 환불)', '맞춤 실행 패키지는 결제와 동시에 제공이 시작되는 디지털 콘텐츠예요. 단순 변심에 의한 청약철회 제한과 환불 기준은 환불 정책에 따릅니다. 이 내용은 결제 전에 안내하고 동의를 받습니다.'],
-      ['제6조 (이용자의 의무)', ['사실과 다른 정보로 다른 사람의 가게를 진단하거나, 서비스 운영을 방해하는 행위를 해서는 안 됩니다.', '받은 보고서를 다른 사람에게 판매하거나, 다시 보기 링크를 대가를 받고 배포해서는 안 됩니다.']],
+      ['제6조 (이용자의 의무)', ['다른 사람의 가게를 사칭하거나 권한 없는 내용, 타인의 개인정보, 허위·불법 자료를 게시하거나 서비스 운영을 방해해서는 안 됩니다.', '받은 보고서를 다른 사람에게 판매하거나, 다시 보기 링크를 대가를 받고 배포해서는 안 됩니다.']],
       ['제7조 (서비스 변경과 중단)', '운영자는 서비스 개선을 위해 화면과 기능을 바꿀 수 있습니다. 시스템 점검·장애 등으로 서비스를 일시 중단할 수 있으며, 이미 결제한 보고서를 볼 수 없게 된 경우에는 환불 정책에 따라 환불합니다.'],
       ['제8조 (책임)', '운영자는 AI 진단 결과의 정확성이나 특정 사업 성과를 보장하지 않습니다. 다만 운영자의 고의 또는 과실로 이용자에게 손해가 생긴 경우에는 관련 법령에 따라 책임을 집니다.'],
       ['제9조 (분쟁 해결)', '서비스 이용과 관련한 문의·불만은 고객센터로 접수해 주세요. 분쟁이 생기면 관련 법령과 소비자분쟁해결기준에 따라 해결하며, 소송은 민사소송법에 따른 관할 법원에 제기합니다.'],
       ['운영자 정보', operatorLine()],
-    ], '2026년 11월 10일'),
+    ], '2026년 11월 11일'),
     refund: () => policyDoc('환불 정책', '맞춤 실행 패키지는 결제가 승인되는 즉시 보고서의 잠긴 내용이 열리는 디지털 콘텐츠예요.', [
       ['결제 전에 확인할 수 있어요', ['무료 핵심 진단으로 우리 가게 보고서의 핵심 내용과 1순위 개선안 전체를 먼저 볼 수 있어요.', '샘플 보고서(예시 데이터)로 결제 후 화면을 미리 볼 수 있어요.']],
       ['단순 변심 환불', '결제 후 바로 열람이 시작되므로, 전자상거래 등에서의 소비자보호에 관한 법률 제17조 제2항 제5호에 따라 단순 변심에 의한 청약철회(환불)는 제한돼요. 이 사실은 결제 전에 안내하고 동의를 받아요.'],
@@ -1875,30 +1883,32 @@ function renderPolicy(kind) {
       ['1. 처리하는 정보와 목적', [
         '가게 찾기: 상호명과 주소를 받아 AI가 인터넷 공개 정보로 가게를 찾는 데 써요. 후보가 맞지 않아 다시 찾을 때 별도 동의를 받으면 사용자가 선택적으로 입력한 공개 사이트 주소와 맞지 않는 이전 후보의 이름·주소도 검색에 참고해요.',
         '가게 소개 초안: 별도 동의를 받은 경우에만 상호명·주소, 사장님이 확인한 가게 정보와 질문 답변을 AI에 보내 비공개 소개 초안을 만들어요. 초안 생성 서버는 답변 원문이나 생성된 초안을 별도 캐시에 저장하지 않도록 설계돼 있어요. 서비스 운영·보안 로그와 외부 AI 제공자의 처리·보관 정책은 별도로 적용될 수 있어요.',
+        '가게 소개 공개: 공개에 별도 동의한 가게명·가게 주소·제목·소개·섹션·질문과 답변을 누구나 볼 수 있는 페이지와 목록에 저장합니다. 관리 비밀번호는 원문이 아닌 해시 형태로 저장하며, 수정과 삭제에 사용합니다. 신고 사유와 중복 신고 방지를 위한 IP 해시를 처리할 수 있습니다. 검색엔진과 제3자는 공개 정보를 수집하거나 복사할 수 있습니다.',
         'AI 진단 보고서: 이용자가 동의한 경우에만 인터뷰 답변(가게 운영 방식, 매출·비용, 사장님·가족 근무 시간 등)을 받아 보고서를 만드는 데 써요. 답변 원문은 서버에 따로 저장하지 않고, 답변으로 만든 보고서(계산값 포함)만 보관해요.',
         '결제: 주문번호, 결제 고유번호(토스페이먼츠가 주는 값), 결제 금액, 결제 일시, 결제 수단 종류를 결제 확인·환불·분쟁 처리와 법정 기록 보존에 써요. 카드 번호 같은 결제 정보는 토스페이먼츠가 처리하며 운영자는 받지 않아요.',
         '이용량 관리: 접속 IP 주소를 되돌릴 수 없게 바꾼 값(해시)으로 하루 이용 횟수를 세고, 중복 요청 방지를 위한 임시 잠금을 사용해요.',
         '브라우저 저장소: 기존 진단의 진행 답변은 localStorage에, 가게 소개 확인·재검색 참고 사이트 주소·질문 답변·초안은 해당 탭의 sessionStorage에 임시 저장될 수 있어요. 브라우저 데이터를 삭제하면 기기의 저장 내용을 지울 수 있으나 외부 제공자가 보관한 자료까지 지워지는 것은 아니에요.']],
       ['2. 보관 기간', [
         '가게 찾기 결과와 인터넷 조사 결과: 3일',
+        '공개 가게 소개와 관리 비밀번호 해시: 이용자가 삭제하거나 서비스가 종료될 때까지. 삭제하면 소개 내용, 비밀번호 해시와 신고 사유를 지웁니다. 삭제된 주소의 재사용을 막기 위한 임의 식별번호와 삭제 표시는 서비스 종료까지 남을 수 있습니다. 신고 및 보안에 필요한 정보는 운영과 권리 보호에 필요한 기간 보관될 수 있습니다.',
         '보고서: 만든 날부터 7일. 맞춤 실행 패키지를 결제하면 결제일부터 90일(다시 보기 링크)',
         '결제 기록(주문번호·결제 고유번호·금액·일시·수단·보고서 번호): 5년 (전자상거래법의 대금결제 및 재화 등의 공급에 관한 기록). 보고서 내용은 포함하지 않아요.',
         '이용량 집계(IP 해시): 2일',
-        '보관 기간이 지나면 저장소에서 자동으로 지워져요.']],
+        '위에서 자동 삭제 기간을 정한 항목은 해당 기간이 지나면 저장소에서 지워지도록 설정합니다. 공개 페이지 삭제 후에도 외부 검색 결과나 복사본은 즉시 지워지지 않을 수 있어요.']],
       ['3. 처리 위탁과 국외 이전', [
         'OpenRouter, Inc.(미국): AI 요청 중계. 동의한 상호명·주소·재검색 참고 사이트 주소·이전 후보 정보·가게 정보와 질문 답변을 요청할 때 네트워크로 전송해요. 데이터 수집을 허용하지 않는 제공 경로를 요청하지만, 외부 제공자의 보관·삭제는 해당 제공자의 정책이 별도로 적용돼요.',
         'Anthropic, PBC 등 OpenRouter가 연결하는 Claude 모델 제공자(미국): 동의한 정보의 AI 처리.',
         '웹 검색 제공자: 가게 찾기와 재검색에서 동의한 상호·주소와 참고 사이트 주소, 이전 후보 정보가 검색 처리에 전달될 수 있어요. 제공자는 연결 방식에 따라 달라질 수 있으며 각 제공자의 정책이 적용돼요.',
         'Vercel Inc.(미국): 웹사이트와 서버 운영. 서버 함수는 서울 지역에서 실행돼요.',
-        'Upstash, Inc.(미국 회사, 저장 위치: 일본 도쿄 AWS 데이터센터): 보고서·조사 결과·결제 기록 저장소.',
+        'Upstash, Inc.(미국 회사, 저장 위치: 일본 도쿄 AWS 데이터센터): 보고서·조사 결과·결제 기록 및 별도 동의한 공개 가게 소개와 관리·신고 정보 저장소.',
         '토스페이먼츠(주)(대한민국): 결제 처리.',
-        '가게 찾기나 AI 보고서 기능을 쓰지 않으면 해외로 전송되지 않아요. 보고서 기능을 원하지 않으면 동의하지 않으면 돼요.']],
-      ['4. 이용자의 권리', ['언제든지 개인정보의 열람·정정·삭제·처리정지를 요청할 수 있어요.', '보고서 화면 맨 아래 \'서버에 보관된 이 보고서 지우기\'로 직접 지울 수 있어요. 결제 기록은 법정 보관 기간 동안 남아요.', `요청: ${biz('email')}`]],
+        '가게 검색과 AI 초안·보고서 요청은 각각의 전송 동의 후 처리하며, 공개 페이지를 게시하면 공개 내용이 저장소와 웹사이트 운영 제공자에게 전송됩니다.']],
+      ['4. 이용자의 권리', ['언제든지 개인정보의 열람·정정·삭제·처리정지를 요청할 수 있어요.', '보고서 화면 맨 아래 \'서버에 보관된 이 보고서 지우기\'로 직접 지울 수 있어요. 공개 가게 페이지는 관리 화면에서 비밀번호로 수정하거나 삭제할 수 있어요. 결제 기록은 법정 보관 기간 동안 남아요.', `요청: ${biz('email')}`]],
       ['5. 안전성 확보 조치', ['모든 통신은 HTTPS로 암호화해요.', '보고서는 추측할 수 없는 보고서 번호와 비밀 토큰이 있어야 열리고, 토큰은 서버에 해시로만 저장해요.', '결제 시크릿 키와 AI 키는 서버에만 두고 화면에 보내지 않아요.']],
       ['6. 개인정보 보호책임자', `${String(BUSINESS.privacyOfficer || '').trim() || biz('owner')} · ${biz('email')} · ${biz('phone')}`],
       ['7. 방침 변경', '이 방침을 바꾸면 시행일과 함께 이 화면에 알려드려요.'],
       ['운영자 정보', operatorLine()],
-    ], '2026년 11월 10일'),
+    ], '2026년 11월 11일'),
   };
   show(h('div', { class: 'policy-page' }, docs[kind]()));
   setNavbar(btn('처음으로', () => { location.hash = '#/'; }, true));

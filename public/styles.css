@@ -659,3 +659,28 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
   .page-draft-content { padding: 38px; }
   .page-facts { padding: 20px; }
 }
+
+/* 공개 가게 목록과 베타 공개 화면 */
+.directory-nav { display: inline-flex; align-items: center; padding: 8px 10px; border-radius: 999px; color: var(--brand); background: var(--brand-soft); text-decoration: none; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.directory-nav:hover, .directory-nav:focus-visible { text-decoration: underline; }
+.page-publish .page-draft-content p, .public-store p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.page-publish .page-consent { margin: 18px 0; }
+.page-publish .page-actions { margin-top: 16px; }
+.ok { color: #166534; }
+.error { color: #b42318; }
+@media (max-width: 480px) { .top .wrap { gap: 6px; } .directory-nav { font-size: 11px; padding: 7px; } .store-name { font-size: 12px; } }
+
+.public-kicker { color: var(--brand); font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+.public-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; list-style: none; padding: 0; margin: 24px 0; }
+.public-grid li { min-width: 0; }
+.public-listing { height: 100%; margin: 0; overflow-wrap: anywhere; }
+.public-listing h2 { margin: 0 0 8px; font-size: 21px; }
+.public-listing h2 a { color: var(--ink); text-decoration: none; }
+.public-listing h2 a:hover { text-decoration: underline; }
+.public-more { color: var(--brand); font-weight: 700; font-size: 14px; text-decoration: none; }
+.public-empty { margin-top: 24px; text-align: center; padding: 40px 24px; }
+.public-store section { border-top: 1px solid var(--line-2); margin-top: 28px; padding-top: 22px; }
+.public-store dt { font-weight: 700; margin-top: 16px; }
+.public-store dd { margin-left: 0; }
+.public-manage, .public-pagination { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 600px) { .public-grid { grid-template-columns: 1fr; } }

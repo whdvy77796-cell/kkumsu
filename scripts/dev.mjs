@@ -15,10 +15,13 @@ const routes = {
   '/api/page-draft': (await import('../api/page-draft.js')).default,
   '/api/report': (await import('../api/report.js')).default,
   '/api/research': (await import('../api/research.js')).default,
+  '/api/stores': (await import('../api/stores.js')).default,
+  '/api/pay': (await import('../api/pay.js')).default,
 };
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
@@ -29,6 +32,11 @@ const MIME = {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (routes[url.pathname]) return routes[url.pathname](req, res);
+  if (url.pathname === '/stores' || /^\/stores\/[A-Za-z0-9_-]{22}$/.test(url.pathname)) {
+    const id = url.pathname.split('/')[2];
+    req.url = '/api/stores?' + new URLSearchParams({ view: id ? 'page' : 'directory', ...(id ? { id } : {}), ...(url.searchParams.has('page') ? { page: url.searchParams.get('page') } : {}) });
+    return routes['/api/stores'](req, res);
+  }
   const rel = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '');
   for (const dir of ['public', 'site']) {
     const base = path.join(ROOT, dir);

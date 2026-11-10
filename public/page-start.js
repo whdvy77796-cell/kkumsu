@@ -1,10 +1,11 @@
 // 소개 페이지의 첫 단계. 기존 매출 진단 상태(maechul.v3)는 읽거나 수정하지 않는다.
 const PAGE_KEY = 'yeogibwa.page.start.v1';
 
-export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
+export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPublished }) {
   let state = load();
   let busy = false;
   let draftBusy = false;
+  let publishing = false;
 
   function load() {
     try {
@@ -54,7 +55,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
     return typeof globalThis.confirm === 'function' && globalThis.confirm(message);
   }
   async function begin(name, address) {
-    if (busy || draftBusy) return;
+    if (busy || draftBusy || publishing || state.pageDraft?.publishAttempt) return;
     if (hasDraftWork() && !askBeforeDiscard('새 가게를 검색하면 이 탭에서 작성하던 가게 소개와 수정 내용이 지워져요. 계속할까요?')) return;
     if (state.status === 'uncertain' && name === state.name && address === state.address && !askBeforeDiscard('이전 검색이 이미 처리됐을 수 있어요. 같은 가게를 다시 검색하면 비용이 중복될 수 있어요. 새 요청을 보내시겠어요?')) return;
     busy = true;
@@ -303,7 +304,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
       h('p', { class: 'small muted' }, '가게가 맞는지 확인하신 단계예요. 영업시간·메뉴·특징의 정확성은 아직 별도로 확인이 필요해요.')),
       h('div', { class: 'card page-next-note' }, h('h3', null, '질문 5개로 소개 초안을 만들어요'),
         h('p', null, '대표 메뉴·서비스만 필수예요. 알고 계신 내용만 적어 주세요.'),
-        h('p', { class: 'small muted' }, '비공개 미리보기만 제공해요. 결제·공개·QR 기능은 아직 없어요.'),
+        h('p', { class: 'small muted' }, '초안을 확인한 뒤 베타 기간에는 무료로 공개하고 QR과 소개글을 만들 수 있어요.'),
         h('button', { type: 'button', class: 'btn primary block', onclick: () => { location.hash = '#/page-questions'; } }, '질문 답하기')),
       candidateCard(chosen, state.confirmedIndex, true),
       sourceCard(state.result));
@@ -342,8 +343,8 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
   }
   function privateNote() {
     return h('div', { class: 'card note page-private-note' },
-      h('strong', null, '비공개 미리보기 · 아직 공개되지 않았어요'),
-      h('p', { class: 'small' }, '결제·공개·QR 기능은 아직 없어요. 검색 노출 및 AI 학습·추천은 보장하지 않아요. 이 탭에서만 보는 미리보기이며 검색엔진이 수집할 공개 페이지가 아니에요.'),
+      h('strong', null, '현재 편집 중인 초안은 비공개예요'),
+      h('p', { class: 'small' }, '이 탭에서만 보는 미리보기이며 검색엔진이 수집할 공개 페이지가 아니에요. 확인 후 별도로 공개할 수 있고, 검색 수집이나 AI 학습·추천은 보장하지 않아요.'),
       h('p', { class: 'small muted' }, 'AI 초안은 틀릴 수 있어요. 가격·시간, 빠진 부정 표현이나 조건을 비롯한 모든 내용을 직접 확인한 뒤 사용해 주세요. 확인되지 않은 정보는 채우지 마세요.'));
   }
   function field(id, label, value, max, oninput, options = {}) {
@@ -553,7 +554,9 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
         draft.sections.filter(x => x.heading || x.body).map(x => h('section', { class: 'page-preview-section' }, x.heading ? h('h2', null, x.heading) : null, x.body ? h('p', null, x.body) : null)),
         draft.faqs.some(x => x.question && x.answer) ? h('section', { class: 'page-preview-faq' }, h('h2', null, '자주 묻는 질문'), draft.faqs.filter(x => x.question && x.answer).map(x => h('div', null, h('h3', null, x.question), h('p', null, x.answer)))) : null),
       draft.keywords.some(x => x.text) ? h('aside', { class: 'card note page-keywords' }, h('h3', null, '확인할 키워드 제안'), h('p', { class: 'small muted' }, '희망 검색어는 사실 근거가 아니에요. 실제 가게와 맞는지 확인해 주세요. 소개 본문이나 공개 페이지의 확정 키워드·메타데이터로 반영되지 않았으며 검색 노출을 보장하지 않아요.'), draft.keywords.filter(x => x.text).map(x => h('span', null, x.text))) : null,
-      h('div', { class: 'page-actions' }, h('button', { class: 'btn primary block', type: 'button', onclick: () => { location.hash = '#/page-edit'; } }, '내용 수정'))));
+      h('div', { class: 'page-actions' }, h('button', { class: 'btn block', type: 'button', onclick: () => { location.hash = '#/page-edit'; } }, '내용 수정'),
+        h('button', { class: 'btn primary block', type: 'button', onclick: () => { location.hash = '#/page-publish'; } }, '결제하기 · 베타 무료 0원'),
+        d.publication?.id ? h('a', { class: 'btn block', href: '/#/manage/' + d.publication.id }, '이미 공개한 페이지 관리') : null))); 
     setNavbar(btn('질문으로', () => { location.hash = '#/page-questions'; }), btn('처음으로', home));
   }
   function renderEdit() {
@@ -591,5 +594,102 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
     setNavbar(btn('미리보기로', () => { location.hash = '#/page-preview'; }), btn('질문으로', () => { location.hash = '#/page-questions'; }));
   }
 
-  return { begin, renderSearch, renderConfirmed, renderQuestions, renderPreview, renderEdit, info: () => ({ name: state.name || '', address: state.address || '', status: state.status || '', draftStatus: state.pageDraft?.status || '', resumeHash: state.pageDraft?.view || (state.status === 'confirmed' ? '#/page-confirmed' : '#/page-search') }), busy: () => busy || draftBusy };
+  // 공개용으로 확정한 데이터만 서버로 보내고, 답변 원문·키워드 제안은 보내지 않는다.
+  function publicationData(d) {
+    const draft = cleanDraft(d.draft);
+    return {
+      name: string(d.store.name).trim(), address: string(d.store.address).trim(),
+      headline: string(draft.headline?.text).trim(), intro: string(draft.intro?.text).trim(),
+      sections: draft.sections.map(x => ({ heading: string(x.heading).trim(), body: string(x.body).trim() })).filter(x => x.heading || x.body),
+      faqs: draft.faqs.map(x => ({ question: string(x.question).trim(), answer: string(x.answer).trim() })).filter(x => x.question || x.answer),
+    };
+  }
+  function publicationProblem(data) {
+    if (!data.name || data.name.length > 60) return '가게명을 1~60자로 확인해 주세요.';
+    if (data.address.length < 4 || data.address.length > 120) return '주소를 4~120자로 확인해 주세요.';
+    if (!data.headline || data.headline.length > 200 || !data.intro || data.intro.length > 2000) return '제목과 소개글을 입력하고 글자 수를 확인해 주세요.';
+    if (data.sections.length > 8 || data.sections.some(x => !x.heading || !x.body || x.heading.length > 200 || x.body.length > 4000)) return '소개 항목의 제목과 내용을 모두 확인해 주세요.';
+    if (data.faqs.length > 8 || data.faqs.some(x => !x.question || !x.answer || x.question.length > 300 || x.answer.length > 2000)) return '질문과 답변을 모두 확인해 주세요.';
+    if (/미완성 초안입니다|가게 소개 초안 · 사장님 검토 필요/.test(data.headline + data.intro)) return '미완성 초안 안내를 지우고 실제 소개 내용으로 수정해 주세요.';
+    const all = [data.name, data.address, data.headline, data.intro, ...data.sections.flatMap(x => [x.heading, x.body]), ...data.faqs.flatMap(x => [x.question, x.answer])];
+    if (all.some(x => /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]|<\s*[!/?a-z][^>]*>|(?:https?:|javascript:|data:|www\.)|\]\s*\(/i.test(x))) return '공개 내용에는 웹 주소나 HTML을 넣을 수 없어요. 내용을 수정해 주세요.';
+    if (new TextEncoder().encode(JSON.stringify(data)).length > 64000) return '공개 내용이 너무 길어요. 일부 내용을 줄여 주세요.';
+    return '';
+  }
+  function newPublicationId() {
+    const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
+    return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  }
+  function renderPublish() {
+    const d = needDraft(); if (!d) return;
+    applyEdits(d);
+    d.view = '#/page-publish'; save();
+    const attempt = d.publishAttempt;
+    const data = attempt?.data || publicationData(d);
+    const issue = publicationProblem(data);
+    const error = h('p', { class: 'page-error', role: 'alert', 'aria-live': 'polite' });
+    const password = h('input', { type: 'password', id: 'publish-password', autocomplete: 'new-password', minlength: 8, maxlength: 64, required: true });
+    const again = h('input', { type: 'password', id: 'publish-password-again', autocomplete: 'new-password', minlength: 8, maxlength: 64, required: true });
+    const consent = h('input', { type: 'checkbox', id: 'publish-consent' });
+    const submit = h('button', { class: 'btn primary block', type: 'submit', disabled: publishing || !!issue }, publishing ? '공개 요청 중…' : attempt ? '같은 공개 요청 확인하기 · 0원' : '결제하기 · 베타 무료 0원으로 공개');
+    async function publish(e) {
+      e.preventDefault(); if (publishing) return;
+      if (issue) { error.textContent = issue; return; }
+      if (!consent.checked) { error.textContent = '공개 내용과 게시 동의를 확인해 주세요.'; consent.focus(); return; }
+      if (password.value.length < 8 || password.value.length > 64 || password.value !== again.value) { error.textContent = '관리 비밀번호 8~64자와 확인 입력이 같은지 확인해 주세요.'; password.focus(); return; }
+      const key = password.value; password.value = ''; again.value = '';
+      let current = d.publishAttempt;
+      const hadPriorAttempt = !!current;
+      if (!current) {
+        try { current = { id: newPublicationId(), data, status: 'pending' }; }
+        catch { error.textContent = '안전한 공개 주소를 만들지 못했어요. 다른 브라우저에서 다시 시도해 주세요.'; return; }
+        d.publishAttempt = current;
+      }
+      current.status = 'pending'; save(); publishing = true; submit.disabled = true; submit.textContent = '공개 요청 중…'; error.textContent = '';
+      try {
+        const result = await post('/api/stores', { action: 'create', id: current.id, password: key, consent: true, data: current.data }, 30000);
+        if (result?.id !== current.id) throw Object.assign(new Error('공개 결과를 확인하지 못했어요.'), { code: 'NETWORK' });
+        d.publication = { id: current.id, data: current.data }; delete d.publishAttempt; d.view = '#/page-published'; save();
+        publishing = false; location.hash = '#/page-published';
+      } catch (err) {
+        publishing = false;
+        // 서버가 첫 요청의 유효성 검사를 거절한 경우에는 저장 전 거절이 확실하다.
+        // 이전에 응답을 잃은 시도가 있었다면 나중 거절만으로 최초 저장 여부를 단정하지 않는다.
+        if (!hadPriorAttempt && ['FIELDS', 'CONSENT', 'PASSWORD', 'BAD_JSON', 'TOO_LARGE'].includes(err?.code)) {
+          delete d.publishAttempt; save();
+          error.textContent = (err?.message || '공개 내용을 확인해 주세요.') + ' 미리보기로 돌아가 내용을 수정한 뒤 다시 공개해 주세요.';
+          submit.disabled = true; submit.textContent = '내용 수정 후 다시 시도';
+          return;
+        }
+        // 응답이 없어도 서버에서 처리됐을 수 있다. 같은 ID와 내용으로만 직접 확인한다.
+        current.status = 'uncertain'; save();
+        error.textContent = (err?.message || '공개 결과를 확인하지 못했어요.') + ' 공개됐을 수 있으므로 같은 비밀번호를 넣고 같은 요청 확인하기를 눌러 주세요. 자동 재전송하지 않아요.';
+        submit.disabled = false; submit.textContent = '같은 공개 요청 확인하기 · 0원';
+      }
+    }
+    show(h('div', { class: 'page-publish' },
+      h('h2', null, '공개하기 전 마지막 확인'),
+      h('p', { class: 'card note' }, h('b', null, '베타 기간 무료 · 결제 금액 0원'), '실제 결제창이 열리거나 돈이 청구되지 않아요. 공개 후 가게 페이지, QR 코드와 공유 소개글을 이용할 수 있어요.'),
+      h('p', { class: 'small muted' }, '공개하면 누구나 볼 수 있고 검색엔진이나 다른 서비스가 수집·복사할 수 있어요. 검색 노출과 AI 추천을 보장하지 않아요. 삭제해도 외부의 사본이나 검색 결과가 바로 사라지지 않을 수 있어요.'),
+      d.publication?.id ? h('p', { class: 'card warn' }, '이미 공개한 페이지가 있어요. 다시 공개하면 별도의 페이지가 만들어져요. 기존 내용을 바꾸려면 ', h('a', { href: '/#/manage/' + d.publication.id }, '기존 페이지 관리'), '를 이용해 주세요.') : null,
+      attempt ? h('p', { class: 'card warn', role: 'status' }, '이전 요청이 이미 공개됐을 수 있어요. 같은 내용과 비밀번호로 결과를 확인해요. 확인 전까지 요청 내용은 고정돼요. ', h('a', { href: '/#/manage/' + attempt.id }, '요청한 주소 관리하기')) : null,
+      issue ? h('p', { class: 'card warn', role: 'alert' }, issue, ' ', h('a', { href: '#/page-edit' }, '내용 수정')) : null,
+      h('article', { class: 'card page-draft-content' }, h('p', { class: 'small muted' }, data.name, ' · ', data.address), h('h3', null, data.headline), h('p', null, data.intro), data.sections.map(x => h('section', null, h('h3', null, x.heading), h('p', null, x.body))), data.faqs.length ? h('section', null, h('h3', null, '자주 묻는 질문'), data.faqs.map(x => h('div', null, h('h4', null, x.question), h('p', null, x.answer)))) : null),
+      h('form', { class: 'card page-form', novalidate: true, onsubmit: publish },
+        h('h3', null, '공개 페이지 관리 비밀번호'),
+        h('p', { class: 'small muted' }, '나중에 수정하거나 삭제할 때 필요해요. 비밀번호는 복구할 수 없으니 안전하게 보관해 주세요. 비밀번호는 공개되지 않아요.'),
+        h('label', { class: 'field', for: 'publish-password' }, h('span', { class: 'lab' }, '관리 비밀번호 8~64자'), password),
+        h('label', { class: 'field', for: 'publish-password-again' }, h('span', { class: 'lab' }, '비밀번호 다시 입력'), again),
+        h('label', { class: 'page-consent', for: 'publish-consent' }, consent, h('span', null, '저는 이 가게 정보를 공개할 권한이 있고, 모든 내용을 사실에 맞게 확인했으며 공개하면 누구나 볼 수 있다는 점과 삭제의 한계를 이해합니다. 개인정보나 권리 없는 자료는 넣지 않았습니다. 공개 페이지와 관리용 정보의 서버 저장에 동의합니다.')),
+        h('p', { class: 'tiny muted' }, h('a', { href: '#/privacy' }, '개인정보처리방침')), error, submit)));
+    setNavbar(btn('미리보기로', () => { location.hash = '#/page-preview'; }), btn('처음으로', home));
+  }
+  function renderPublished() {
+    const d = needDraft(); if (!d) return;
+    if (!d.publication?.id) { location.hash = '#/page-preview'; return; }
+    d.view = '#/page-published'; save();
+    if (typeof onPublished === 'function') onPublished(d.publication.id, d.publication.data);
+  }
+
+  return { begin, renderSearch, renderConfirmed, renderQuestions, renderPreview, renderEdit, renderPublish, renderPublished, info: () => ({ name: state.name || '', address: state.address || '', status: state.status || '', draftStatus: state.pageDraft?.status || '', resumeHash: state.pageDraft?.view || (state.status === 'confirmed' ? '#/page-confirmed' : '#/page-search') }), busy: () => busy || draftBusy || publishing || !!state.pageDraft?.publishAttempt };
 }
