@@ -21,7 +21,7 @@ function createContext(post) {
 function text(node) {
   if (node == null || node === false) return '';
   if (typeof node !== 'object') return String(node);
-  return (node.children || []).map(text).join(' ');
+  return node.textContent ?? (node.children || []).map(text).join(' ');
 }
 function allText(state) { return state.rendered.map(text).join(' '); }
 function find(node, predicate) {
@@ -54,7 +54,8 @@ test('one consented request, duplicate blocked, candidate confirmation preserves
   select.attrs.onclick();
   assert.equal(location.hash, '#/page-confirmed');
   ctx.flow.renderConfirmed();
-  assert.match(allText(ctx.state), /다음 단계는 준비 중/);
+  assert.match(allText(ctx.state), /질문 5개로 소개 초안/);
+  assert.ok(findRendered(ctx.state, n => n.tag === 'button' && text(n) === '질문 답하기'));
   assert.match(allText(ctx.state), /정확성은 아직 별도로 확인/);
   assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
 });
@@ -218,4 +219,234 @@ test('webFeatures empty keeps unsourced summary labeled; legacy keeps old behavi
   assert.match(t, /지도별 공개 검색 단서/);
   assert.doesNotMatch(t, /개별 출처가 연결되지 않은/);
   assert.ok(!collectLinks(ctx.state).some((l) => l.includes('google.com/search')));
+});
+
+const PAGE_KEY = 'yeogibwa.page.start.v1';
+const draftResult = () => ({ draft: {
+  headline: { text: '창가에서 즐기는 차', evidence: ['answers.offer'] },
+  intro: { text: '차를 제공해요.', evidence: ['answers.offer'] },
+  sections: [{ heading: '우리 메뉴', body: '따뜻한 차', evidence: ['answers.offer'] }],
+  faqs: [{ question: '예약은 어떻게 하나요?', answer: '방문 전 예약해 주세요.', evidence: ['answers.visit'] }],
+  keywords: [{ text: '차 한 잔', evidence: ['answers.offer'] }], omittedCount: 2,
+}, createdAt: '2026-11-08T10:00:00Z', cached: false, mock: false });
+function getNode(ctx, id) { const n = findRendered(ctx.state, x => x.attrs?.id === id); assert.ok(n, id); return n; }
+function input(ctx, id, value) { getNode(ctx, id).attrs.oninput({ target: { value } }); }
+function check(ctx, id, checked = true) { getNode(ctx, id).attrs.onchange({ target: { checked } }); }
+function submit(ctx) { const f = findRendered(ctx.state, x => x.tag === 'form'); assert.ok(f); return f.attrs.onsubmit({ preventDefault() {} }); }
+function reload(ctx) {
+  ctx.flow = makePageStart({ h: ctx.h, show: ctx.show, setNavbar: ctx.setNavbar, btn: ctx.btn, post: ctx.post, storeName: ctx.state.storeName });
+  return ctx;
+}
+async function ready(post = async () => draftResult(), c = candidate) {
+  const calls = [];
+  const ctx = createContext(async (url, data, timeout) => {
+    if (url === '/api/page-search') return { ...response(), candidates: [c] };
+    calls.push({ url, data, timeout }); return post(url, data, timeout);
+  });
+  await ctx.flow.begin('입력가게', '입력주소');
+  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '이 가게가 맞아요').attrs.onclick();
+  ctx.flow.renderConfirmed();
+  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '질문 답하기').attrs.onclick();
+  assert.equal(location.hash, '#/page-questions'); ctx.flow.renderQuestions();
+  ctx.calls = calls; return ctx;
+}
+function fillAnswers(ctx) {
+  input(ctx, 'page-answer-offer', '따뜻한 차');
+  input(ctx, 'page-answer-difference', '직접 고른 찻잎');
+  input(ctx, 'page-answer-audience', '친구와 이야기할 때');
+  input(ctx, 'page-answer-visit', '방문 전 예약해 주세요.');
+  input(ctx, 'page-answer-keywords', '지역 인기 카페');
+}
+
+test('five questions, candidate prefill, independent consent and validation block every request', async () => {
+  const ctx = await ready();
+  const ids = ['offer', 'difference', 'audience', 'visit', 'keywords'];
+  for (const id of ids) assert.ok(getNode(ctx, 'page-answer-' + id));
+  assert.equal(getNode(ctx, 'page-store-name').attrs.value, candidate.name);
+  assert.equal(getNode(ctx, 'page-store-address').attrs.value, candidate.address);
+  assert.equal(getNode(ctx, 'page-store-name').attrs.maxlength, 60);
+  assert.equal(getNode(ctx, 'page-store-address').attrs.maxlength, 120);
+  assert.equal(getNode(ctx, 'page-answer-offer').attrs.required, true);
+  assert.equal(getNode(ctx, 'page-answer-visit').attrs.required, false);
+  assert.equal(getNode(ctx, 'page-answer-offer').attrs.maxlength, 500);
+  assert.equal(getNode(ctx, 'page-answer-keywords').attrs.maxlength, 300);
+  assert.ok(!getNode(ctx, 'page-draft-consent').attrs.checked);
+  assert.match(allText(ctx.state), /OpenRouter 및 연결된 AI 제공자/);
+  assert.match(allText(ctx.state), /가게명·주소·직접 선택한 특징·위 5개 답변/);
+  assert.match(allText(ctx.state), /보관정책|개인정보|검색 동의와 별도/);
+  await submit(ctx); assert.equal(ctx.calls.length, 0);
+  assert.match(allText(ctx.state), /대표 메뉴·서비스를 2자 이상 입력/);
+  input(ctx, 'page-answer-offer', '차 음료'); await submit(ctx);
+  assert.equal(ctx.calls.length, 0); assert.match(allText(ctx.state), /별도로 동의/);
+  check(ctx, 'page-draft-consent'); input(ctx, 'page-answer-offer', '가'.repeat(501)); await submit(ctx);
+  assert.equal(ctx.calls.length, 0);
+  input(ctx, 'page-answer-offer', '차 음료'); input(ctx, 'page-store-name', ''); await submit(ctx); assert.equal(ctx.calls.length, 0);
+  input(ctx, 'page-store-name', '수정한 가게'); input(ctx, 'page-store-address', '수정한 주소');
+  await submit(ctx); assert.equal(ctx.calls.length, 1);
+  assert.equal(ctx.calls[0].data.store.name, '수정한 가게'); assert.equal(ctx.calls[0].data.store.address, '수정한 주소');
+  assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
+});
+
+test('only explicitly checked facts are sent, maximum eight, no AI price or hours prefill', async () => {
+  const c = { ...candidate, hours: '24시간', priceRange: '무료', webFeatures: Array.from({ length: 10 }, (_, i) => ({ text: '특징' + i, sourceUrl: 'https://example.com/a' })) };
+  const ctx = await ready(undefined, c);
+  for (let i = 0; i < 8; i++) assert.ok(!getNode(ctx, 'page-fact-' + i).attrs.checked);
+  assert.equal(findRendered(ctx.state, n => n.attrs?.id === 'page-fact-8'), null);
+  assert.equal(getNode(ctx, 'page-answer-visit').attrs.value, '');
+  assert.equal(getNode(ctx, 'page-answer-offer').attrs.value, '');
+  check(ctx, 'page-fact-1'); check(ctx, 'page-fact-2'); check(ctx, 'page-fact-2', false);
+  fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  assert.equal(ctx.calls.length, 1);
+  assert.equal(ctx.calls[0].url, '/api/page-draft');
+  assert.deepEqual(ctx.calls[0].data, { store: { name: candidate.name, address: candidate.address, verifiedFacts: ['특징1'] }, answers: { offer: '따뜻한 차', difference: '직접 고른 찻잎', audience: '친구와 이야기할 때', visit: '방문 전 예약해 주세요.', keywords: '지역 인기 카페' }, consent: true });
+  assert.equal(location.hash, '#/page-preview');
+  assert.match(allText(ctx.state), /비공개 미리보기/); assert.match(allText(ctx.state), /2개를 제외/);
+  assert.match(allText(ctx.state), /확인할 키워드 제안/); assert.match(allText(ctx.state), /사실 근거가 아니에요/);
+  assert.match(allText(ctx.state), /부정 표현이나 조건/);
+  assert.match(allText(ctx.state), /AI 학습·추천은 보장하지 않아요/);
+  assert.equal(ctx.flow.info().resumeHash, '#/page-preview');
+});
+
+test('duplicate submit and pending reentry/reload never repeat automatically', async () => {
+  let finish;
+  const ctx = await ready(() => new Promise(resolve => { finish = resolve; }));
+  fillAnswers(ctx); check(ctx, 'page-draft-consent');
+  const originalForm = findRendered(ctx.state, n => n.tag === 'form');
+  const pending = submit(ctx);
+  await originalForm.attrs.onsubmit({ preventDefault() {} });
+  ctx.flow.renderQuestions();
+  assert.equal(ctx.calls.length, 1); assert.equal(ctx.flow.busy(), true);
+  assert.equal(findRendered(ctx.state, n => n.tag === 'button' && n.attrs.type === 'submit').attrs.disabled, true);
+  assert.equal(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.status, 'pending');
+  reload(ctx); ctx.flow.renderQuestions(); ctx.flow.renderPreview(); ctx.flow.renderEdit();
+  assert.equal(ctx.calls.length, 1);
+  assert.match(allText(ctx.state), /이미 처리됐을 수도/); assert.match(allText(ctx.state), /자동으로 다시 보내지 않았어요/);
+  assert.equal(getNode(ctx, 'page-answer-offer').attrs.value, '따뜻한 차');
+  assert.ok(!getNode(ctx, 'page-draft-consent').attrs.checked);
+  finish(draftResult()); await pending;
+});
+
+test('API errors preserve all answers and selected facts; retry requires a user action and consent', async () => {
+  let attempt = 0;
+  const ctx = await ready(async () => { if (++attempt === 1) { const e = new Error('응답 지연'); e.code = 'TIMEOUT'; throw e; } return draftResult(); });
+  fillAnswers(ctx); check(ctx, 'page-fact-0'); check(ctx, 'page-draft-consent'); await submit(ctx);
+  assert.equal(ctx.calls.length, 1); assert.match(allText(ctx.state), /답변은 보존/);
+  assert.equal(getNode(ctx, 'page-answer-visit').attrs.value, '방문 전 예약해 주세요.');
+  reload(ctx); ctx.flow.renderQuestions();
+  assert.equal(ctx.calls.length, 1); assert.equal(getNode(ctx, 'page-fact-0').attrs.checked, true);
+  assert.equal(getNode(ctx, 'page-answer-keywords').attrs.value, '지역 인기 카페');
+  await submit(ctx); assert.equal(ctx.calls.length, 1);
+  check(ctx, 'page-draft-consent'); await submit(ctx); assert.equal(ctx.calls.length, 2);
+  assert.equal(location.hash, '#/page-preview');
+});
+
+test('every draft field is editable and survives refresh; save is local only and preserves omittedCount', async () => {
+  const ctx = await ready(); fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '내용 수정').attrs.onclick();
+  assert.equal(location.hash, '#/page-edit'); ctx.flow.renderEdit();
+  const changes = { 'page-edit-store-name': '수정한 상호', 'page-edit-store-address': '수정한 주소', 'page-edit-headline': '수정 제목', 'page-edit-intro': '수정 소개', 'page-edit-section-0-heading': '수정 섹션', 'page-edit-section-0-body': '수정 본문', 'page-edit-faq-0-question': '수정 질문?', 'page-edit-faq-0-answer': '수정 답변', 'page-edit-keyword-0': '수정 키워드' };
+  for (const [id, value] of Object.entries(changes)) input(ctx, id, value);
+  reload(ctx); ctx.flow.renderEdit(); assert.equal(ctx.flow.info().resumeHash, '#/page-edit');
+  for (const [id, value] of Object.entries(changes)) assert.equal(getNode(ctx, id).attrs.value, value);
+  await submit(ctx); assert.equal(ctx.calls.length, 1); assert.equal(location.hash, '#/page-preview');
+  for (const value of Object.values(changes)) assert.ok(allText(ctx.state).includes(value));
+  assert.match(allText(ctx.state), /2개를 제외/);
+  reload(ctx); ctx.flow.renderPreview(); assert.match(allText(ctx.state), /수정 제목/);
+  assert.equal(ctx.calls.length, 1); assert.equal(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.draft.omittedCount, 2);
+  ctx.flow.renderQuestions(); assert.equal(getNode(ctx, 'page-answer-offer').attrs.value, '따뜻한 차');
+  await submit(ctx); assert.equal(ctx.calls.length, 1);
+  ctx.flow.renderSearch(); assert.match(allText(ctx.state), /이 가게가 맞나요/);
+  ctx.flow.renderConfirmed(); assert.match(allText(ctx.state), /가게를 확인했어요/);
+  assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
+});
+
+test('sparse results never invent FAQ, prices or opening hours', async () => {
+  const ctx = await ready(async () => ({ draft: { headline: { text: '차를 파는 가게', evidence: ['answers.offer'] }, omittedCount: 3 }, cached: false, mock: false }));
+  input(ctx, 'page-answer-offer', '차 음료'); check(ctx, 'page-draft-consent'); await submit(ctx);
+  assert.match(allText(ctx.state), /차를 파는 가게/); assert.match(allText(ctx.state), /3개를 제외/);
+  assert.doesNotMatch(allText(ctx.state), /자주 묻는 질문|24시간|무료|예약은 어떻게/);
+  ctx.flow.renderEdit(); assert.equal(findRendered(ctx.state, n => n.attrs?.id === 'page-edit-faq-0-question'), null);
+  await submit(ctx); assert.equal(ctx.calls.length, 1); assert.match(allText(ctx.state), /3개를 제외/);
+});
+
+test('all malicious draft content and edits stay text, never elements or HTML', async () => {
+  const attack = '<img src=x onerror=alert(1)><script>alert(2)</script>';
+  const payload = draftResult();
+  for (const item of [payload.draft.headline, payload.draft.intro, ...payload.draft.keywords]) item.text = attack;
+  payload.draft.sections[0].heading = attack; payload.draft.sections[0].body = attack;
+  payload.draft.faqs[0].question = attack; payload.draft.faqs[0].answer = attack;
+  const ctx = await ready(async () => payload); input(ctx, 'page-answer-offer', attack); check(ctx, 'page-draft-consent'); await submit(ctx);
+  assert.ok(allText(ctx.state).includes(attack));
+  assert.equal(findRendered(ctx.state, n => ['img', 'script', 'iframe'].includes(n.tag)), null);
+  assert.equal(findRendered(ctx.state, n => 'innerHTML' in n.attrs || 'srcdoc' in n.attrs), null);
+  ctx.flow.renderEdit(); input(ctx, 'page-edit-headline', attack + '<svg/onload=alert(3)>'); await submit(ctx);
+  assert.ok(allText(ctx.state).includes('<svg/onload=alert(3)>'));
+  assert.equal(findRendered(ctx.state, n => n.tag === 'svg'), null); assert.equal(ctx.calls.length, 1);
+});
+
+test('preview/edit direct entry without chosen store does not call API', () => {
+  let calls = 0; const ctx = createContext(() => { calls++; });
+  ctx.flow.renderQuestions(); ctx.flow.renderPreview(); ctx.flow.renderEdit();
+  assert.equal(calls, 0); assert.equal(location.hash, '#/');
+});
+
+test('regeneration is explicitly requested, separately consented, and preserves answers', async () => {
+  const ctx = await ready(); fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  ctx.flow.renderQuestions();
+  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '답변으로 새 초안 만들기').attrs.onclick();
+  assert.equal(ctx.calls.length, 1); assert.equal(getNode(ctx, 'page-answer-offer').attrs.value, '따뜻한 차');
+  await submit(ctx); assert.equal(ctx.calls.length, 1);
+  input(ctx, 'page-answer-offer', '차와 커피'); check(ctx, 'page-draft-consent'); location.hash = '#/page-questions'; await submit(ctx);
+  assert.equal(ctx.calls.length, 2); assert.equal(ctx.calls[1].data.answers.offer, '차와 커피');
+  assert.match(allText(ctx.state), /검색엔진이 수집할 공개 페이지가 아니에요/);
+});
+
+
+test('editing is automatically reflected when navigating to preview or back to questions', async () => {
+  const ctx = await ready(); fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  ctx.flow.renderEdit(); input(ctx, 'page-edit-headline', '자동 저장된 제목'); input(ctx, 'page-edit-store-name', '수정한 상호');
+  ctx.flow.renderPreview(); assert.match(allText(ctx.state), /자동 저장된 제목/); assert.match(allText(ctx.state), /수정한 상호/);
+  ctx.flow.renderEdit(); input(ctx, 'page-edit-intro', '질문으로 돌아가도 보존'); ctx.flow.renderQuestions();
+  ctx.flow.renderPreview(); assert.match(allText(ctx.state), /질문으로 돌아가도 보존/); assert.equal(ctx.calls.length, 1);
+});
+
+test('owner can add and remove their own sections, FAQ and keywords locally', async () => {
+  const ctx = await ready(async () => ({ draft: { headline: { text: '처음 제목', evidence: ['offer'] }, intro: { text: '기본 소개', evidence: ['offer'] }, sections: [], faqs: [], keywords: [], omittedCount: 1 }, cached: false }));
+  fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx); ctx.flow.renderEdit();
+  for (const label of ['소개 섹션 추가', 'FAQ 직접 추가', '키워드 추가']) {
+    const button = findRendered(ctx.state, n => n.tag === 'button' && text(n) === label); assert.ok(button); button.attrs.onclick();
+  }
+  input(ctx, 'page-edit-section-0-heading', '사장님이 추가한 내용'); input(ctx, 'page-edit-section-0-body', '확인한 소개예요.');
+  input(ctx, 'page-edit-faq-0-question', '포장할 수 있나요?'); input(ctx, 'page-edit-faq-0-answer', '네, 포장할 수 있어요.');
+  input(ctx, 'page-edit-keyword-0', '직접 확인한 키워드'); await submit(ctx);
+  for (const value of ['사장님이 추가한 내용', '확인한 소개예요.', '포장할 수 있나요?', '네, 포장할 수 있어요.', '직접 확인한 키워드']) assert.ok(allText(ctx.state).includes(value));
+  assert.equal(ctx.calls.length, 1); ctx.flow.renderEdit();
+  for (const label of ['소개 섹션 삭제', 'FAQ 삭제', '키워드 삭제']) {
+    const button = findRendered(ctx.state, n => n.tag === 'button' && text(n) === label); assert.ok(button); button.attrs.onclick();
+  }
+  ctx.flow.renderPreview(); assert.doesNotMatch(allText(ctx.state), /사장님이 추가한 내용|포장할 수 있나요|직접 확인한 키워드/);
+  assert.equal(ctx.calls.length, 1);
+});
+
+test('starting another store asks before destroying an in-progress draft', async () => {
+  const ctx = await ready(); fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  const prior = sessionStorage.getItem(PAGE_KEY); let warning = '';
+  try {
+    globalThis.confirm = msg => { warning = msg; return false; };
+    await ctx.flow.begin('다른 가게', '서울 서초구 다른로 10');
+    assert.match(warning, /작성하던 가게 소개와 수정 내용이 지워져요/);
+    assert.equal(sessionStorage.getItem(PAGE_KEY), prior); assert.equal(ctx.calls.length, 1);
+  } finally { delete globalThis.confirm; }
+});
+
+test('uncertain search outcome never retries without a deliberate warning', async () => {
+  let requests = 0;
+  const ctx = createContext(async () => { requests++; const e = new Error('연결 끊김'); e.code = 'TIMEOUT'; throw e; });
+  await ctx.flow.begin('기존가게', '서울 마포구 망원로 12');
+  assert.equal(ctx.flow.info().status, 'uncertain'); assert.equal(requests, 1);
+  try {
+    let warning = ''; globalThis.confirm = msg => { warning = msg; return false; };
+    await ctx.flow.begin('기존가게', '서울 마포구 망원로 12');
+    assert.match(warning, /비용이 중복될 수/); assert.equal(requests, 1);
+  } finally { delete globalThis.confirm; }
 });
