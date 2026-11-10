@@ -112,6 +112,44 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
           mapSearch(platform) ? h('a', { href: mapSearch(platform), target: '_blank', rel: 'noopener noreferrer', class: 'small' }, `${label}에서 직접 검색`) : null);
       }));
   }
+  function webFeatureGroups(c) {
+    // 새 결과(webFeatures 배열 존재)에서만 사용한다. 최대 8개, 안전한 링크와 내용이 있는 항목만.
+    const items = (Array.isArray(c?.webFeatures) ? c.webFeatures : [])
+      .filter((x) => x && typeof x === 'object' && !Array.isArray(x) && typeof x.text === 'string' && x.text.trim())
+      .map((x) => ({
+        text: x.text.trim().slice(0, 300),
+        title: typeof x.sourceTitle === 'string' && x.sourceTitle.trim() ? x.sourceTitle.trim().slice(0, 120) : '참고 링크',
+        url: typeof x.sourceUrl === 'string' ? safeLink(x.sourceUrl) : null,
+        provider: x.origin === 'provider_annotation',
+      })).filter((x) => x.url).slice(0, 8);
+    const groups = [];
+    for (const it of items) {
+      let g = groups.find((x) => x.url === it.url && x.provider === it.provider);
+      if (!g) { g = { url: it.url, title: it.title, provider: it.provider, texts: [] }; groups.push(g); }
+      g.texts.push(it.text);
+    }
+    return groups;
+  }
+  function webFeatureSection(groups) {
+    return h('div', { class: 'web-features' },
+      h('div', { class: 'sub-title' }, 'AI가 웹에서 찾은 가게 특징'),
+      h('p', { class: 'small muted' }, '각 링크는 참고자료예요. 링크가 해당 내용의 근거가 아닐 수 있으니 사실 여부를 직접 확인해 주세요.'),
+      groups.map((g) => h('div', { class: 'web-feature-group' },
+        h('a', { href: g.url, target: '_blank', rel: 'noopener noreferrer' }, g.title),
+        h('span', { class: 'tiny muted' }, g.provider ? ' · 제공자 인용' : ' · AI 제시 링크', ' · 참고자료, 사실 확인 필요'),
+        h('ul', { class: 'plain-list' }, g.texts.map((t) => h('li', null, t))))));
+  }
+  function directCheckSection() {
+    const query = [state.name, state.address].filter((x) => typeof x === 'string' && x.trim()).join(' ').trim();
+    if (!query) return null;
+    const q = encodeURIComponent(query);
+    return h('div', { class: 'direct-check' },
+      h('div', { class: 'sub-title' }, '직접 확인'),
+      h('p', { class: 'tiny muted' }, '아래 링크를 누르면 입력하신 가게명과 주소가 해당 사이트(구글 웹 검색 또는 카카오맵)로 전달돼요. 누르기 전에는 전달되지 않아요. 구글 지도가 아닌 구글 웹 검색이에요.'),
+      h('a', { href: `https://www.google.com/search?q=${q}`, target: '_blank', rel: 'noopener noreferrer', class: 'small' }, '구글 웹 검색에서 직접 확인'),
+      h('br'),
+      h('a', { href: `https://map.kakao.com/link/search/${q}`, target: '_blank', rel: 'noopener noreferrer', class: 'small' }, '카카오맵에서 직접 검색'));
+  }
   function candidateCard(c, index, confirmed = false) {
     const rows = [
       ['주소', c?.address], ['업종', c?.category], ['영업시간', c?.hours], ['전화', c?.phone],
@@ -120,15 +158,19 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
     const menu = (Array.isArray(c?.menu) ? c.menu : []).filter((m) => m?.name);
     const features = (Array.isArray(c?.features) ? c.features : []).filter(Boolean);
     const strengths = (Array.isArray(c?.strengths) ? c.strengths : []).filter(Boolean);
+    const isNew = Array.isArray(c?.webFeatures);
+    const wf = isNew ? webFeatureGroups(c) : [];
+    const showLegacy = !wf.length;
     return h('div', { class: 'card cand page-candidate' },
       h('h3', null, c?.name || '상호 확인 필요'),
       h('p', { class: 'small muted' }, '입력한 가게가 맞는지 상호와 주소를 직접 확인해 주세요.'),
       rows.length ? h('div', { class: 'kv' }, rows.map(([label, value]) => h('div', null, h('span', null, label), h('b', null, value)))) : h('p', { class: 'small muted' }, '확인할 수 있는 상세 정보가 부족해요.'),
       menu.length ? [h('div', { class: 'sub-title' }, '대표 메뉴·상품'), h('div', { class: 'menu-chips' }, menu.map((m) => h('span', null, m.name, m.price ? h('small', null, m.price) : null)))] : null,
-      features.length ? [h('div', { class: 'sub-title' }, 'AI가 정리한 가게 특징'), h('ul', { class: 'plain-list' }, features.map((f) => h('li', null, f)))] : null,
-      strengths.length ? [h('div', { class: 'sub-title' }, '공개 정보에서 살펴볼 강점'), h('ul', { class: 'plain-list' }, strengths.map((s) => h('li', null, s)))] : null,
-      !features.length && !strengths.length ? h('p', { class: 'small muted' }, '가게의 특징은 공개 정보에서 충분히 확인하지 못했어요.') : null,
-      mapSignalSection(c),
+      wf.length ? webFeatureSection(wf) : null,
+      showLegacy && features.length ? [h('div', { class: 'sub-title' }, isNew ? 'AI 요약 특징 (개별 출처가 연결되지 않은 AI 요약)' : 'AI가 정리한 가게 특징'), isNew ? h('p', { class: 'small muted' }, '개별 출처가 연결되지 않은 AI 요약이에요. 사실 여부를 직접 확인해 주세요.') : null, h('ul', { class: 'plain-list' }, features.map((f) => h('li', null, f)))] : null,
+      showLegacy && strengths.length ? [h('div', { class: 'sub-title' }, isNew ? '살펴볼 강점 (개별 출처가 연결되지 않은 AI 요약)' : '공개 정보에서 살펴볼 강점'), isNew ? h('p', { class: 'small muted' }, '개별 출처가 연결되지 않은 AI 요약이에요. 사실 여부를 직접 확인해 주세요.') : null, h('ul', { class: 'plain-list' }, strengths.map((s) => h('li', null, s)))] : null,
+      showLegacy && !features.length && !strengths.length ? h('p', { class: 'small muted' }, '가게의 특징은 공개 정보에서 충분히 확인하지 못했어요.') : null,
+      isNew ? directCheckSection() : mapSignalSection(c),
       !confirmed ? h('button', { class: 'btn primary block page-choose', type: 'button', onclick: () => choose(index) }, '이 가게가 맞아요') : null);
   }
   function choose(index) {
