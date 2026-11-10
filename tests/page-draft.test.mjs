@@ -7,7 +7,7 @@ import { MemoryStore, limits, UNLIMITED } from '../lib/guard.mjs';
 const ENV = { OPENROUTER_API_KEY: 'test-key', SESSION_SECRET: 'private-test-salt', VERCEL: '1', VERCEL_ENV: 'preview' };
 const OK = { store: { name: '골목분식', address: '서울 마포구 망원로 12', verifiedFacts: ['주문 후 김밥을 만듭니다', '포장 가능합니다'] }, answers: { offer: '김밥과 떡볶이를 제공합니다', difference: '주문 후 만드는 김밥', audience: '간단히 식사하려는 이웃', visit: '포장 가능합니다', keywords: '24시간 무료주차 맛집' }, consent: true };
 const clone = o => JSON.parse(JSON.stringify(o));
-const good = () => ({ headline: { text: '주문 후 만드는 김밥', evidence: ['fact0'] }, intro: { text: '김밥과 떡볶이로 간단한 식사를 준비해 보세요.', evidence: ['offer', 'audience'] }, sections: [{ heading: '주문 후 준비하는 김밥', body: '주문을 받고 김밥을 만듭니다. 포장도 가능합니다.', evidence: ['fact0', 'fact1'] }], faqs: [{ question: '포장할 수 있나요?', answer: '네, 포장 가능합니다.', evidence: ['visit'] }], keywords: [{ text: '24시간 무료주차 맛집', evidence: ['keywords'] }] });
+const good = () => ({ headline: { text: '주문 후 만드는 김밥', evidence: ['fact0'] }, intro: { text: '김밥과 떡볶이로 간단한 식사를 준비해 보세요.', evidence: ['offer', 'audience'] }, sections: [{ heading: '주문 후 준비하는 김밥', body: '주문을 받고 김밥을 만듭니다. 포장도 가능합니다.', evidence: ['fact0', 'fact1'] }], faqs: [{ question: '포장할 수 있나요?', answer: '네, 포장 가능합니다.', evidence: ['visit'] }], keywords: [{ text: '골목분식', evidence: ['name'] }, { text: '서울 마포구', evidence: ['address'] }] });
 function req(body = OK, headers = {}, preParsed = false) {
   const data = typeof body === 'string' ? body : JSON.stringify(body);
   const r = Readable.from([Buffer.from(data)]);
@@ -65,7 +65,7 @@ test('salted TTL lock prevents duplicate concurrent calls and unlocks in finally
 test('numeric safety scoped to cited facts, not keywords or uncited inputs; preserve supported items', () => {
   const raw = good(); raw.sections.push({ heading: '이용 시간', body: '24시간 이용 가능합니다.', evidence: ['keywords', 'offer'] }, { heading: '가격', body: '김밥 3000원입니다.', evidence: ['offer'] });
   raw.faqs.push({ question: '주차 비용은?', answer: '무료주차입니다.', evidence: ['keywords'] });
-  const d = normalizeDraft(raw, validateDraftInput(OK)); assert.equal(d.sections.length, 1); assert.equal(d.faqs.length, 1); assert.equal(d.omittedCount, 3); assert.equal(d.keywords.length, 1);
+  const d = normalizeDraft(raw, validateDraftInput(OK)); assert.equal(d.sections.length, 1); assert.equal(d.faqs.length, 1); assert.equal(d.omittedCount, 3); assert.equal(d.keywords.length, 2);
   const b = clone(OK); b.answers.offer = '김밥 10,000원, 오전 10시부터 20시까지'; const r = good(); r.sections = [{ heading: '가격과 시간', body: '김밥 10000원, 10시부터 20시까지입니다.', evidence: ['offer'] }]; assert.equal(normalizeDraft(r, validateDraftInput(b)).sections.length, 1);
   r.sections[0].body = '김밥 1000원입니다.'; assert.equal(normalizeDraft(r, validateDraftInput(b)).sections.length, 0); assert.deepEqual(numberTokens('10000원과 10,000원'), ['10000', '10000']);
 });
@@ -180,4 +180,15 @@ test('contradictory positive claims are not hidden by a separate negative senten
   assert.equal(contradictsOwner('주차할 수 없습니다. 주차 가능합니다.', { visit: '주차장은 이용하실 수 없습니다' }), true);
   assert.equal(contradictsOwner('영업합니다.', { visit: '현재 영업하지 않습니다' }), true);
   assert.equal(contradictsOwner('주차는 가능하지 않습니다.', { visit: '주차 불가' }), false);
+});
+
+
+test('keyword suggestions never reuse unsupported practical claims and have confirmed identity fallbacks', () => {
+  const raw = good(); raw.keywords = [{ text: '무료주차', evidence: ['keywords'] }, { text: '24시간 영업', evidence: ['keywords'] }];
+  const d = normalizeDraft(raw, validateDraftInput(OK));
+  assert.deepEqual(d.keywords.map(k => k.text), ['골목분식', '서울 마포구']);
+  assert.equal(d.omittedCount, 2);
+  raw.keywords = []; const sparse = normalizeDraft(raw, validateDraftInput(OK));
+  assert.deepEqual(sparse.keywords.map(k => k.text), ['골목분식', '서울 마포구']);
+  assert.deepEqual(sparse.keywords.map(k => k.evidence), [['name'], ['address']]);
 });
