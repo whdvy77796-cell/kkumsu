@@ -367,6 +367,54 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
     if (key === 'difference' && food) return '예: 직접 확인한 맛이나 공간의 특징. 해당하는 내용만 적고 모르면 비워 두세요.';
     return fallback;
   }
+  // 예시의 대괄호는 실제 가게 정보로 바꾸기 전까지 AI에 보내지 않는다.
+  const EXAMPLE_MARKERS = ['[메뉴 이름]', '[맛이나 재료]', '[상품·서비스 이름]', '[제공 방식]', '[가게의 특징]', '[만드는 방식 또는 운영 방식]', '[어떤 손님]', '[방문 목적]', '[방문 상황]', '[주차 가능 여부와 방법]', '[포장 가능 여부]', '[방문 전 확인할 점]', '[업종]', '[대표 메뉴]'];
+  function answerExamples(key, d) {
+    const c = chosenStore() || {};
+    const food = /카페|커피|음식|식당|분식|베이커리|제과|빵집|주점|한식|중식|일식|양식/.test(string(c.category));
+    const names = (Array.isArray(c.menu) ? c.menu : []).map(x => string(x?.name).trim()).filter(x => x && x.length <= 40).slice(0, 3);
+    const data = {
+      offer: food
+        ? [{ text: '대표 메뉴: [메뉴 이름].' }, { text: '판매 메뉴: [메뉴 이름]. 맛이나 재료: [맛이나 재료].' }]
+        : [{ text: '대표 상품·서비스: [상품·서비스 이름].' }, { text: '대표 서비스: [상품·서비스 이름]. 제공 방식: [제공 방식].' }],
+      difference: [{ text: '우리 가게의 특징은 [가게의 특징]이에요.' }, { text: '저희는 [만드는 방식 또는 운영 방식]을 중요하게 생각해요.' }],
+      audience: [{ text: '추천 손님: [어떤 손님]. 방문 목적: [방문 목적].' }, { text: '이럴 때 추천해요: [방문 상황].' }],
+      visit: [{ text: '주차: [주차 가능 여부와 방법]. 포장: [포장 가능 여부].' }, { text: '방문 전 [방문 전 확인할 점]을 확인해 주세요.' }],
+      keywords: [
+        { label: '가게 이름 + 지역으로 만들기', value: () => { const name = string(d.store.name).trim(); const region = string(d.store.address).trim().split(/\s+/).slice(0, 2).join(' '); return name && region ? `${name}, ${region} ${name}` : name || region; } },
+        { label: '지역 + 업종·대표 메뉴로 만들기', value: () => { const region = string(d.store.address).trim().split(/\s+/).slice(0, 2).join(' '); return `${region ? region + ' ' : ''}[업종], ${region ? region + ' ' : ''}[대표 메뉴]`; } },
+      ],
+    };
+    if (key === 'offer' && names.length) data.offer.unshift({ text: `대표 메뉴: ${names.join(', ')}.`, fromAi: true });
+    return data[key] || [];
+  }
+  function suggestionPanel(key, d, max) {
+    const status = h('p', { class: 'page-suggestion-status', role: 'status', 'aria-live': 'polite' });
+    const apply = (choice) => {
+      if (busy || draftBusy) return;
+      const value = string(typeof choice.value === 'function' ? choice.value() : choice.text).trim();
+      if (!value || value.length > max) { status.textContent = '가게 이름과 주소를 확인한 뒤 이용해 주세요.'; return; }
+      const current = string(d.answers[key]).trim();
+      const replace = current && current !== value;
+      if (choice.fromAi) {
+        if (!askBeforeDiscard('AI가 찾은 메뉴는 틀릴 수 있어요. 다음 내용이 우리 가게의 대표 메뉴가 맞는지 확인한 뒤 적용해 주세요.\n\n' + value + (replace ? '\n\n기존 답변은 바뀌어요.' : ''))) return;
+      } else if (replace && !askBeforeDiscard('기존에 작성한 답변을 이 예시로 바꿀까요?')) return;
+      d.answers[key] = value; save();
+      const el = typeof document === 'undefined' ? null : document.getElementById('page-answer-' + key);
+      if (el) {
+        el.value = value; el.removeAttribute('aria-invalid'); el.focus();
+        const first = value.indexOf('['), last = first < 0 ? -1 : value.indexOf(']', first);
+        if (first >= 0 && last > first && typeof el.setSelectionRange === 'function') el.setSelectionRange(first, last + 1);
+      }
+      status.textContent = EXAMPLE_MARKERS.some(m => value.includes(m)) ? '답변에 넣었어요. [ ] 부분을 우리 가게에 맞게 바꿔 주세요.' : '답변에 넣었어요. 실제 가게와 맞는지 확인해 주세요.';
+    };
+    const examples = answerExamples(key, d);
+    return h('div', { class: 'page-suggestions', 'data-suggestions-for': key },
+      h('p', { class: 'page-suggestions-title' }, '답변 추천 ', h('span', { class: 'tiny muted' }, '눌러서 넣고 우리 가게에 맞게 고쳐 주세요')),
+      examples.map((x, i) => h('button', { type: 'button', class: 'page-suggestion', disabled: draftBusy, 'data-suggestion-for': key, 'data-suggestion-index': i, onclick: () => apply(x) },
+        x.fromAi ? h('span', { class: 'page-suggestion-label' }, 'AI가 찾은 메뉴 · 확인 필요') : null, x.label || x.text)),
+      status);
+  }
   function applyEdits(d) {
     if (!d.edit) return;
     d.draft = cleanDraft(d.edit);
@@ -395,8 +443,10 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
             onchange: e => { d.store.verifiedFacts = e.target.checked ? [...new Set([...d.store.verifiedFacts, fact])].slice(0, 8) : d.store.verifiedFacts.filter(x => x !== fact); save(); } }), fact)),
         !factOptions().length ? h('p', { class: 'small muted' }, '선택할 특징이 없어요. 아래 질문에 직접 적어 주세요.') : null),
       h('h3', null, '질문 5개'),
-      QUESTION_FIELDS.map(([key, label, help, max, required], i) => field('page-answer-' + key, (i + 1) + '. ' + label, d.answers[key], max,
-        value => { d.answers[key] = value; save(); }, { required, help: questionHelp(key, help), multiline: true, disabled: draftBusy })),
+      QUESTION_FIELDS.map(([key, label, help, max, required], i) => h('div', { class: 'page-question' },
+        field('page-answer-' + key, (i + 1) + '. ' + label, d.answers[key], max,
+          value => { d.answers[key] = value; save(); }, { required, help: questionHelp(key, help), multiline: true, disabled: draftBusy }),
+        suggestionPanel(key, d, max))),
       existing ? h('p', { class: 'card note' }, '이미 초안을 만들었어요. 답변 변경은 AI에 다시 전송하지 않아요. 초안의 문장은 내용 수정에서 직접 고쳐 주세요.') :
         h('div', { class: 'card note page-disclosure' },
           h('h3', null, 'AI 초안 생성을 위한 별도 전송 동의'),
@@ -422,6 +472,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
     if (!store.name || store.name.length > 60) { message = '가게명을 1~60자로 입력해 주세요.'; focusId = 'page-store-name'; }
     else if (store.address.length < 4 || store.address.length > 120) { message = '주소를 4~120자로 입력해 주세요.'; focusId = 'page-store-address'; }
     else if (answers.offer.length < 2) { message = '대표 메뉴·서비스를 2자 이상 입력해 주세요.'; focusId = 'page-answer-offer'; }
+    else if (QUESTION_FIELDS.some(([key]) => EXAMPLE_MARKERS.some(marker => answers[key].includes(marker)))) { const field = QUESTION_FIELDS.find(([key]) => EXAMPLE_MARKERS.some(marker => answers[key].includes(marker))); message = '답변 예시의 [ ] 부분을 실제 가게 내용으로 바꾸거나 지워 주세요.'; focusId = 'page-answer-' + field[0]; }
     else if (QUESTION_FIELDS.some(([key, , , max]) => answers[key].length > max)) { message = '답변은 각 500자, 희망 검색어는 300자 이내로 입력해 주세요.'; focusId = 'page-answer-offer'; }
     else if (!consent) { message = 'AI 초안 생성 전송에 별도로 동의해 주세요.'; focusId = 'page-draft-consent'; }
     if (message) {
