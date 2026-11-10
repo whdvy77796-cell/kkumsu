@@ -456,3 +456,76 @@ test('uncertain search outcome never retries without a deliberate warning', asyn
     assert.match(warning, /비용이 중복될 수/); assert.equal(requests, 1);
   } finally { delete globalThis.confirm; }
 });
+
+
+test('reject button opens a separate consented retry with optional public website and preserves candidate details', async () => {
+  const calls = []; let finish;
+  const ctx = createContext((path, body) => { calls.push({ path, body }); if (calls.length === 1) return Promise.resolve(response()); return new Promise(r => { finish = r; }); });
+  await ctx.flow.begin('테스트가게', '서울 마포구 망원로 12');
+  const card = ctx.state.rendered.find(n => n.attrs?.class === 'card cand page-candidate');
+  const labels = card.children.filter(n => n?.tag === 'button').map(text);
+  assert.deepEqual(labels, ['이 가게가 맞아요', '아니에요']);
+  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '아니에요').attrs.onclick();
+  assert.match(allText(ctx.state), /운영 중인 사이트 주소 \(선택\)/);
+  let form = findRendered(ctx.state, n => n.tag === 'form' && n.attrs.class === 'page-retry-form');
+  await form.attrs.onsubmit({ preventDefault() {} }); assert.equal(calls.length, 1);
+  let url = findRendered(ctx.state, n => n.tag === 'input' && n.attrs.id === 'page-retry-url-1');
+  url.attrs.oninput({ target: { value: 'https://example.com/?token=secret' } });
+  await form.attrs.onsubmit({ preventDefault() {} }); assert.equal(calls.length, 1);
+  url.attrs.oninput({ target: { value: 'www.example.com/store' } });
+  const checkbox = findRendered(ctx.state, n => n.tag === 'input' && n.attrs.id === 'page-retry-consent-1');
+  checkbox.attrs.onchange({ target: { checked: true } });
+  const pending = form.attrs.onsubmit({ preventDefault() {} });
+  await form.attrs.onsubmit({ preventDefault() {} }); assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1], { path: '/api/page-search', body: { name: '테스트가게', address: '서울 마포구 망원로 12', consent: true, retry: true, siteUrl: 'https://www.example.com/store', rejected: { name: '테스트가게', address: '서울 마포구 망원로 12' }, previousSearchAt: '2026-11-10T10:00:00Z' } });
+  finish(response()); await pending;
+  assert.match(allText(ctx.state), /이 가게가 맞나요/);
+  assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
+});
+
+test('retry works without a website, preserves input on failure and never automatically retries', async () => {
+  const calls = [];
+  const ctx = createContext(async (path, body) => { calls.push({ path, body }); if (calls.length === 1) return response(); const e = new Error('시간 초과'); e.code = 'AI_TIMEOUT'; throw e; });
+  await ctx.flow.begin('테스트가게', '서울 마포구 망원로 12');
+  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '아니에요').attrs.onclick();
+  const check = findRendered(ctx.state, n => n.attrs?.id === 'page-retry-consent-1'); check.attrs.onchange({ target: { checked: true } });
+  await findRendered(ctx.state, n => n.tag === 'form' && n.attrs.class === 'page-retry-form').attrs.onsubmit({ preventDefault() {} });
+  assert.equal(calls.length, 2); assert.equal(calls[1].body.siteUrl, '');
+  assert.match(allText(ctx.state), /이미 처리됐을 수 있고 자동 재시도하지 않았어요/);
+  assert.match(allText(ctx.state), /이 가게가 맞아요/);
+  ctx.flow.renderSearch(); assert.equal(calls.length, 2);
+});
+
+test('reloading a pending retry does not call AI again and shows the earlier result', async () => {
+  const ctx = createContext(async () => response()); await ctx.flow.begin('테스트가게', '서울 마포구 망원로 12');
+  const data = JSON.parse(sessionStorage.getItem('yeogibwa.page.start.v1'));
+  data.status = 'pending'; data.retry = { index: 0, siteUrl: 'https://example.com/', status: 'pending' };
+  sessionStorage.setItem('yeogibwa.page.start.v1', JSON.stringify(data));
+  let calls = 0, out = [];
+  const flow = makePageStart({ h: ctx.h, show: (...x) => { out = x.flat(Infinity).filter(Boolean); }, setNavbar: ctx.setNavbar, btn: ctx.btn, post: () => { calls++; }, storeName: ctx.state.storeName });
+  flow.renderSearch();
+  assert.equal(calls, 0); assert.match(out.map(text).join(' '), /자동으로 다시 보내지 않았어요/);
+  assert.match(out.map(text).join(' '), /이 가게가 맞아요/);
+  assert.match(JSON.stringify(out), /https:\/\/example\.com\//);
+});
+
+test('no candidate result also offers a consented search again', async () => {
+  const calls = []; const ctx = createContext(async (path, body) => { calls.push(body); return { ...response(), candidates: [] }; });
+  await ctx.flow.begin('테스트가게', '서울 마포구 망원로 12');
+  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '다시 찾아보기').attrs.onclick();
+  findRendered(ctx.state, n => n.attrs?.id === 'page-retry-consent-0').attrs.onchange({ target: { checked: true } });
+  await findRendered(ctx.state, n => n.tag === 'form' && n.attrs.class === 'page-retry-form').attrs.onsubmit({ preventDefault() {} });
+  assert.equal(calls.length, 2); assert.deepEqual(calls[1].rejected, { name: '', address: '' });
+});
+
+
+test('malformed or unverified retry response preserves the original candidate and never publishes it', async () => {
+  for (const invalid of [null, {}, { candidates: [] }, { candidates: [], webEvidence: { status: 'unverified' } }]) {
+    let calls = 0; const ctx = createContext(async () => { calls++; return calls === 1 ? response() : invalid; });
+    await ctx.flow.begin('테스트가게', '서울 마포구 망원로 12');
+    findRendered(ctx.state, n => n.tag === 'button' && text(n) === '아니에요').attrs.onclick();
+    findRendered(ctx.state, n => n.attrs?.id === 'page-retry-consent-1').attrs.onchange({ target: { checked: true } });
+    await findRendered(ctx.state, n => n.tag === 'form' && n.attrs.class === 'page-retry-form').attrs.onsubmit({ preventDefault() {} });
+    assert.equal(calls, 2); assert.match(allText(ctx.state), /이전 결과는 보존했어요/); assert.match(allText(ctx.state), /이 가게가 맞아요/);
+  }
+});

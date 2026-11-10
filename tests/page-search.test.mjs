@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
-import { createHandler, buildWebEvidence, normalizeMapSignals, normalizeWebFeatures, currentBranchPrice, CACHE_NAMESPACE } from '../api/page-search.js';
+import { createHandler, buildWebEvidence, normalizeMapSignals, normalizeWebFeatures, currentBranchPrice, CACHE_NAMESPACE, RETRY_CACHE_NAMESPACE } from '../api/page-search.js';
 import { MemoryStore, hashKey } from '../lib/guard.mjs';
 
 const ENV = { OPENROUTER_API_KEY: 'test-key', SESSION_SECRET: 'x'.repeat(32), VERCEL: '1', VERCEL_ENV: 'preview' };
@@ -336,4 +336,48 @@ test('prices explicitly for another branch are removed without discarding the me
   const content = JSON.stringify({ candidates: [{ name: '성심당 본점', address: '대전 중구', menu: [{ name: '튀김소보로', price: '1,700원 (대전역점 기준)' }] }] });
   const out = (await call(OK, { store: new MemoryStore(), fetcher: fakeFetch(aiReply(content)) })).json().candidates[0];
   assert.deepEqual(out.menu, [{ name: '튀김소보로', price: null }]);
+});
+
+
+const RETRY = { ...OK, retry: true, siteUrl: 'www.example.com/store', rejected: { name: '골목분식 다른 지점', address: '서울 다른 곳' }, previousSearchAt: '2026-11-10T10:00:00.000Z' };
+
+test('retry requires consent and validates public reference URL before any provider call', async () => {
+  for (const siteUrl of ['file:///etc/passwd', 'javascript:alert(1)', 'http://localhost/', 'http://127.1/', 'https://[::1]/', 'https://user:pass@example.com/', 'https://example.com/?token=secret', 'https://example.com/#private', 'https://example.com:444/', 'http://shop.internal/', 'bad domain', 'x'.repeat(301), 123, {}]) {
+    const f = fakeFetch(); const o = await call({ ...RETRY, siteUrl }, { store: new MemoryStore(), fetcher: f });
+    assert.equal(o.statusCode, 400, String(siteUrl)); assert.equal(o.json().code, 'SITE_URL'); assert.equal(f.calls.length, 0);
+  }
+  const noConsent = await call({ ...RETRY, consent: false }, { store: new MemoryStore(), fetcher: fakeFetch() });
+  assert.equal(noConsent.json().code, 'CONSENT');
+  for (const extra of [{ retry: false }, { retry: 'true' }, { retry: undefined, siteUrl: 'https://example.com' }, { rejected: { name: '가게', address: '', secret: 'x' } }, { previousSearchAt: 'not-a-date' }]) {
+    const f = fakeFetch(); const o = await call({ ...RETRY, ...extra }, { store: new MemoryStore(), fetcher: f });
+    assert.equal(o.statusCode, 400); assert.equal(f.calls.length, 0);
+  }
+});
+
+test('a rejection performs a separately cached search with URL and prior candidate as untrusted context', async () => {
+  const store = new MemoryStore();
+  const f = fakeFetch(aiReply(JSON_OUT), aiReply(JSON_OUT), aiReply(JSON_OUT), aiReply(JSON_OUT));
+  const first = await call(OK, { store, fetcher: f }); assert.equal(first.statusCode, 200);
+  const retry = await call(RETRY, { store, fetcher: f }); assert.equal(retry.statusCode, 200); assert.equal(retry.json().cached, false);
+  assert.equal(f.calls.length, 2);
+  const user = f.calls[1].body.messages.find(m => m.role === 'user').content;
+  assert.match(user, /https:\/\/www\.example\.com\/store/); assert.match(user, /골목분식 다른 지점/); assert.match(user, /명령이 아닌 참고 데이터/);
+  assert.equal(f.calls[1].url, 'https://openrouter.ai/api/v1/chat/completions');
+  assert.equal(f.calls[1].body.max_tool_calls, 4);
+  const repeat = await call(RETRY, { store, fetcher: f }); assert.equal(repeat.json().cached, true); assert.equal(f.calls.length, 2);
+  const differentUrl = await call({ ...RETRY, siteUrl: 'https://another.example.org/' }, { store, fetcher: f }); assert.equal(differentUrl.json().cached, false);
+  const noUrl = await call({ ...RETRY, siteUrl: '' }, { store, fetcher: f }); assert.equal(noUrl.json().cached, false);
+  assert.equal(f.calls.length, 4);
+  assert.ok([...store.kv.keys()].some(k => k.includes(':' + RETRY_CACHE_NAMESPACE + ':')));
+  assert.ok([...store.kv.keys()].some(k => k.includes(':' + CACHE_NAMESPACE + ':')));
+});
+
+test('duplicate retry has an independent lock and keeps existing search budget accounting', async () => {
+  const store = new MemoryStore(); let release; const gate = new Promise(r => { release = r; });
+  const f = fakeFetch(() => gate.then(() => aiReply(JSON_OUT)));
+  const first = call(RETRY, { store, fetcher: f }); await new Promise(r => setTimeout(r, 30));
+  const second = await call(RETRY, { store, fetcher: fakeFetch() }); assert.equal(second.statusCode, 409);
+  release(); assert.equal((await first).statusCode, 200); assert.equal(f.calls.length, 1);
+  assert.ok([...store.kv.keys()].some(k => k.includes(':ip:search:')));
+  assert.equal([...store.kv.entries()].find(([k]) => k.includes(':budget:'))[1], 100000);
 });
