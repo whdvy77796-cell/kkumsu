@@ -529,3 +529,66 @@ test('malformed or unverified retry response preserves the original candidate an
     assert.equal(calls, 2); assert.match(allText(ctx.state), /이전 결과는 보존했어요/); assert.match(allText(ctx.state), /이 가게가 맞아요/);
   }
 });
+
+
+function suggestion(ctx, key, index) { const b = findRendered(ctx.state, n => n.tag === 'button' && n.attrs['data-suggestion-for'] === key && n.attrs['data-suggestion-index'] === index); assert.ok(b, key + ':' + index); return b; }
+test('each question has clickable, non-submitting answer examples without changing consent or making a request', async () => {
+  const ctx = await ready();
+  for (const key of ['offer', 'difference', 'audience', 'visit', 'keywords']) {
+    assert.ok(findRendered(ctx.state, n => n.attrs?.['data-suggestions-for'] === key));
+    assert.equal(suggestion(ctx, key, 0).attrs.type, 'button'); assert.equal(suggestion(ctx, key, 1).attrs.type, 'button');
+  }
+  check(ctx, 'page-draft-consent');
+  suggestion(ctx, 'offer', 0).attrs.onclick();
+  assert.equal(ctx.calls.length, 0);
+  assert.match(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.answers.offer, /\[메뉴 이름\]/);
+  await submit(ctx); assert.equal(ctx.calls.length, 0); assert.match(allText(ctx.state), /실제 가게 내용으로 바꾸거나 지워/);
+  input(ctx, 'page-answer-offer', '따뜻한 차를 제공해요.'); await submit(ctx);
+  assert.equal(ctx.calls.length, 1); assert.equal(ctx.calls[0].data.consent, true);
+});
+
+test('an example cannot silently overwrite an answer and the user can deliberately replace it', async () => {
+  const ctx = await ready(); input(ctx, 'page-answer-difference', '오래 작성한 내 답변');
+  const old = globalThis.confirm; let prompts = [];
+  try {
+    globalThis.confirm = s => { prompts.push(s); return false; };
+    suggestion(ctx, 'difference', 0).attrs.onclick();
+    assert.equal(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.answers.difference, '오래 작성한 내 답변');
+    globalThis.confirm = s => { prompts.push(s); return true; };
+    suggestion(ctx, 'difference', 0).attrs.onclick();
+    assert.match(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.answers.difference, /\[가게의 특징\]/);
+    assert.equal(prompts.length, 2); assert.match(prompts[0], /기존에 작성한 답변/);
+    reload(ctx); ctx.flow.renderQuestions(); assert.match(getNode(ctx, 'page-answer-difference').attrs.value, /\[가게의 특징\]/);
+  } finally { if (old === undefined) delete globalThis.confirm; else globalThis.confirm = old; }
+});
+
+test('AI-found menus require explicit confirmation and never auto-select facts or include prices', async () => {
+  const c = { ...candidate, menu: [{ name: '차와 빵', price: '99999원' }, { name: '홍차', price: '10000원' }] };
+  const ctx = await ready(undefined, c); const old = globalThis.confirm; let prompted = '';
+  try {
+    globalThis.confirm = s => { prompted = s; return false; };
+    const b = suggestion(ctx, 'offer', 0); assert.match(text(b), /AI가 찾은 메뉴 · 확인 필요/);
+    b.attrs.onclick(); assert.equal(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.answers.offer, '');
+    assert.match(prompted, /틀릴 수 있어요/); assert.doesNotMatch(prompted, /99999|10000/);
+    globalThis.confirm = () => true; b.attrs.onclick();
+    const saved = JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft;
+    assert.equal(saved.answers.offer, '대표 메뉴: 차와 빵, 홍차.'); assert.deepEqual(saved.store.verifiedFacts, []);
+    assert.equal(ctx.calls.length, 0);
+  } finally { if (old === undefined) delete globalThis.confirm; else globalThis.confirm = old; }
+});
+
+test('example placeholders in any answer block transmission until the user fills or removes them', async () => {
+  const ctx = await ready(); input(ctx, 'page-answer-offer', '따뜻한 차'); check(ctx, 'page-draft-consent');
+  suggestion(ctx, 'visit', 0).attrs.onclick(); await submit(ctx);
+  assert.equal(ctx.calls.length, 0); assert.match(allText(ctx.state), /\[ \] 부분을 실제 가게 내용으로 바꾸거나 지워/);
+  input(ctx, 'page-answer-visit', '주차는 방문 전 확인해 주세요.'); await submit(ctx);
+  assert.equal(ctx.calls.length, 1); assert.equal(ctx.calls[0].data.answers.visit, '주차는 방문 전 확인해 주세요.');
+});
+
+test('keyword suggestions use currently entered store identity and remain nonfactual suggestions', async () => {
+  const ctx = await ready(); input(ctx, 'page-store-name', '새 가게'); input(ctx, 'page-store-address', '대전 중구 대종로 1');
+  suggestion(ctx, 'keywords', 0).attrs.onclick();
+  assert.equal(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.answers.keywords, '새 가게, 대전 중구 새 가게');
+  reload(ctx); ctx.flow.renderQuestions(); assert.equal(getNode(ctx, 'page-answer-keywords').attrs.value, '새 가게, 대전 중구 새 가게');
+  assert.match(allText(ctx.state), /희망 검색어는 사실 근거로 사용하지 않아요/); assert.equal(ctx.calls.length, 0);
+});
