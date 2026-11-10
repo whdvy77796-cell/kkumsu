@@ -9,6 +9,9 @@
     "api/page-search.js": {
       "maxDuration": 180
     },
+    "api/page-draft.js": {
+      "maxDuration": 180
+    },
     "api/store-search.js": {
       "maxDuration": 180
     },
