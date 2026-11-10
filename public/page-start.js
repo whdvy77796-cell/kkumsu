@@ -368,7 +368,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
     return fallback;
   }
   // 예시의 대괄호는 실제 가게 정보로 바꾸기 전까지 AI에 보내지 않는다.
-  const EXAMPLE_MARKERS = ['[메뉴 이름]', '[맛이나 재료]', '[상품·서비스 이름]', '[제공 방식]', '[가게의 특징]', '[만드는 방식 또는 운영 방식]', '[어떤 손님]', '[방문 목적]', '[방문 상황]', '[주차 가능 여부와 방법]', '[포장 가능 여부]', '[방문 전 확인할 점]', '[업종]', '[대표 메뉴]'];
+  const EXAMPLE_MARKERS = ['[메뉴 이름]', '[맛이나 재료]', '[상품·서비스 이름]', '[제공 방식]', '[재료·공간·서비스의 특징]', '[만드는 방식 또는 운영 방식]', '[어떤 손님]', '[방문 목적]', '[방문 상황]', '[주차 가능 여부와 방법]', '[포장 가능 여부]', '[예약·주차 등 확인할 점]', '[업종]', '[대표 메뉴]'];
   function answerExamples(key, d) {
     const c = chosenStore() || {};
     const food = /카페|커피|음식|식당|분식|베이커리|제과|빵집|주점|한식|중식|일식|양식/.test(string(c.category));
@@ -377,9 +377,18 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
       offer: food
         ? [{ text: '대표 메뉴: [메뉴 이름].' }, { text: '판매 메뉴: [메뉴 이름]. 맛이나 재료: [맛이나 재료].' }]
         : [{ text: '대표 상품·서비스: [상품·서비스 이름].' }, { text: '대표 서비스: [상품·서비스 이름]. 제공 방식: [제공 방식].' }],
-      difference: [{ text: '우리 가게의 특징은 [가게의 특징]이에요.' }, { text: '저희는 [만드는 방식 또는 운영 방식]을 중요하게 생각해요.' }],
-      audience: [{ text: '추천 손님: [어떤 손님]. 방문 목적: [방문 목적].' }, { text: '이럴 때 추천해요: [방문 상황].' }],
-      visit: [{ text: '주차: [주차 가능 여부와 방법]. 포장: [포장 가능 여부].' }, { text: '방문 전 [방문 전 확인할 점]을 확인해 주세요.' }],
+      difference: [
+        { text: food ? '재료를 골라 가게에서 직접 만들어 제공해요.' : '손님의 필요에 맞춰 꼼꼼하게 안내해 드려요.', confirmFact: true },
+        { text: '우리 가게의 특징: [재료·공간·서비스의 특징].' },
+      ],
+      audience: [
+        { text: '가족이나 친구와 함께 방문하는 분께 좋아요.', confirmFact: true },
+        { text: '추천 손님: [어떤 손님]. 방문 목적: [방문 목적].' },
+      ],
+      visit: [
+        { text: food ? '포장이 가능해요. 주차는 방문 전 문의해 주세요.' : '방문 전 예약과 이용 방법을 문의해 주세요.', confirmFact: true },
+        { text: '방문 전 확인: [예약·주차 등 확인할 점].' },
+      ],
       keywords: [
         { label: '가게 이름 + 지역으로 만들기', value: () => { const name = string(d.store.name).trim(); const region = string(d.store.address).trim().split(/\s+/).slice(0, 2).join(' '); return name && region ? `${name}, ${region} ${name}` : name || region; } },
         { label: '지역 + 업종·대표 메뉴로 만들기', value: () => { const region = string(d.store.address).trim().split(/\s+/).slice(0, 2).join(' '); return `${region ? region + ' ' : ''}[업종], ${region ? region + ' ' : ''}[대표 메뉴]`; } },
@@ -398,6 +407,8 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
       const replace = current && current !== value;
       if (choice.fromAi) {
         if (!askBeforeDiscard('AI가 찾은 메뉴는 틀릴 수 있어요. 다음 내용이 우리 가게의 대표 메뉴가 맞는지 확인한 뒤 적용해 주세요.\n\n' + value + (replace ? '\n\n기존 답변은 바뀌어요.' : ''))) return;
+      } else if (choice.confirmFact) {
+        if (!askBeforeDiscard('아래는 참고용 예시예요. 우리 가게와 실제로 맞는 내용인지 확인한 뒤 적용해 주세요.\n\n' + value + (replace ? '\n\n기존 답변은 바뀌어요.' : ''))) return;
       } else if (replace && !askBeforeDiscard('기존에 작성한 답변을 이 예시로 바꿀까요?')) return;
       d.answers[key] = value; save();
       const el = typeof document === 'undefined' ? null : document.getElementById('page-answer-' + key);
@@ -412,7 +423,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
     return h('div', { class: 'page-suggestions', 'data-suggestions-for': key },
       h('p', { class: 'page-suggestions-title' }, '답변 추천 ', h('span', { class: 'tiny muted' }, '눌러서 넣고 우리 가게에 맞게 고쳐 주세요')),
       examples.map((x, i) => h('button', { type: 'button', class: 'page-suggestion', disabled: draftBusy, 'data-suggestion-for': key, 'data-suggestion-index': i, onclick: () => apply(x) },
-        x.fromAi ? h('span', { class: 'page-suggestion-label' }, 'AI가 찾은 메뉴 · 확인 필요') : null, x.label || x.text)),
+        x.fromAi ? h('span', { class: 'page-suggestion-label' }, 'AI가 찾은 메뉴 · 확인 필요') : x.confirmFact ? h('span', { class: 'page-suggestion-label' }, '참고 예시 · 실제와 맞는지 확인') : null, x.label || x.text)),
       status);
   }
   function applyEdits(d) {
