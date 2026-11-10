@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { createHandler, buildWebEvidence, normalizeMapSignals, CACHE_NAMESPACE } from '../api/page-search.js';
-import { MemoryStore } from '../lib/guard.mjs';
+import { MemoryStore, hashKey } from '../lib/guard.mjs';
 
 const ENV = { OPENROUTER_API_KEY: 'test-key', SESSION_SECRET: 'x'.repeat(32), VERCEL: '1', VERCEL_ENV: 'preview' };
 
@@ -113,8 +113,10 @@ test('success: confirmed evidence, separated sources, one call, cache hit keeps 
   assert.equal(j2.cached, true);
   assert.equal(j2.searchedAt, j.searchedAt);
   const store2 = new MemoryStore();
-  await store2.setJson('maechul:v2:search:old', { candidates: [{ name: 'old' }] });
+  const oldKey = hashKey('page-search-v2', OK.name, OK.address);
+  await store2.setJson(oldKey, { candidates: [{ name: 'old' }] });
   assert.equal((await call(OK, { store: store2, fetcher: fakeFetch(aiReply(JSON_OUT)) })).json().cached, false);
+  assert.equal((await store2.getJson(oldKey)).candidates[0].name, 'old');
 });
 
 test('lock: in-flight duplicate gets 409 and no second provider call', async () => {
@@ -217,6 +219,8 @@ test('map signals only keep bounded, attributed public links and classify actual
   const g = (text, sourceUrl, extra = {}) => ({ platform: 'google_maps', text, sourceUrl, ...extra });
   const k = (text, sourceUrl, extra = {}) => ({ platform: 'kakao_map', text, sourceUrl, ...extra });
   const signals = normalizeMapSignals([
+    g('가'.repeat(121), 'https://www.google.com/maps/place/cafe'),
+    k('연결된 블로그의 별도 설명입니다', 'https://place.map.kakao.com/123'),
     g('좌석', 'https://www.google.com/maps/place/cafe', { sourceTitle: '지도', sourceKind: 'third_party' }),
     g('좌석', 'https://www.google.com/maps/place/other'),
     g('주차', 'https://public.example.org/post', { sourceKind: 'map_page' }),
