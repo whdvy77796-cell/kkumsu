@@ -165,7 +165,7 @@ function showError(e, retry) {
   setNavbar(btn('처음으로', () => { location.hash = '#/'; }), stop ? null : btn('다시 시도', retry, true));
 }
 
-const storeTools = makeStoreTools({ h, show, setNavbar, btn, post });
+const storeTools = makeStoreTools({ h, show, setNavbar, btn, post, onDeleted: id => pageStartFlow.clearPublication(id), onUpdated: (id, data) => pageStartFlow.recordPublicationUpdate(id, data) });
 const pageStartFlow = makePageStart({ h, show, setNavbar, btn, post, storeName, onPublished: (id, data) => storeTools.renderPublished(id, data) });
 
 // ───────── 1. 첫 화면: 상호명·주소

@@ -691,5 +691,17 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     if (typeof onPublished === 'function') onPublished(d.publication.id, d.publication.data);
   }
 
-  return { begin, renderSearch, renderConfirmed, renderQuestions, renderPreview, renderEdit, renderPublish, renderPublished, info: () => ({ name: state.name || '', address: state.address || '', status: state.status || '', draftStatus: state.pageDraft?.status || '', resumeHash: state.pageDraft?.view || (state.status === 'confirmed' ? '#/page-confirmed' : '#/page-search') }), busy: () => busy || draftBusy || publishing || !!state.pageDraft?.publishAttempt };
+  function clearPublication(id) {
+    const d = state.pageDraft; if (!d) return;
+    if (d.publication?.id === id) delete d.publication;
+    if (d.publishAttempt?.id === id) delete d.publishAttempt;
+    if (d.view === '#/page-published' || d.view === '#/page-publish') d.view = '#/page-preview';
+    save();
+  }
+  function recordPublicationUpdate(id, data) {
+    const d = state.pageDraft;
+    if (d?.publication?.id === id) { d.publication.data = data; save(); }
+  }
+
+  return { begin, renderSearch, renderConfirmed, renderQuestions, renderPreview, renderEdit, renderPublish, renderPublished, clearPublication, recordPublicationUpdate, info: () => ({ name: state.name || '', address: state.address || '', status: state.status || '', draftStatus: state.pageDraft?.status || '', resumeHash: state.pageDraft?.view || (state.status === 'confirmed' ? '#/page-confirmed' : '#/page-search') }), busy: () => busy || draftBusy || publishing || !!state.pageDraft?.publishAttempt };
 }

@@ -36,6 +36,8 @@ test('create, same-data retry, conflict, auth, update, delete; no secret leakage
  r=await invoke(h,undefined,get());assert.deepEqual(Object.keys(r.json()).sort(),['data','id']);assert.equal(r.json().data.intro,'수정 소개');assert.ok(!/password|salt|hash/.test(r.body));
  r=await invoke(h,owner('delete'));assert.equal(r.statusCode,200);
  assert.equal((await invoke(h,undefined,get())).statusCode,404);
+ const missingPage=await invoke(h,undefined,{method:'GET',url:'/api/stores?view=page&id='+ID});
+ assert.equal(missingPage.statusCode,404);assert.match(missingPage.headers['content-type'],/text\/html/);assert.ok(missingPage.body.includes('/#/manage/'+ID));assert.equal(missingPage.headers['x-robots-tag'],'noindex, nofollow');
  assert.equal((await invoke(h,undefined,{method:'GET',url:'/api/stores?view=directory'})).body.includes('/stores/'+ID),false);
  r=await invoke(h,create());assert.equal(r.statusCode,409,'deleted ID tombstone prevents late retry resurrection');
  const keys=storeKeys(scope,ID),tomb=await st.getJson(keys[0]);assert.deepEqual(Object.keys(tomb).sort(),['deleted','revision']);

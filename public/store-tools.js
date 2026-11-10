@@ -84,7 +84,7 @@ async function copyText(text, field) {
   return false;
 }
 
-export function makeStoreTools({ h, show, setNavbar, btn, post }) {
+export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpdated }) {
   const msgOf = (e) => (e && e.message) || '요청이 실패했어요. 잠시 후 다시 시도해 주세요.';
   const toHome = () => { location.hash = '#/'; };
   const openPublic = (id) => () => window.open(`/stores/${id}`, '_blank', 'noopener');
@@ -185,7 +185,7 @@ export function makeStoreTools({ h, show, setNavbar, btn, post }) {
           busy = true; save.disabled = true; setNote(msg, '저장하는 중이에요…', 'muted');
           try {
             await post('/api/stores', { action: 'update', id, password, data, consent: true }, 30000);
-            Object.assign(d, data); verified = false;
+            Object.assign(d, data); onUpdated?.(id, data); verified = false;
             status = { text: hidden ? '내용을 저장했어요. 신고로 숨겨진 페이지는 수정만으로 다시 공개되지 않아요.' : '저장했어요. 공개 페이지에 반영됐는지 확인해 보세요.', cls: 'ok' };
           } catch (e) { status = { text: msgOf(e), cls: 'error' }; }
           busy = false; draw();
@@ -200,7 +200,7 @@ export function makeStoreTools({ h, show, setNavbar, btn, post }) {
           busy = true; delGo.disabled = true; setNote(delStatus, '삭제하는 중이에요…', 'muted');
           try {
             await post('/api/stores', { action: 'delete', id, password }, 30000);
-            password = ''; busy = false; deleted();
+            password = ''; busy = false; onDeleted?.(id); deleted();
           } catch (e) { busy = false; delGo.disabled = false; setNote(delStatus, msgOf(e), 'error'); }
         }, true);
         const delArea = confirmDelete

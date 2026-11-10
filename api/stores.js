@@ -1,5 +1,5 @@
 import { HttpError, send, readJson, createStore } from '../lib/guard.mjs';
-import { BODY_LIMIT, requestScope, checkStoreOrigin, validateRequest, actOnStore, publicStore, renderStore, renderDirectory } from '../lib/stores.mjs';
+import { BODY_LIMIT, requestScope, checkStoreOrigin, validateRequest, actOnStore, publicStore, renderStore, renderUnavailable, renderDirectory } from '../lib/stores.mjs';
 export function createHandler(deps={}) {
   return async function handler(req,res) {
     try {
@@ -20,8 +20,15 @@ export function createHandler(deps={}) {
       const query=name=>{const value=req.query?.[name] ?? url.searchParams.get(name);if (Array.isArray(value)) throw new HttpError(400,'QUERY','요청 주소를 확인해 주세요.');return value;};
       const view=query('view');
       if (view==='directory' || view==='page') {
-        const html=view==='directory'?await renderDirectory(store,scope,query('page') || '1'):renderStore(scope,await publicStore(store,scope,query('id')));
-        res.statusCode=200;res.setHeader('Content-Type','text/html; charset=utf-8');res.setHeader('Cache-Control','no-store');
+        let html;
+        try { html=view==='directory'?await renderDirectory(store,scope,query('page') || '1'):renderStore(scope,await publicStore(store,scope,query('id'))); }
+        catch (err) {
+          if (view!=='page' || !(err instanceof HttpError) || err.code!=='NOT_FOUND') throw err;
+          html=renderUnavailable(scope,query('id'));
+          res.statusCode=404; res.setHeader('X-Robots-Tag','noindex, nofollow');
+        }
+        if (res.statusCode!==404) res.statusCode=200;
+        res.setHeader('Content-Type','text/html; charset=utf-8');res.setHeader('Cache-Control','no-store');
         res.setHeader('Content-Security-Policy',"default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
         return res.end(html);
       }

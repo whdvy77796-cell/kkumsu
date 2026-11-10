@@ -628,6 +628,12 @@ test('publication requires separate consent and never persists password or priva
   const payload = ctx.calls[1].data;
   assert.equal(payload.consent, true); assert.deepEqual(Object.keys(payload.data), ['name', 'address', 'headline', 'intro', 'sections', 'faqs']);
   assert.ok(!sessionStorage.getItem('yeogibwa.page.start.v1').includes('sample-test-secret'));
+  const updated = { ...payload.data, intro: '수정된 소개' };
+  ctx.flow.recordPublicationUpdate(payload.id, updated);
+  assert.equal(JSON.parse(sessionStorage.getItem('yeogibwa.page.start.v1')).pageDraft.publication.data.intro, '수정된 소개');
+  ctx.flow.clearPublication(payload.id);
+  const after = JSON.parse(sessionStorage.getItem('yeogibwa.page.start.v1')).pageDraft;
+  assert.equal(after.publication, undefined); assert.equal(after.view, '#/page-preview'); assert.ok(after.draft);
   assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
 });
 
