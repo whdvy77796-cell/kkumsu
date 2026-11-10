@@ -55,7 +55,13 @@ test('one consented request, duplicate blocked, candidate confirmation preserves
   assert.equal(location.hash, '#/page-confirmed');
   ctx.flow.renderConfirmed();
   assert.match(allText(ctx.state), /질문 5개로 소개 초안/);
-  assert.ok(findRendered(ctx.state, n => n.tag === 'button' && text(n) === '질문 답하기'));
+  assert.match(text(ctx.state.rendered[0]), /가게를 확인했어요/);
+  assert.match(text(ctx.state.rendered[1]), /질문 5개로 소개 초안을 만들어요/);
+  assert.match(text(ctx.state.rendered[2]), /테스트가게/);
+  const answerQuestions = findRendered(ctx.state, n => n.tag === 'button' && text(n) === '질문 답하기');
+  assert.ok(answerQuestions);
+  answerQuestions.attrs.onclick();
+  assert.equal(location.hash, '#/page-questions');
   assert.match(allText(ctx.state), /정확성은 아직 별도로 확인/);
   assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
 });
