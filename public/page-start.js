@@ -74,7 +74,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName }) {
     if (!links.length) return null;
     return h('div', { class: 'card note' },
       h('h3', null, 'AI가 제시한 참고 링크'),
-      h('p', { class: 'small muted' }, '링크의 내용과 해당 가게 정보가 맞는지 직접 확인해 주세요.'),
+      h('p', { class: 'small muted' }, '링크가 열리지 않거나 해당 정보의 근거가 아닐 수 있어요. 내용을 직접 확인해 주세요.'),
       h('ol', { class: 'sources' }, links.map((s) => h('li', null, h('a', { href: s.url, target: '_blank', rel: 'noopener noreferrer' }, s.title), h('span', { class: 'tiny muted' }, s.origin === 'provider_annotation' ? ' · 제공자 인용' : s.origin === 'mock' ? ' · 모의 링크' : ' · AI 제시 링크')))));
   }
   function candidateCard(c, index, confirmed = false) {
