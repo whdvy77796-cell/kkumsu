@@ -7,24 +7,24 @@ import { validateSearchInput, normalizeStoreResult, safeUrl, clean } from '../li
 import { mockEnabled, mockSearch } from '../lib/mock.mjs';
 import { searchTool } from './store-search.js';
 
-export const CACHE_NAMESPACE = 'page-search-v4';
+export const CACHE_NAMESPACE = 'page-search-v5';
 const ALLOWED = new Set(['name', 'address', 'consent']);
 const NOTE = '검색 도구가 돌려준 인용(provider_annotation)과 모델이 직접 적은 링크(model_generated)는 구분해서 보여줘요. 어느 쪽도 개별 항목이 사실을 입증한다는 뜻은 아니에요.';
 
-// 기존 진단 프롬프트는 건드리지 않고 소개 페이지 검색에만 지도 관련 공개 검색을 더한다.
-// 검색 횟수, 토큰 한도, 기존 예산·호출 제한은 변경하지 않는다.
-export const PAGE_SEARCH_SYSTEM = `${SEARCH_SYSTEM}
-추가 조사 지침:
-- 허용된 최대 3회 검색 안에서 상호와 주소를 함께 넣어 1회는 가게 기본정보·공식 안내, 1회는 Google Maps/구글 지도 관련 공개 웹자료, 1회는 카카오맵에서 가게를 직접 열 수 있는 링크를 찾아보세요. 자료가 부족하면 확인하지 못한 채로 둡니다.
-- 이 요청은 지도 공식 API 응답이 아닙니다. 접근하거나 검색 결과에서 실제로 확인할 수 없는 지도 내용·후기·평점·리뷰 수를 읽었다고 가장하지 마세요. 한 플랫폼의 내용을 다른 플랫폼에서 봤다고 쓰지 마세요.
-- 카카오맵의 후기·평점·상세정보나 그 가공 요약은 수집·출력하지 마세요. 사용자가 카카오맵 서비스에서 직접 확인할 수 있도록 링크만 제시하며, mapSignals에도 카카오맵 내용을 넣지 않습니다. 다른 웹페이지의 자체 정보는 실제 출처를 밝혀 일반 가게 특징에만 정리합니다.
-- 각 후보에 mapSignals 배열을 추가하세요. Google 지도를 명시적으로 언급한 외부 공개 자료에서, 상호와 주소가 이 지점에 맞는다는 근거까지 살핀 뒤 확인 가능한 가게 특징만 짧게 요약합니다. Google 지도 원문을 직접 읽었다고 가장하거나 개인 후기 원문·개인정보를 복사하지 마세요.
-- Google 관련 단서마다 platform은 google_maps, text는 특징 하나만 70자 이내로 쓰고, sourceTitle은 실제 검색 결과 제목, sourceUrl은 그 특징을 직접 뒷받침하는 실제 외부 검색 결과의 전체 URL을 적습니다. 서로 다른 내용이나 출처를 한 문장에 섞지 마세요. 하나라도 확인하지 못하면 그 항목을 넣지 말고 최대 3개만 적습니다. URL을 추측하거나 만들어내지 마세요.
-- 지도 페이지에서 연결된 블로그·외부 글의 내용은 해당 블로그·외부 글의 실제 원문 URL로만 표시하고, 지도 페이지 URL을 대신 붙이지 마세요. 그 글에서 직접 확인한 범위만 씁니다. 광고·블로그 자체 평가를 지도 후기나 평점으로 바꾸지 마세요.
-- 각 지도에서 확인 가능한 단서가 없거나 해당 지점이 불명확하면 mapSignals를 빈 배열로 둡니다. 이는 실제 정보가 없다는 뜻이 아닙니다.`;
+// 기존 진단은 건드리지 않고 소개 페이지의 공개 웹 검색만 가게 특징 중심으로 구성한다.
+// 검색 횟수, 토큰 한도, 기존 예산·호출 제한은 바꾸지 않는다.
+export const PAGE_SEARCH_SYSTEM = `${SEARCH_SYSTEM.replace('4. 네이버 지도·플레이스, 카카오맵, 다이닝코드, 망고플레이트, 배달앱, 인스타그램, 블로그 후기, 공식 홈페이지 등을 참고합니다.', '4. 공식 홈페이지, 공개 가게 소개, 공개 웹페이지와 검색 결과를 참고합니다.')}
+소개 페이지용 추가 조사 지침:
+- 허용된 최대 3회 웹 검색을 가게 자체의 특징에 집중하세요. 상호와 주소를 대조해 공식 안내·가게 소개, 대표 메뉴와 서비스, 매장 분위기·이용 경험을 각각 살펴봅니다. 동명 다른 지점의 정보나 가격을 섞지 마세요.
+- AI의 학습 기억이나 추측을 사실로 쓰지 마세요. 검색 결과에서 이 가게와 연결되는 공개 정보가 확인되지 않으면 항목을 생략합니다. 이 웹 검색은 특정 검색 엔진의 결과라고 보장되지 않으므로 Google 검색을 했다고 주장하지 마세요.
+- 후보마다 webFeatures 배열에 확인 가능한 서로 다른 특징을 최대 8개 적습니다. 자료가 적으면 억지로 채우지 마세요. '맛있다', '친절하다' 같은 막연한 말보다 이 가게를 설명하는 메뉴, 운영 방식, 공간, 방문 목적 등을 구체적으로 씁니다.
+- 각 항목은 한 가지 사실 또는 출처에 명시된 경험만 짧게 씁니다. 후기 하나를 여러 후기의 공통점처럼 표현하지 말고, 개인 이름·후기 원문을 복사하지 마세요. 현재 가격·영업시간·주차나 이용 조건은 확인되지 않으면 추측하지 마세요.
+- 각 webFeatures 항목에는 text, sourceTitle, sourceUrl을 넣습니다. 실제 검색 결과에 나타난 관련 원문 URL만 쓰고, URL을 추측해서 만들지 마세요. 같은 sourceUrl을 최상위 sources 목록에도 넣으세요. 서로 다른 출처의 내용을 한 항목에 섞지 마세요.
+- 검색 결과 화면의 주소나 지도 서비스 페이지를 근거인 것처럼 붙이지 마세요. 카카오맵 후기·평점·상세정보 또는 그 가공 요약과 Google 지도 원문 콘텐츠를 가져오거나 출력하지 않습니다. 다른 웹페이지 자체의 정보만 그 원래 출처로 정리합니다.
+- 실제로 확인할 수 있는 항목이 없으면 webFeatures는 빈 배열로 둡니다. 이는 웹에 정보가 없다는 뜻이 아닙니다.`;
 
 export function pageSearchUser(input) {
-  return `${searchUser(input)}\n\n각 candidates 항목에는 다음 mapSignals도 포함하세요. Google 관련 외부 공개 검색 결과와 해당 지점이 확인된 경우만 적으며, 확인하지 못하면 []입니다. 카카오맵의 후기·상세 정보는 넣지 마세요.\n"mapSignals": [{ "platform": "google_maps", "text": "외부 검색 결과에서 확인한 가게 특징", "sourceTitle": "실제로 표시된 출처 제목", "sourceUrl": "실제 외부 검색 결과 URL" }]`;
+  return `${searchUser(input)}\n\n각 candidates 항목에 아래 webFeatures 배열을 추가하세요. 상호와 주소가 맞는 공개 웹 검색 결과에서 찾은 특징만 적고, 각 sourceUrl은 최상위 sources에도 같은 주소로 넣습니다. 근거가 없으면 []로 둡니다.\n"webFeatures": [{ "text": "가게 특징 한 가지", "sourceTitle": "실제 검색 결과 제목", "sourceUrl": "실제 원문 URL" }]`;
 }
 
 // 링크는 브라우저에서만 열고 서버는 가져오지 않는다. AI가 제시한 출처라는 점은 화면에 남긴다.
@@ -70,6 +70,46 @@ export function normalizeMapSignals(raw) {
     out.push({ platform, text, sourceTitle: clean(item?.sourceTitle, 100) || new URL(sourceUrl).hostname, sourceUrl, sourceKind: 'third_party' });
   }
   return out;
+}
+
+// 모델이 적은 특징은 모델이 제시한 출처 또는 제공자의 인용 목록에 실제로 포함된 URL에만 연결한다.
+// URL 목록이 근거의 진위를 검증하는 것은 아니므로 출처 유형을 그대로 드러낸다.
+export function normalizeWebFeatures(raw, sources) {
+  if (!Array.isArray(raw) || !Array.isArray(sources)) return [];
+  const allowed = new Map();
+  for (const s of sources) {
+    const url = publicSourceUrl(s?.url);
+    if (!url || mapUrlPlatform(url)) continue;
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    if ((/^(?:www\.)?google\.(?:com|co\.kr)$/.test(host) && /^\/(?:search|url|webhp)/.test(u.pathname)) || host === 'search.naver.com' || host === 'search.daum.net' || (host === 'www.bing.com' && /^\/search/.test(u.pathname))) continue;
+    const origin = s.origin === 'provider_annotation' ? 'provider_annotation' : 'model_generated';
+    const prior = allowed.get(url);
+    if (!prior || origin === 'provider_annotation') allowed.set(url, { title: clean(s.title, 100) || host, origin });
+  }
+  const out = [];
+  const seen = new Set();
+  for (const f of raw) {
+    const text = clean(f?.text, 1000);
+    const url = publicSourceUrl(f?.sourceUrl);
+    if (!text || text.length > 120 || /카카오\s*맵|kakao\s*map/i.test(text) || !url || !allowed.has(url)) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const source = allowed.get(url);
+    out.push({ text, sourceTitle: source.title, sourceUrl: url, origin: source.origin });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
+// 다른 지점 가격임이 응답에 명시된 경우, 메뉴는 남기되 현재 가게 가격으로 보여주지 않는다.
+export function currentBranchPrice(value, storeName) {
+  if (typeof value !== 'string' || !value.trim()) return value || null;
+  if (/다른\s*(?:지점|매장)|타\s*(?:지점|매장)/.test(value)) return null;
+  const store = String(storeName || '').replace(/\s+/g, '').toLowerCase();
+  const branches = value.match(/[가-힣a-zA-Z0-9]{2,16}(?:지점|본점|점)/g) || [];
+  return branches.some((branch) => !store.includes(branch.toLowerCase())) ? null : value;
 }
 
 export function validatePageInput(body) {
@@ -146,6 +186,7 @@ export async function pageSearch({ env, fetcher, input, meter }) {
     throw new HttpError(502, 'SEARCH_UNVERIFIED', 'AI의 웹 검색 실행 여부를 확인하지 못했어요. 자동으로 다시 보내지 않았어요.');
   }
   const rawCandidates = parsed.candidates.filter((c) => c && typeof c === 'object' && clean(c.name, 80)).slice(0, 3);
+  const sources = buildSources(webEvidence.providerCitations, norm.sources);
   const notKakao = (s) => !/카카오\s*맵|kakao\s*map/i.test(String(s || ''));
   const candidates = norm.candidates.map((c, i) => ({
     ...c,
@@ -154,19 +195,20 @@ export async function pageSearch({ env, fetcher, input, meter }) {
     rating: notKakao(c.rating) ? c.rating : null,
     reviewCount: notKakao(c.reviewCount) ? c.reviewCount : null,
     priceRange: notKakao(c.priceRange) ? c.priceRange : null,
-    menu: c.menu.filter((m) => notKakao(m.name) && notKakao(m.price)),
+    menu: c.menu.filter((m) => notKakao(m.name) && notKakao(m.price)).map((m) => ({ ...m, price: currentBranchPrice(m.price, c.name) })),
     features: c.features.filter(notKakao),
     strengths: c.strengths.filter(notKakao),
     weaknesses: c.weaknesses.filter(notKakao),
     reviewThemes: c.reviewThemes.filter((t) => notKakao(t.note)),
     mapSignals: normalizeMapSignals(rawCandidates[i]?.mapSignals),
+    webFeatures: normalizeWebFeatures(rawCandidates[i]?.webFeatures, sources),
   }));
   return {
     candidates,
     summary: notKakao(norm.summary) ? norm.summary : '',
     notFoundReason: notKakao(norm.notFoundReason) ? norm.notFoundReason : null,
     absenceConfirmed: false, // 후보 없음은 "없다"는 확인이 아니다
-    sources: buildSources(webEvidence.providerCitations, norm.sources),
+    sources,
     webEvidence,
     input: { name: input.name, address: input.address },
     model: r.model,
@@ -178,7 +220,7 @@ export async function pageSearch({ env, fetcher, input, meter }) {
 export async function mockPageSearch(input, delay) {
   const m = await mockSearch(input, delay);
   return {
-    candidates: (m.candidates || []).map((c) => ({ ...c, mapSignals: [] })),
+    candidates: (m.candidates || []).map((c) => ({ ...c, mapSignals: [], webFeatures: [] })),
     summary: m.summary,
     notFoundReason: m.notFoundReason,
     absenceConfirmed: false,
