@@ -233,8 +233,8 @@ function renderHome() {
 
   show(
     h('section', { class: 'hero' },
-      h('h1', null, 'AI 시대,', h('br'), '우리 가게가 발견되는 방법.'),
-      h('h2', { class: 'hero-sub' }, '가게 이름과 주소를 알려주세요.', h('br'), '몇 가지 질문에 답하면, 우리 가게의 매력을', h('br'), '고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.'),
+      h('h1', null, 'AI 시대,', h('br'), "우리 가게가 '추천' 되는 방법."),
+      h('h2', { class: 'hero-sub' }, '가게 이름과 주소를 알려주세요.', h('br'), '몇 가지 질문에 답하면, 우리 가게의 특징을', h('br'), '고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.'),
       h('p', { class: 'hero-desc' }, '상호명과 주소를 넣고 가게 질문에 답하면, AI가 인터넷 평판과 사장님 숫자를 함께 살펴 무엇부터 고칠지 진단해요. 실행 방법과 계획은 맞춤 실행 패키지로 받아보세요.'),
       h('div', { class: 'hero-actions' },
         h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료 진단 시작'),
