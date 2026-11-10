@@ -68,13 +68,13 @@ b, strong { font-weight: 700; }
 .top { background: rgba(255, 255, 255, 0.96); -webkit-backdrop-filter: saturate(180%) blur(10px); backdrop-filter: saturate(180%) blur(10px); border-bottom: 1px solid var(--line-2); position: sticky; top: 0; z-index: 20; }
 .top .wrap { max-width: var(--wrap-wide); display: flex; align-items: center; gap: 12px; min-height: 60px; }
 .logo { display: flex; align-items: center; flex: none; text-decoration: none; }
-.logo img { display: block; height: 27px; width: auto; }
+.logo img { display: block; height: 38px; width: auto; }
 .store-name { margin-left: auto; min-width: 0; flex: 1; text-align: right; font-size: 14px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 main { padding: 28px 0 128px; }
 @media (min-width: 640px) {
   .top .wrap { min-height: 68px; }
-  .logo img { height: 32px; }
+  .logo img { height: 46px; }
   main { padding-top: 44px; }
 }
 
@@ -310,7 +310,7 @@ details.all-answers > summary { cursor: pointer; font-weight: 700; font-size: 16
 
 @media (max-width: 359px) {
   :root { --pad: 16px; }
-  .logo img { height: 24px; }
+  .logo img { height: 32px; }
 }
 @media (min-width: 640px) {
   .kv { grid-template-columns: 1fr 1fr; gap: 0 28px; }

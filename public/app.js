@@ -1129,7 +1129,7 @@ async function saveReportPdf(data, button, opts = {}) {
   try {
     await ensurePdfLibs();
     const logo = document.querySelector('.logo img')?.getAttribute('src') || '/logo.png';
-    box.append(h('div', { class: 'pdf-brand' }, h('img', { src: logo, alt: '매출올려드림 AI' })));
+    box.append(h('div', { class: 'pdf-brand' }, h('img', { src: logo, alt: '여기봐 AI' })));
     for (const child of view.children) {
       if (child.classList.contains('no-print') || child.classList.contains('warn') && child.querySelector('a[href="#/done"]')) continue;
       // 개선안 묶음은 카드마다 따로 배치해야 쪽 사이에서 잘리지 않는다
