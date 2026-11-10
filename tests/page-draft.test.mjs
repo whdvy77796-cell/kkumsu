@@ -160,3 +160,24 @@ test('owner negation blocks positive availability while preserving a correctly n
   const raw = good(); raw.faqs = [{ question: '예약할 수 있나요?', answer: '예약해 주세요.', evidence: ['visit'] }];
   assert.equal(normalizeDraft(raw, validateDraftInput(input)).faqs.length, 0);
 });
+
+
+test('draft instructions request visitor-facing copy rather than survey commentary', () => {
+  assert.match(PAGE_DRAFT_SYSTEM, /실제 손님이 가게 홈페이지에서 읽는 소개글/);
+  assert.match(PAGE_DRAFT_SYSTEM, /설문이나 작성 과정을 설명하지 말고/);
+});
+
+
+test('numeric units must come from cited facts rather than reusing a number for another claim', () => {
+  const input = clone(OK); input.answers.offer = '김밥 3개를 판매합니다'; input.answers.visit = '';
+  const raw = good(); raw.headline = { text: '김밥 판매', evidence: ['offer'] }; raw.intro = { text: '김밥 3개를 판매합니다.', evidence: ['offer'] };
+  raw.sections = [{ heading: '이용 안내', body: '김밥은 3시간 보관해요.', evidence: ['offer'] }, { heading: '상품', body: '김밥 3개를 판매합니다.', evidence: ['offer'] }]; raw.faqs = []; raw.keywords = [];
+  const d = normalizeDraft(raw, validateDraftInput(input));
+  assert.deepEqual(d.sections.map(x => x.body), ['김밥 3개를 판매합니다.']); assert.equal(d.omittedCount, 1);
+});
+
+test('contradictory positive claims are not hidden by a separate negative sentence', () => {
+  assert.equal(contradictsOwner('주차할 수 없습니다. 주차 가능합니다.', { visit: '주차장은 이용하실 수 없습니다' }), true);
+  assert.equal(contradictsOwner('영업합니다.', { visit: '현재 영업하지 않습니다' }), true);
+  assert.equal(contradictsOwner('주차는 가능하지 않습니다.', { visit: '주차 불가' }), false);
+});
