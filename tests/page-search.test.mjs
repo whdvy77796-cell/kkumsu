@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
-import { createHandler, buildWebEvidence, normalizeMapSignals, CACHE_NAMESPACE } from '../api/page-search.js';
+import { createHandler, buildWebEvidence, normalizeMapSignals, normalizeWebFeatures, currentBranchPrice, CACHE_NAMESPACE } from '../api/page-search.js';
 import { MemoryStore, hashKey } from '../lib/guard.mjs';
 
 const ENV = { OPENROUTER_API_KEY: 'test-key', SESSION_SECRET: 'x'.repeat(32), VERCEL: '1', VERCEL_ENV: 'preview' };
@@ -243,20 +243,20 @@ test('map signals only keep bounded, attributed public links and classify actual
   assert.deepEqual(normalizeMapSignals(null), []);
 });
 
-test('dedicated map search instructions use the same provider call and search limits', async () => {
+test('public-web feature instructions use the same provider call and search limits without claiming Google search', async () => {
   const f = fakeFetch(aiReply(JSON_OUT));
   const j = (await call(OK, { store: new MemoryStore(), fetcher: f })).json();
   assert.equal(j.candidates.length, 1);
-  assert.deepEqual(j.candidates[0].mapSignals, []);
+  assert.deepEqual(j.candidates[0].webFeatures, []);
   assert.equal(f.calls.length, 1);
   const body = f.calls[0].body;
   assert.equal(body.tools[0].parameters.max_uses, 3);
   assert.equal(body.max_tool_calls, 4);
   assert.equal(body.max_tokens, 5000);
-  assert.match(body.messages[0].content, /Google Maps/);
-  assert.match(body.messages[0].content, /카카오맵/);
-  assert.match(body.messages[0].content, /지도 공식 API 응답이 아닙니다/);
-  assert.match(body.messages[1].content, /mapSignals/);
+  assert.match(body.messages[0].content, /가게 자체의 특징/);
+  assert.match(body.messages[0].content, /Google 검색을 했다고 주장하지 마세요/);
+  assert.match(body.messages[0].content, /카카오맵 후기·평점·상세정보/);
+  assert.match(body.messages[1].content, /webFeatures/);
 });
 
 test('map notes remain attached to the correct candidate after filtering invalid names', async () => {
@@ -282,4 +282,58 @@ test('Kakao map details are not returned as extracted data', async () => {
   assert.deepEqual(out.features, ['별도 공개 홈페이지 안내']);
   assert.deepEqual(out.strengths, ['별도 공개 글의 특징']);
   assert.deepEqual(out.mapSignals, []);
+});
+
+
+test('web features require safe matching sources, preserve origin, deduplicate, and never treat search/map pages as source evidence', () => {
+  const sources = [
+    { title: '제공자가 인용', url: 'https://official.example.org/about', origin: 'provider_annotation' },
+    { title: 'AI가 제시', url: 'https://blog.example.org/a', origin: 'model_generated' },
+    { title: 'Google 검색', url: 'https://www.google.com/search?q=store', origin: 'model_generated' },
+    { title: '카카오 지도', url: 'https://place.map.kakao.com/123', origin: 'model_generated' },
+    { title: '내부 주소', url: 'http://127.0.0.1/private', origin: 'provider_annotation' },
+  ];
+  const feature = (text, sourceUrl) => ({ text, sourceUrl, sourceTitle: '임의의 잘못된 제목', origin: 'provider_annotation' });
+  const items = normalizeWebFeatures([
+    feature('빵을 직접 구워요', 'https://official.example.org/about'),
+    feature('주말에 문을 열어요', 'https://blog.example.org/a'),
+    feature('빵을 직접 구워요', 'https://blog.example.org/a'),
+    feature('없는 출처', 'https://else.example.org/a'),
+    feature('검색 페이지', 'https://www.google.com/search?q=store'),
+    feature('카카오 상세', 'https://place.map.kakao.com/123'),
+    feature('카카오맵 후기 특징', 'https://blog.example.org/a'),
+    feature('내부', 'http://127.0.0.1/private'),
+    feature('실행', 'javascript:alert(1)'),
+    feature('가'.repeat(121), 'https://blog.example.org/a'),
+    null,
+  ], sources);
+  assert.deepEqual(items, [
+    { text: '빵을 직접 구워요', sourceTitle: '제공자가 인용', sourceUrl: 'https://official.example.org/about', origin: 'provider_annotation' },
+    { text: '주말에 문을 열어요', sourceTitle: 'AI가 제시', sourceUrl: 'https://blog.example.org/a', origin: 'model_generated' },
+  ]);
+  assert.deepEqual(normalizeWebFeatures(null, sources), []);
+  assert.deepEqual(normalizeWebFeatures([feature('x', 'https://blog.example.org/a')], null), []);
+  const many = Array.from({ length: 12 }, (_, i) => feature('특징 ' + i, 'https://blog.example.org/a'));
+  assert.equal(normalizeWebFeatures(many, sources).length, 8);
+});
+
+test('web features stay with the right candidate and distinguish AI-generated links from provider citations', async () => {
+  const make = (name, text, url) => ({ name, address: '서울 마포구', webFeatures: [{ text, sourceUrl: url }] });
+  const content = JSON.stringify({ candidates: [make('', 'skip', 'https://blog.example.org/a'), null,
+    make('하나', '특징 하나', 'https://example.com/c'), make('둘', '특징 둘', 'https://blog.example.org/a')],
+    sources: [{ title: 'AI 링크', url: 'https://blog.example.org/a' }] });
+  const out = (await call(OK, { store: new MemoryStore(), fetcher: fakeFetch(aiReply(content, { annotations: CITE })) })).json();
+  assert.deepEqual(out.candidates.map((c) => [c.name, c.webFeatures[0].text, c.webFeatures[0].origin]), [
+    ['하나', '특징 하나', 'provider_annotation'], ['둘', '특징 둘', 'model_generated'],
+  ]);
+});
+
+test('prices explicitly for another branch are removed without discarding the menu', async () => {
+  assert.equal(currentBranchPrice('1,700원 (대전역점 기준)', '성심당 본점'), null);
+  assert.equal(currentBranchPrice('다른 지점 2,000원', '성심당 본점'), null);
+  assert.equal(currentBranchPrice('1,700원 (대전역점 기준)', '성심당 대전역점'), '1,700원 (대전역점 기준)');
+  assert.equal(currentBranchPrice('1,700원', '성심당 본점'), '1,700원');
+  const content = JSON.stringify({ candidates: [{ name: '성심당 본점', address: '대전 중구', menu: [{ name: '튀김소보로', price: '1,700원 (대전역점 기준)' }] }] });
+  const out = (await call(OK, { store: new MemoryStore(), fetcher: fakeFetch(aiReply(content)) })).json().candidates[0];
+  assert.deepEqual(out.menu, [{ name: '튀김소보로', price: null }]);
 });

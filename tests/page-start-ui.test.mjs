@@ -155,3 +155,67 @@ test('third-party label, empty array and legacy candidates without mapSignals', 
   assert.match(allText(ctx.state), /지도별 공개 검색 단서/);
   assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
 });
+
+function collectLinks(state) { const links = []; const walk = (n) => { if (!n || typeof n !== 'object') return; if (n.tag === 'a') links.push(n.attrs.href); (n.children || []).forEach(walk); }; state.rendered.forEach(walk); return links; }
+
+test('webFeatures: per-source links, labels, unsafe/empty defense, no raw HTML, direct links without map section', async () => {
+  const wf = [
+    { text: '시그니처 라떼', sourceTitle: '블로그A', sourceUrl: 'https://a.example.com/p', origin: 'provider_annotation' },
+    { text: '조용한 분위기', sourceTitle: '블로그A', sourceUrl: 'https://a.example.com/p', origin: 'provider_annotation' },
+    { text: '주차 가능', sourceTitle: '기사B', sourceUrl: 'https://b.example.com/x', origin: 'model_generated' },
+    { text: '위험요소', sourceTitle: 'x', sourceUrl: 'javascript:alert(1)', origin: 'model_generated' },
+    { text: '내부요소', sourceTitle: 'x', sourceUrl: 'http://127.0.0.1/a', origin: 'model_generated' },
+    { text: '   ', sourceTitle: 'x', sourceUrl: 'https://c.example.com', origin: 'model_generated' },
+    { text: '<img src=x onerror=alert(1)>', sourceTitle: '<b>t</b>', sourceUrl: 'https://d.example.com', origin: 'model_generated' },
+    null, 'x', { sourceUrl: 'https://e.example.com' },
+  ];
+  const ctx = createContext(async () => ({ ...response(), candidates: [{ ...candidate, features: ['무출처특징'], webFeatures: wf }] }));
+  await ctx.flow.begin('테스트가게', '서울 마포구 망원로 12');
+  const t = allText(ctx.state);
+  assert.match(t, /AI가 웹에서 찾은 가게 특징/);
+  assert.match(t, /시그니처 라떼/); assert.match(t, /주차 가능/);
+  assert.match(t, /제공자 인용/); assert.match(t, /AI 제시 링크/);
+  assert.match(t, /참고자료/); assert.match(t, /사실 확인 필요/);
+  assert.doesNotMatch(t, /위험요소|내부요소|무출처특징/);
+  const links = collectLinks(ctx.state);
+  assert.ok(links.includes('https://a.example.com/p') && links.includes('https://b.example.com/x'));
+  assert.ok(!links.some((l) => /javascript|127\.0\.0\.1/.test(l)));
+  const q = encodeURIComponent('테스트가게 서울 마포구 망원로 12');
+  assert.ok(links.includes(`https://www.google.com/search?q=${q}`));
+  assert.ok(links.includes(`https://map.kakao.com/link/search/${q}`));
+  assert.ok(!links.some((l) => l.includes('google.com/maps')));
+  assert.doesNotMatch(t, /지도별 공개 검색 단서/);
+  assert.match(t, /구글 웹 검색/); assert.match(t, /전달/);
+  assert.ok(findRendered(ctx.state, (n) => n.tag === 'button' && text(n).includes('이 가게가 맞아요')));
+  assert.ok(findRendered(ctx.state, (n) => n.tag === 'li' && n.children[0] === '<img src=x onerror=alert(1)>'));
+});
+
+test('webFeatures: at most 8 items shown', async () => {
+  const wf = Array.from({ length: 12 }, (_, i) => ({ text: `특징${i}`, sourceTitle: `s${i}`, sourceUrl: `https://s${i}.example.com`, origin: 'model_generated' }));
+  const ctx = createContext(async () => ({ ...response(), candidates: [{ ...candidate, webFeatures: wf }] }));
+  await ctx.flow.begin('테스트가게', '서울 마포구 망원로 12');
+  const t = allText(ctx.state);
+  assert.match(t, /특징7/); assert.doesNotMatch(t, /특징8/);
+});
+
+test('webFeatures empty keeps unsourced summary labeled; legacy keeps old behavior', async () => {
+  let ctx = createContext(async () => ({ ...response(), candidates: [{ ...candidate, strengths: ['친절'], webFeatures: [] }] }));
+  await ctx.flow.begin('테스트가게', '서울 마포구 망원로 12');
+  let t = allText(ctx.state);
+  assert.match(t, /개별 출처가 연결되지 않은 AI 요약/);
+  assert.match(t, /창가 좌석/); assert.match(t, /친절/);
+  assert.doesNotMatch(t, /AI가 웹에서 찾은 가게 특징/);
+  assert.ok(collectLinks(ctx.state).some((l) => l.startsWith('https://www.google.com/search?q=')));
+  ctx = createContext(async () => ({ ...response(), candidates: [{ name: '빈가게', webFeatures: [] }] }));
+  await ctx.flow.begin('빈가게', '서울');
+  t = allText(ctx.state);
+  assert.match(t, /충분히 확인하지 못했어요/);
+  assert.doesNotMatch(t, /개별 출처가 연결되지 않은/);
+  ctx = createContext(async () => ({ ...response(), candidates: [{ ...candidate, mapSignals: [] }] }));
+  await ctx.flow.begin('테스트가게', '서울 마포구 망원로 12');
+  t = allText(ctx.state);
+  assert.match(t, /AI가 정리한 가게 특징/);
+  assert.match(t, /지도별 공개 검색 단서/);
+  assert.doesNotMatch(t, /개별 출처가 연결되지 않은/);
+  assert.ok(!collectLinks(ctx.state).some((l) => l.includes('google.com/search')));
+});
