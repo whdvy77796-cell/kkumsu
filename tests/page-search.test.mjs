@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
-import { createHandler, buildWebEvidence } from '../api/page-search.js';
+import { createHandler, buildWebEvidence, normalizeMapSignals, CACHE_NAMESPACE } from '../api/page-search.js';
 import { MemoryStore } from '../lib/guard.mjs';
 
 const ENV = { OPENROUTER_API_KEY: 'test-key', SESSION_SECRET: 'x'.repeat(32), VERCEL: '1', VERCEL_ENV: 'preview' };
@@ -55,7 +55,7 @@ async function call(body, deps, extra = {}) {
   await createHandler({ env: ENV, ...deps })(req({ body, ...extra }), out);
   return out;
 }
-const pageKeys = (store) => [...store.kv.keys()].filter((k) => k.includes(':page-search-v1:') && !k.endsWith(':lock'));
+const pageKeys = (store) => [...store.kv.keys()].filter((k) => k.includes(`:${CACHE_NAMESPACE}:`) && !k.endsWith(':lock'));
 
 test('consent missing/false/non-true: 400 and no cache or provider call', async () => {
   for (const consent of [undefined, false, 'true', 1, null]) {
@@ -210,4 +210,56 @@ test('mock: evidence status mock and mock=true; consent still required; no provi
   assert.equal(j.mock, true);
   assert.equal(j.webEvidence.status, 'mock');
   assert.equal(f.calls.length, 0);
+});
+
+
+test('map signals only keep bounded, attributed public links and classify actual hosts', () => {
+  const g = (text, sourceUrl, extra = {}) => ({ platform: 'google_maps', text, sourceUrl, ...extra });
+  const k = (text, sourceUrl, extra = {}) => ({ platform: 'kakao_map', text, sourceUrl, ...extra });
+  const signals = normalizeMapSignals([
+    g('좌석', 'https://www.google.com/maps/place/cafe', { sourceTitle: '지도', sourceKind: 'third_party' }),
+    g('좌석', 'https://www.google.com/maps/place/other'),
+    g('주차', 'https://public.example.org/post', { sourceKind: 'map_page' }),
+    g('음식', 'https://maps.google.com/?cid=123'),
+    g('초과', 'https://public.example.org/extra'),
+    k('매장', 'https://place.map.kakao.com/123'),
+    k('분위기', 'https://blog.example.org/story'),
+    k('플랫폼 불일치', 'https://www.google.com/maps/place/cafe'),
+    k('스크립트', 'javascript:alert(1)'),
+    k('내부', 'http://127.0.0.1/secret'),
+    k('계정정보', 'https://u:p@example.org/path'),
+    { platform: 'unknown', text: 'unknown', sourceUrl: 'https://example.org/' },
+    { platform: 'google_maps', text: '', sourceUrl: 'https://example.org/' },
+    { platform: 'google_maps', text: '출처 누락' }, null,
+  ]);
+  assert.equal(signals.length, 5);
+  assert.deepEqual(signals.map((s) => [s.platform, s.sourceKind]), [
+    ['google_maps', 'map_page'], ['google_maps', 'third_party'], ['google_maps', 'map_page'],
+    ['kakao_map', 'map_page'], ['kakao_map', 'third_party'],
+  ]);
+  assert.ok(signals.every((s) => s.sourceUrl.startsWith('http') && s.text && s.sourceTitle));
+  assert.deepEqual(normalizeMapSignals(null), []);
+});
+
+test('dedicated map search instructions use the same provider call and search limits', async () => {
+  const f = fakeFetch(aiReply(JSON_OUT));
+  const j = (await call(OK, { store: new MemoryStore(), fetcher: f })).json();
+  assert.equal(j.candidates.length, 1);
+  assert.deepEqual(j.candidates[0].mapSignals, []);
+  assert.equal(f.calls.length, 1);
+  const body = f.calls[0].body;
+  assert.equal(body.tools[0].parameters.max_uses, 3);
+  assert.equal(body.max_tool_calls, 4);
+  assert.equal(body.max_tokens, 5000);
+  assert.match(body.messages[0].content, /Google Maps/);
+  assert.match(body.messages[0].content, /카카오맵/);
+  assert.match(body.messages[0].content, /지도 공식 API 응답이 아닙니다/);
+  assert.match(body.messages[1].content, /mapSignals/);
+});
+
+test('map notes remain attached to the correct candidate after filtering invalid names', async () => {
+  const make = (name, note) => ({ name, address: '서울 마포구', mapSignals: [{ platform: 'kakao_map', text: note, sourceUrl: 'https://place.map.kakao.com/123' }] });
+  const content = JSON.stringify({ candidates: [make('', 'skip'), null, make('하나', 'one'), make('둘', 'two'), make('셋', 'three'), make('넷', 'four')] });
+  const out = (await call(OK, { store: new MemoryStore(), fetcher: fakeFetch(aiReply(content)) })).json();
+  assert.deepEqual(out.candidates.map((c) => [c.name, c.mapSignals[0].text]), [['하나', 'one'], ['둘', 'two'], ['셋', 'three']]);
 });
