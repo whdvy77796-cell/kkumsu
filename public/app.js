@@ -118,12 +118,15 @@ function route() {
   const linked = /^#\/r\/([A-Za-z0-9_-]{16,32})\.([A-Za-z0-9_-]{16,100})$/.exec(hash);
   const policy = { '#/terms': 'terms', '#/privacy': 'privacy', '#/refund': 'refund' }[hash];
   // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다 (home·find·survey·done·report·policy)
-  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/page-search': 'find', '#/page-confirmed': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
+  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/page-search': 'find', '#/page-confirmed': 'find', '#/page-questions': 'find', '#/page-preview': 'find', '#/page-edit': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
   if (linked) renderLinked(linked[1], linked[2]);
   else if (policy) renderPolicy(policy);
   else if (hash === '#/sample') renderSample();
   else if (hash === '#/page-search') pageStartFlow.renderSearch();
   else if (hash === '#/page-confirmed') pageStartFlow.renderConfirmed();
+  else if (hash === '#/page-questions') pageStartFlow.renderQuestions();
+  else if (hash === '#/page-preview') pageStartFlow.renderPreview();
+  else if (hash === '#/page-edit') pageStartFlow.renderEdit();
   else if (hash === '#/find') renderFind();
   else if (hash === '#/survey') renderSurvey();
   else if (hash === '#/done') renderDone();
@@ -229,21 +232,22 @@ function renderHome() {
     h('p', { class: 'small', style: { margin: '4px 0 8px' } }, chosenStore()?.name || S.name),
     h('a', { class: 'btn small', href: S.doneAt ? '#/done' : '#/survey' }, S.doneAt ? '이전 결과 보기' : '이전 답변 이어보기'),
     S.doneAt && S.report?.data ? h('a', { class: 'btn small', href: '#/report', style: { marginLeft: '6px' } }, '이전 보고서 보기') : null) : null;
+  const draftResume = ['#/page-questions', '#/page-preview', '#/page-edit'].includes(existing.resumeHash) ? existing.resumeHash : '';
   const pageResume = ['result', 'confirmed'].includes(existing.status)
-    ? h('div', { class: 'card note resume' }, h('b', null, '확인하던 가게 정보가 있어요'),
+    ? h('div', { class: 'card note resume' }, h('b', null, draftResume ? '작성하던 가게 소개가 있어요' : '확인하던 가게 정보가 있어요'),
         h('p', { class: 'small', style: { margin: '4px 0 8px' } }, existing.name),
-        h('a', { class: 'btn small', href: existing.status === 'confirmed' ? '#/page-confirmed' : '#/page-search' }, '가게 정보 이어보기'))
-    : existing.status === 'pending' && !pageStartFlow.busy()
-      ? h('div', { class: 'card note small' }, '이전 요청의 완료 여부를 확인하지 못했어요. 자동으로 다시 보내지 않았어요.') : null;
+        h('a', { class: 'btn small', href: draftResume || (existing.status === 'confirmed' ? '#/page-confirmed' : '#/page-search') }, draftResume ? '가게 소개 이어보기' : '가게 정보 이어보기'))
+    : (existing.status === 'pending' && !pageStartFlow.busy()) || existing.status === 'uncertain'
+      ? h('div', { class: 'card warn small' }, '이전 가게 조회가 이미 처리됐을 수 있어요. 자동 재시도하지 않았으며, 같은 가게를 다시 검색하면 비용이 중복될 수 있어요.') : null;
 
   show(
     h('section', { class: 'hero' },
       h('h1', null, 'AI 시대,', h('br'), "우리 가게가 '추천' 되는 방법."),
       h('h2', { class: 'hero-sub' }, '가게 이름과 주소를 알려주세요.', h('br'), '몇 가지 질문에 답하면, 우리 가게의 특징을', h('br'), '고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.'),
-      h('p', { class: 'hero-desc' }, '여기봐AI는 가게 정보와 사장님의 답변을 바탕으로 우리 가게만의 매력을 정리합니다. 소개글은 물론, 구조화 데이터와 검색 접근성을 고려한 기술적 설계까지 적용해 AI가 정보를 수집하고 참고하기 쉬운 페이지로 제작·배포합니다.', h('br'), '완성된 페이지는 QR코드와 SNS용 소개글로도 활용할 수 있습니다.'),
+      h('p', { class: 'hero-desc' }, '여기봐AI는 사장님이 확인한 가게 정보와 답변을 바탕으로 우리 가게만의 매력을 정리해요. 소개와 질문·답변을 읽기 쉽게 구성한 비공개 페이지 초안을 만들고 직접 수정할 수 있어요.', h('br'), '페이지 공개와 QR코드·SNS 소개글 활용은 준비 중이에요.'),
       h('div', { class: 'hero-actions' }, h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료로 페이지 만들기')),
       h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
-      h('p', { class: 'small muted page-stage-note' }, '현재는 가게 정보 확인까지 이용할 수 있어요. 질문과 소개 페이지 제작·결제·배포는 준비 중이에요.')),
+      h('p', { class: 'small muted page-stage-note' }, '현재는 비공개 소개 페이지 확인·수정까지 이용할 수 있어요. 결제와 페이지 공개·QR·소개글 활용은 준비 중이에요.')),
     pageResume, oldResume,
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
@@ -261,12 +265,12 @@ function renderHome() {
       h('ol', { class: 'steps-list' },
         h('li', null, h('b', null, '가게 정보 입력 '), h('span', { class: 'muted small' }, '상호명과 주소를 알려주세요.')),
         h('li', null, h('b', null, '가게 정보 확인 '), h('span', { class: 'muted small' }, 'AI가 찾은 공개 정보와 특징을 확인해요.')),
-        h('li', null, h('b', null, '맞춤 질문 3~5개 '), h('span', { class: 'muted small' }, '준비 중')),
-        h('li', null, h('b', null, '완성본 확인·수정 '), h('span', { class: 'muted small' }, '준비 중')),
+        h('li', null, h('b', null, '가게에 관한 질문 5개 '), h('span', { class: 'muted small' }, '대표 메뉴와 우리 가게의 특징을 알려주세요.')),
+        h('li', null, h('b', null, '완성본 확인·수정 '), h('span', { class: 'muted small' }, '비공개 초안을 확인하고 직접 고쳐요.')),
         h('li', null, h('b', null, '결제 후 배포·QR·소개글 활용 '), h('span', { class: 'muted small' }, '준비 중')))),
     h('div', { class: 'card note small privacy-card' },
       h('b', null, '입력한 정보는 이렇게 쓰여요'),
-      h('p', null, '동의하신 상호명과 주소로 공개 정보를 찾고, 결과를 현재 탭에서 확인해요. AI가 정리한 내용은 실제와 다를 수 있어 사장님이 직접 확인해 주세요.'),
+      h('p', null, '동의하신 상호명과 주소로 공개 정보를 찾아요. 질문 답변과 확인한 정보를 AI에 보내 초안을 만들 때는 별도로 동의받아요. 초안은 비공개이며 AI가 정리한 내용은 사장님이 직접 확인해 주세요.'),
       h('p', { style: { margin: '8px 0 0' } }, h('a', { href: '#/privacy' }, '개인정보처리방침 자세히 보기'))),
   );
   setNavbar(btn('무료로 페이지 만들기', focusStart, true));
@@ -1829,9 +1833,9 @@ async function renderSample() {
 // ───────── 이용약관 · 개인정보처리방침 · 환불 정책
 const biz = (k, fallback = '사업자 정보 등록 후 표시') => String(BUSINESS[k] || '').trim() || fallback;
 const POLICY_DATE = '2026년 11월 9일';
-function policyDoc(title, intro, sections) {
+function policyDoc(title, intro, sections, effectiveDate = POLICY_DATE) {
   return [
-    h('div', { class: 'policy-head' }, h('h1', null, title), h('p', { class: 'small muted' }, `시행일 ${POLICY_DATE}`), intro ? h('p', null, intro) : null),
+    h('div', { class: 'policy-head' }, h('h1', null, title), h('p', { class: 'small muted' }, `시행일 ${effectiveDate}`), intro ? h('p', null, intro) : null),
     sections.map(([t, ...items]) => h('section', { class: 'card policy' },
       h('h2', null, t),
       items.map((x) => (Array.isArray(x) ? h('ul', { class: 'note-list' }, x.map((y) => h('li', null, y))) : h('p', null, x))))),
@@ -1847,7 +1851,8 @@ function renderPolicy(kind) {
     terms: () => policyDoc('이용약관', null, [
       ['제1조 (목적)', `이 약관은 ${biz('name', '매출올려드림 AI 운영자')}(이하 '운영자')가 제공하는 매출올려드림 AI(www.kkumsu.com, 이하 '서비스')를 이용하는 조건과 절차, 운영자와 이용자의 권리·의무를 정합니다.`],
       ['제2조 (서비스 내용)',
-        ['무료 핵심 진단: 상호명·주소, 인터뷰 답변, 인터넷 공개 정보를 바탕으로 AI가 만든 진단 보고서 중 핵심 진단(한 줄 진단과 핵심 숫자, 가장 중요한 문제, 지금 바로 할 일, 위생·안전, 인터넷에서 본 우리 가게, 숫자로 본 우리 가게, 우선 개선안 목록과 1순위 개선안, 확인할 것)을 무료로 제공합니다.',
+        ['가게 소개 초안: 가게 정보와 사장님의 답변을 별도 동의 후 AI로 정리해 비공개 미리보기와 직접 수정 기능을 제공합니다. 소개 페이지 공개·결제·QR·SNS 소개글 기능은 아직 준비 중입니다.',
+          '무료 핵심 진단: 상호명·주소, 인터뷰 답변, 인터넷 공개 정보를 바탕으로 AI가 만든 진단 보고서 중 핵심 진단(한 줄 진단과 핵심 숫자, 가장 중요한 문제, 지금 바로 할 일, 위생·안전, 인터넷에서 본 우리 가게, 숫자로 본 우리 가게, 우선 개선안 목록과 1순위 개선안, 확인할 것)을 무료로 제공합니다.',
           `맞춤 실행 패키지(유료, 보고서 1건 ${price}): 같은 보고서의 나머지 개선안별 확인 근거·실행 방법·기대 효과·담당·비용과 기간·준비물·확인 지표, 수익 구조·메뉴·고객 경험 연결 분석, 실행 계획, PDF 저장, 결제일부터 90일 동안의 다시 보기 링크를 제공합니다.`,
           '보고서는 AI가 이용자의 답변과 인터넷 공개 정보로 만든 참고 자료예요. 매출·이익 증가 같은 결과를 보장하지 않으며, 중요한 결정 전에는 장부와 현장에서 확인해야 합니다.']],
       ['제3조 (이용 방법)', '회원가입 없이 이용합니다. 진행 중인 답변과 보고서는 이용자의 브라우저에 저장되며, 브라우저 저장소를 지우면 다시 볼 수 없을 수 있습니다. 결제한 보고서는 다시 보기 링크로 결제일부터 90일 동안 열 수 있습니다.'],
@@ -1858,7 +1863,7 @@ function renderPolicy(kind) {
       ['제8조 (책임)', '운영자는 AI 진단 결과의 정확성이나 특정 사업 성과를 보장하지 않습니다. 다만 운영자의 고의 또는 과실로 이용자에게 손해가 생긴 경우에는 관련 법령에 따라 책임을 집니다.'],
       ['제9조 (분쟁 해결)', '서비스 이용과 관련한 문의·불만은 고객센터로 접수해 주세요. 분쟁이 생기면 관련 법령과 소비자분쟁해결기준에 따라 해결하며, 소송은 민사소송법에 따른 관할 법원에 제기합니다.'],
       ['운영자 정보', operatorLine()],
-    ]),
+    ], '2026년 11월 10일'),
     refund: () => policyDoc('환불 정책', '맞춤 실행 패키지는 결제가 승인되는 즉시 보고서의 잠긴 내용이 열리는 디지털 콘텐츠예요.', [
       ['결제 전에 확인할 수 있어요', ['무료 핵심 진단으로 우리 가게 보고서의 핵심 내용과 1순위 개선안 전체를 먼저 볼 수 있어요.', '샘플 보고서(예시 데이터)로 결제 후 화면을 미리 볼 수 있어요.']],
       ['단순 변심 환불', '결제 후 바로 열람이 시작되므로, 전자상거래 등에서의 소비자보호에 관한 법률 제17조 제2항 제5호에 따라 단순 변심에 의한 청약철회(환불)는 제한돼요. 이 사실은 결제 전에 안내하고 동의를 받아요.'],
@@ -1869,10 +1874,11 @@ function renderPolicy(kind) {
     privacy: () => policyDoc('개인정보처리방침', `${biz('name', '매출올려드림 AI 운영자')}(이하 '운영자')는 개인정보 보호법에 따라 이용자의 개인정보를 보호하고 관련 고충을 신속하게 처리하기 위해 이 방침을 둡니다. 회원가입이 없고, 쿠키를 쓰지 않아요.`, [
       ['1. 처리하는 정보와 목적', [
         '가게 찾기: 상호명과 주소를 받아 AI가 인터넷 공개 정보로 가게를 찾는 데 써요.',
+        '가게 소개 초안: 별도 동의를 받은 경우에만 상호명·주소, 사장님이 확인한 가게 정보와 질문 답변을 AI에 보내 비공개 소개 초안을 만들어요. 초안 생성 서버는 답변 원문이나 생성된 초안을 별도 캐시에 저장하지 않도록 설계돼 있어요. 서비스 운영·보안 로그와 외부 AI 제공자의 처리·보관 정책은 별도로 적용될 수 있어요.',
         'AI 진단 보고서: 이용자가 동의한 경우에만 인터뷰 답변(가게 운영 방식, 매출·비용, 사장님·가족 근무 시간 등)을 받아 보고서를 만드는 데 써요. 답변 원문은 서버에 따로 저장하지 않고, 답변으로 만든 보고서(계산값 포함)만 보관해요.',
         '결제: 주문번호, 결제 고유번호(토스페이먼츠가 주는 값), 결제 금액, 결제 일시, 결제 수단 종류를 결제 확인·환불·분쟁 처리와 법정 기록 보존에 써요. 카드 번호 같은 결제 정보는 토스페이먼츠가 처리하며 운영자는 받지 않아요.',
-        '이용량 관리: 접속 IP 주소를 되돌릴 수 없게 바꾼 값(해시)으로 하루 이용 횟수를 세요.',
-        '브라우저 저장소: 진행 중인 답변과 보고서는 이용자 기기의 브라우저 저장소(localStorage)에만 저장돼요. 완료 화면의 \'처음부터 다시\' 또는 브라우저 데이터 삭제로 지울 수 있어요.']],
+        '이용량 관리: 접속 IP 주소를 되돌릴 수 없게 바꾼 값(해시)으로 하루 이용 횟수를 세고, 중복 요청 방지를 위한 임시 잠금을 사용해요.',
+        '브라우저 저장소: 기존 진단의 진행 답변은 localStorage에, 가게 소개 확인·질문 답변·초안은 해당 탭의 sessionStorage에 임시 저장될 수 있어요. 브라우저 데이터를 삭제하면 기기의 저장 내용을 지울 수 있으나 외부 제공자가 보관한 자료까지 지워지는 것은 아니에요.']],
       ['2. 보관 기간', [
         '가게 찾기 결과와 인터넷 조사 결과: 3일',
         '보고서: 만든 날부터 7일. 맞춤 실행 패키지를 결제하면 결제일부터 90일(다시 보기 링크)',
@@ -1880,8 +1886,8 @@ function renderPolicy(kind) {
         '이용량 집계(IP 해시): 2일',
         '보관 기간이 지나면 저장소에서 자동으로 지워져요.']],
       ['3. 처리 위탁과 국외 이전', [
-        'OpenRouter, Inc.(미국): AI 요청 중계. 상호명·주소·찾은 공개 정보, 동의한 경우 인터뷰 답변을 요청할 때마다 네트워크로 전송해요. 이용자 데이터를 수집·학습에 쓰지 않는 제공자로만 보내도록 설정해요.',
-        'Anthropic, PBC 등 OpenRouter가 연결하는 Claude 모델 제공자(미국): AI 진단 처리.',
+        'OpenRouter, Inc.(미국): AI 요청 중계. 동의한 상호명·주소·가게 정보와 질문 답변을 요청할 때 네트워크로 전송해요. 데이터 수집을 허용하지 않는 제공 경로를 요청하지만, 외부 제공자의 보관·삭제는 해당 제공자의 정책이 별도로 적용돼요.',
+        'Anthropic, PBC 등 OpenRouter가 연결하는 Claude 모델 제공자(미국): 동의한 정보의 AI 처리.',
         'Vercel Inc.(미국): 웹사이트와 서버 운영. 서버 함수는 서울 지역에서 실행돼요.',
         'Upstash, Inc.(미국 회사, 저장 위치: 일본 도쿄 AWS 데이터센터): 보고서·조사 결과·결제 기록 저장소.',
         '토스페이먼츠(주)(대한민국): 결제 처리.',
@@ -1891,7 +1897,7 @@ function renderPolicy(kind) {
       ['6. 개인정보 보호책임자', `${String(BUSINESS.privacyOfficer || '').trim() || biz('owner')} · ${biz('email')} · ${biz('phone')}`],
       ['7. 방침 변경', '이 방침을 바꾸면 시행일과 함께 이 화면에 알려드려요.'],
       ['운영자 정보', operatorLine()],
-    ]),
+    ], '2026년 11월 10일'),
   };
   show(h('div', { class: 'policy-page' }, docs[kind]()));
   setNavbar(btn('처음으로', () => { location.hash = '#/'; }, true));
