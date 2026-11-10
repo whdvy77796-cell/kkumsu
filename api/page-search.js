@@ -7,7 +7,7 @@ import { validateSearchInput, normalizeStoreResult, safeUrl, clean } from '../li
 import { mockEnabled, mockSearch } from '../lib/mock.mjs';
 import { searchTool } from './store-search.js';
 
-export const CACHE_NAMESPACE = 'page-search-v2';
+export const CACHE_NAMESPACE = 'page-search-v3';
 const ALLOWED = new Set(['name', 'address', 'consent']);
 const NOTE = '검색 도구가 돌려준 인용(provider_annotation)과 모델이 직접 적은 링크(model_generated)는 구분해서 보여줘요. 어느 쪽도 개별 항목이 사실을 입증한다는 뜻은 아니에요.';
 
@@ -18,8 +18,8 @@ export const PAGE_SEARCH_SYSTEM = `${SEARCH_SYSTEM}
 - 허용된 최대 3회 검색 안에서 상호와 주소를 함께 넣어 1회는 가게 기본정보·공식 안내, 1회는 Google Maps/구글 지도와 가게 특징, 1회는 카카오맵과 가게 특징을 살펴보세요. 자료가 부족하면 확인하지 못한 채로 둡니다.
 - 이 요청은 지도 공식 API 응답이 아닙니다. 접근하거나 검색 결과에서 실제로 확인할 수 없는 지도 내용·후기·평점·리뷰 수를 읽었다고 가장하지 마세요. 한 플랫폼의 내용을 다른 플랫폼에서 봤다고 쓰지 마세요.
 - 각 후보에 mapSignals 배열을 추가하세요. Google 지도나 카카오맵 자체의 공개 검색 단서 또는 그 지도를 명시적으로 언급한 외부 공개 자료에서, 상호와 주소가 이 지점에 맞는다는 근거까지 살핀 뒤 확인 가능한 가게 특징만 짧게 요약합니다. 개인 후기 원문이나 개인정보는 복사하지 마세요.
-- 지도별 단서마다 platform은 google_maps 또는 kakao_map, text는 특징, sourceTitle은 실제 검색 결과 제목, sourceUrl은 해당 내용을 뒷받침하는 실제 검색 결과의 전체 URL을 적습니다. 하나라도 확인하지 못하면 그 항목을 넣지 말고 각 지도당 최대 3개만 적습니다. URL을 추측하거나 만들어내지 마세요.
-- 외부 글에서 지도 정보를 간접적으로 언급한 경우에는 그 외부 글의 URL을 적고, 그 글에서 직접 확인한 범위만 씁니다. 광고·블로그 자체 평가를 지도 후기나 평점으로 바꾸지 마세요.
+- 지도별 단서마다 platform은 google_maps 또는 kakao_map, text는 특징 하나만 70자 이내로 쓰고, sourceTitle은 실제 검색 결과 제목, sourceUrl은 그 특징을 직접 뒷받침하는 실제 검색 결과의 전체 URL을 적습니다. 서로 다른 내용이나 출처를 한 문장에 섞지 마세요. 하나라도 확인하지 못하면 그 항목을 넣지 말고 각 지도당 최대 3개만 적습니다. URL을 추측하거나 만들어내지 마세요.
+- 지도 페이지에서 연결된 블로그·외부 글의 내용은 해당 블로그·외부 글의 실제 원문 URL로만 표시하고, 지도 페이지 URL을 대신 붙이지 마세요. 그 글에서 직접 확인한 범위만 씁니다. 광고·블로그 자체 평가를 지도 후기나 평점으로 바꾸지 마세요.
 - 각 지도에서 확인 가능한 단서가 없거나 해당 지점이 불명확하면 mapSignals를 빈 배열로 둡니다. 이는 실제 정보가 없다는 뜻이 아닙니다.`;
 
 export function pageSearchUser(input) {
@@ -55,11 +55,13 @@ export function normalizeMapSignals(raw) {
   for (const item of raw) {
     const platform = item?.platform;
     if (!(platform === 'google_maps' || platform === 'kakao_map') || counts[platform] >= 3) continue;
-    const text = clean(item?.text, 160);
+    const text = clean(item?.text, 1000);
     const sourceUrl = publicSourceUrl(item?.sourceUrl);
-    if (!text || !sourceUrl) continue;
+    if (!text || text.length > 120 || !sourceUrl) continue;
     const detected = mapUrlPlatform(sourceUrl);
     if (detected && detected !== platform) continue;
+    // 지도에 링크된 다른 블로그의 내용은 원문 주소가 아니면 지도 정보로 표시하지 않는다.
+    if (detected && /블로그|티스토리|외부\s*글/.test(text)) continue;
     const dedup = `${platform}\n${text.toLowerCase()}`;
     if (seen.has(dedup)) continue;
     seen.add(dedup);
