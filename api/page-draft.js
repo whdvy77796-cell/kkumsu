@@ -5,7 +5,7 @@ import { chat, extractJson, DEFAULT_MODEL, costMicro } from '../lib/ai.mjs';
 import { mockEnabled } from '../lib/mock.mjs';
 
 export const INPUT_LIMITS = Object.freeze({ name: 60, address: 120, fact: 200, facts: 8, offer: 500, difference: 500, audience: 500, visit: 500, keywords: 300, bytes: 18000 });
-export const OUTPUT_LIMITS = Object.freeze({ headline: 120, intro: 800, heading: 100, body: 1000, question: 160, answer: 700, keyword: 80, sections: 5, faqs: 4, keywords: 8 });
+export const OUTPUT_LIMITS = Object.freeze({ headline: 120, intro: 800, heading: 100, body: 1000, question: 160, answer: 700, keyword: 80, sections: 5, faqs: 4, keywords: 8, situations: 5 });
 const ANSWERS = ['offer', 'difference', 'audience', 'visit', 'keywords'];
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const object = (o) => o !== null && typeof o === 'object' && !Array.isArray(o) && [Object.prototype, null].includes(Object.getPrototypeOf(o));
@@ -55,19 +55,28 @@ name/address는 사장님이 가게를 확인한 후 수정할 수 있는 기본
 부정과 불확실성을 보존하세요. 주차 안 됨/모름/미확인은 주차 가능이나 무료주차가 아니며 반려견 동반 불가도 가능으로 바꾸면 안 됩니다.
 추측, 사실 발명, 매출/성과/순위/AI 노출 보장, 확인되지 않은 가격/영업시간/숫자, 과장 표현을 금지합니다. 항목마다 직접 뒷받침하는 입력 ID만 evidence에 넣으세요. name만으로 메뉴나 시설을 추측하지 마세요. 사실 근거가 없거나 keywords만 근거인 소개/제목/섹션/FAQ는 생략하세요. 숫자는 해당 항목이 인용한 사실 evidence 원문에 실제 있는 숫자만 사용하세요. keywords 숫자는 사실 숫자 근거가 아닙니다.
 읽기 쉽게 한 단락 한 주제로 쓰고, 제목·소개·가게만의 구체적인 가치·고객 상황·방문 정보에 집중하세요. FAQ는 질문에 바로 답하세요. 답변 근거 없는 질문은 만들지 마세요. 이 글은 실제 손님이 가게 홈페이지에서 읽는 소개글입니다. '사장님이 알려주셨습니다', '입력하신 정보', '손님에게 알리고 싶은 곳', 'AI가 작성했습니다'처럼 설문이나 작성 과정을 설명하지 말고, 확인한 사실과 이용 상황을 손님에게 자연스럽게 직접 안내하세요. 정상적인 문장과 자연스러운 바꿔쓰기는 허용하되 의미를 보태지 마세요. HTML/마크다운/링크/코드 없이 일반 텍스트만 씁니다.
-형식: {"headline":{"text":"제목","evidence":["offer"]},"intro":{"text":"소개","evidence":["offer"]},"sections":[{"heading":"제목","body":"본문","evidence":["fact0"]}],"faqs":[{"question":"질문?","answer":"직접 답변","evidence":["visit"]}],"keywords":[{"text":"희망 검색어","evidence":["keywords"]}]}
-headline/intro는 근거 없으면 null, 나머지는 빈 배열로 둡니다. 최대 글자 수: 제목120, 소개800, 섹션 제목100/본문1000, FAQ 질문160/답700, 키워드80. 섹션 최대5개, FAQ 최대4개, 키워드 최대8개. 실제 제공되지 않은 evidence ID를 쓰지 마세요.`;
+별도 situations는 '이럴 때 찾는 가게'용 가상의 대화체 질문과 가게를 직접 안내하는 사실 답변입니다. 실제 검색량·인기 질문·추천 보증·후기·고객 경험이 아닙니다. 가상 질문의 '추천좀/추천해줘' 같은 요청 표현은 가능하지만 답변에서 근거 없는 추천이나 인기 주장을 하지 마세요. 기존 다섯 답변과 확인 사실만 사용하여 지역/동행/목적이 자연스러운 서로 다른 상황 3~5개를 목표로 하되, 직접 근거가 부족하면 더 적게 또는 []로 둡니다. 새 조사나 외부 호출은 없습니다. question과 answer 모두 근거를 지켜야 합니다. 질문이라는 이유로 헌팅/소개팅/데이트/합석, 여자/남자, 둘/2명/2인 등 인원, 나이, 시설, 시간, 가격, 방문 목적을 만들어내지 마세요. 이 민감한 상황 표현은 해당 사장님 사실 원문에 명시되어야 합니다. keywords와 상호·주소만으로 방문 자격이나 상황을 추론하지 마세요. evidence는 실질적으로 뒷받침하는 사실 ID를 반드시 포함하세요. answer는 question에 바로 답하고 가게명을 포함하며 부정/불확실성을 그대로 보존합니다. '헌팅 불가'에서 헌팅을 권하거나 '주차 모름'에서 주차 가능을 말하지 마세요. 실제 사람이 방문했다는 1인칭 후기, 인기/자주 찾는/추천/유명/최고 등의 주장은 쓰지 마세요. selected 및 기타 추가 필드를 만들지 마세요.
+형식: {"headline":{"text":"제목","evidence":["offer"]},"intro":{"text":"소개","evidence":["offer"]},"sections":[{"heading":"제목","body":"본문","evidence":["fact0"]}],"faqs":[{"question":"질문?","answer":"직접 답변","evidence":["visit"]}],"keywords":[{"text":"검색어 제안","evidence":["offer"]}],"situations":[{"question":"자연스러운 가상 질문?","answer":"가게명을 넣은 사실 기반 직접 답변","evidence":["offer"]}]}
+headline/intro는 근거 없으면 null, 나머지는 빈 배열로 둡니다. 최대 글자 수: 제목120, 소개800, 섹션 제목100/본문1000, FAQ 질문160/답700, 키워드80. 섹션 최대5개, FAQ 최대4개, 키워드 최대8개, situations 최대5개(질문160/답700). 실제 제공되지 않은 evidence ID를 쓰지 마세요.`;
 
 // This is a syntactic support check, NOT semantic verification. The owner must review.
 // Normalize separators so 10,000 and 10000 agree; do not use substring matching (3 != 30).
-export function numberTokens(text) {
-  return String(text).normalize('NFKC').match(/\d+(?:,\d{3})*(?:\.\d+)?/g)?.map(s => s.replace(/,/g, '')) || [];
+function normalizedNumbers(text) {
+  const counts = { 한: 1, 하나: 1, 혼자: 1, 두: 2, 둘: 2, 세: 3, 셋: 3, 네: 4, 넷: 4, 다섯: 5, 여섯: 6, 일곱: 7, 여덟: 8, 아홉: 9, 열: 10 };
+  return String(text).normalize('NFKC').replace(/(\d+(?:,\d{3})*(?:\.\d+)?)\s*h(?:ours?)?\b/gi, '$1시간')
+    .replace(/((?:여성|여자|남성|남자|손님|일행)\s*)(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열|\d+)\s*분/g, (_, prefix, n) => prefix + (counts[n] || n) + '명')
+    .replace(/(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*사람/g, (_, n) => counts[n] + '명')
+    .replace(/(\d+)\s*사람/g, '$1명')
+    .replace(/(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*(명|인|시간|시|개|잔|분|살)/g, (_, n, unit) => counts[n] + unit)
+    .replace(/혼자|(?:둘|셋|넷)(?=이|만|끼리|씩|\s|[,.?!]|$)/g, n => counts[n] + '명');
 }
-// Retain the unit with a number so an address or head count cannot by itself
-// justify reusing the same number as a price, opening time, duration or quantity.
+export function numberTokens(text) {
+  return normalizedNumbers(text).match(/\d+(?:,\d{3})*(?:\.\d+)?/g)?.map(s => s.replace(/,/g, '')) || [];
+}
+// Canonical person counts permit 여자 둘 / 여성 2명 / 2인, never a new count.
 export function quantityTokens(text) {
-  const pattern = /(\d+(?:,\d{3})*(?:\.\d+)?)\s*(만원|시간|퍼센트|가지|개월|킬로그램|킬로|원|년|월|일|시|분|개|명|석|인|세|%|종|회|곳|대|평|층|kg|g)/gi;
-  return [...String(text).normalize('NFKC').matchAll(pattern)].map(match => `${match[1].replace(/,/g, '')}|${match[2].toLowerCase()}`);
+  const pattern = /(\d+(?:,\d{3})*(?:\.\d+)?)\s*(만원|시간|퍼센트|가지|개월|킬로그램|킬로|원|년|월|일|시|분|개|명|석|인|세|살|잔|%|종|회|곳|대|평|층|kg|g)/gi;
+  return [...normalizedNumbers(text).matchAll(pattern)].map(match => `${match[1].replace(/,/g, '')}|${({ 인: '명', 살: '세' })[match[2]] || match[2].toLowerCase()}`);
 }
 const forbidden = (s) => /(?:매출|수익|성과|성공|상위\s*노출|검색\s*노출|AI\s*노출|순위)[^.!?\n]{0,24}(?:보장|확실|무조건)|(?:무조건|반드시)[^.!?\n]{0,20}(?:노출|매출|성공)|(?:기사|언론\s*보도|검색\s*결과)에\s*따르면|모델\s*(?:지식|기억)/i.test(s);
 
@@ -75,7 +84,7 @@ export function contradictsOwner(text, sources) {
   const factual = Object.entries(sources).filter(([id]) => id !== 'keywords').map(([, s]) => s).join('\n');
   const statements = String(text).split(/[.!?\n,;]+/);
   for (const topic of ['주차', '반려(?:견|묘|동물)|애견', '예약', '포장', '배달', '영업|운영']) {
-    const negative = new RegExp(`(?:${topic})[^.!?\\n,]{0,28}(?:안\\s*(?:돼|되|됩|받|하)|못\\s*(?:해|하|받|했)|불가|없|모르|모름|미확인|불확실|받지\\s*않|하지\\s*않|되지\\s*않|확인하지\\s*못|가능하지\\s*않|어려)`);
+    const negative = new RegExp(`(?:${topic})[^.!?\\n,]{0,28}(?:안\\s*(?:돼|되|됩|받|하)|못\\s*(?:해|하|받|했)|불가|없|모르|모름|모릅|미확인|불확실|받지\\s*않|하지\\s*않|되지\\s*않|확인하지\\s*못|가능하지\\s*않|어려)`);
     const positive = new RegExp(`(?:(?:${topic})[^.!?\\n,]{0,24}(?:가능|됩니다|돼요|환영|허용|제공|할\\s*수\\s*있|해\\s*주세요|받습니다|받아요|합니다|해요|열어요))`);
     if (negative.test(factual) && statements.some(part => (positive.test(part) || (topic === '주차' && /무료\s*주차/.test(part))) && !negative.test(part))) return true;
   }
@@ -98,13 +107,66 @@ export function unsupportedPracticalClaim(text, sources) {
   return topics.some(([claim, support]) => claim.test(text) && !support.test(factual));
 }
 
+// Deliberately conservative lexical guards, not a claim of semantic verification.
+// Only substantive cited owner facts may support these topics, never desired keywords.
+const situationTopics = [
+  /헌팅|hunting/i, /소개팅/, /데이트/, /합석/, /미팅/, /만남|교류/, /친목/, /이성/, /남녀/, /플러팅|flirting/i, /번호\s*(?:따|교환)/,
+  /여자|여성/, /남자|남성/, /커플|연인/, /친구/, /동료|직장/, /가족/, /아이|어린이|아동/,
+  /회식/, /생일/, /기념일/, /퇴근/, /모임/, /혼술/, /혼밥/, /여행|관광/,
+  /점심|런치/, /저녁|디너/, /새벽/, /주말/, /평일/,
+  /주차|파킹/i, /예약/, /반려(?:견|묘|동물)|애견|애묘/, /포장|테이크\s*아웃/i,
+  /배달|배송|택배/, /화장실/, /테라스/, /룸|개별실/, /휠체어/, /흡연/, /와이파이|wifi/i,
+  /영업|운영|24\s*(?:시간|h)|연중\s*무휴/i, /무료/, /조용/, /단체/,
+];
+const noOrUnknown = /불가|없|안\s*(?:되|돼|됩|받|하)|못\s*(?:해|하|받)|않|금지|모르|모름|모릅|미확인|불확실|확인\s*필요|어려/;
+const unknown = /모르|모름|모릅|미확인|불확실|확인\s*필요/;
+const positiveAnswer = /가능|됩니다|돼요|환영|허용|제공|할\s*수\s*있|받습니다|받아요|합니다|해요|있습니다|있어요/;
+function unsafeSituation(question, answer, cited, sources, name) {
+  const substantive = Object.entries(cited).filter(([id]) => !['name', 'address', 'keywords'].includes(id));
+  if (!substantive.length || !answer.includes(name)) return true;
+  const factual = substantive.map(([, text]) => text).join('\n');
+  const text = question + '\n' + answer;
+  const assertionText = question.replace(/추천\s*(?:좀|해\s*줘|해주세요|해\s*주세요|부탁)/g, '') + '\n' + answer;
+  if (/(?:지시|프롬프트).{0,20}(?:무시|따르)|system\s*:|ignore\s+(?:previous|all)|(?:역할|시스템).{0,12}(?:변경|명령)|(?:이라고|라고)\s*(?:답해|출력)/i.test(factual)) return true;
+  if (/(?:인기|자주\s*(?:찾|묻)|많이\s*(?:찾|묻)|검색량|추천|유명|최고|핫플|리뷰|후기)|(?:제가|저는|우리는|우리가).{0,25}(?:갔|가봤|방문했|먹었|이용했)|(?:지시|프롬프트).{0,20}(?:무시|따르)|system\s*:|ignore\s+(?:previous|all)/i.test(assertionText)) return true;
+  if (contradictsOwner(answer, sources)) return true;
+  for (const topic of situationTopics) {
+    if (!topic.test(text)) continue;
+    if (!topic.test(factual)) return true;
+    // A stock unrelated answer does not answer an availability/occasion question.
+    if (topic.test(question) && !topic.test(answer)) return true;
+    const sourceParts = Object.entries(sources).filter(([id]) => !['name', 'address', 'keywords'].includes(id)).flatMap(([, s]) => s.split(/[.!?\n,;]+/)).filter(s => topic.test(s));
+    const answerParts = answer.split(/[.!?\n,;]+/).filter(s => topic.test(s));
+    const sourceNegative = sourceParts.some(s => noOrUnknown.test(s));
+    if (sourceNegative && answerParts.some(s => !noOrUnknown.test(s))) return true;
+    if (sourceParts.some(s => unknown.test(s)) && answerParts.some(s => !unknown.test(s))) return true;
+    if (sourceParts.length && !sourceNegative && sourceParts.some(s => positiveAnswer.test(s)) && answerParts.some(s => noOrUnknown.test(s))) return true;
+    // Preserve negative constraints in the request rather than contradict them.
+    if (question.split(/[.!?\n,;]+/).some(s => topic.test(s) && noOrUnknown.test(s)) && answerParts.some(s => positiveAnswer.test(s) && !noOrUnknown.test(s))) return true;
+  }
+  const counts = s => quantityTokens(s).filter(q => q.endsWith('|명') || q.endsWith('|세'));
+  const confirmed = new Set(counts(factual));
+  if (counts(text).some(q => !confirmed.has(q))) return true;
+  if (counts(question).some(q => !counts(answer).includes(q))) return true;
+  // Preserve named locations and ages instead of inventing another district/age group.
+  const locations = text.replaceAll(name, '').match(/[가-힣]+(?:구|동|역)(?=에서|근처|주변)|종로|홍대|강남|이태원|건대|성수|신촌|합정|망원|연남/g) || [];
+  const locationSource = Object.values(cited).join(' ');
+  if (locations.some(p => !locationSource.includes(p))) return true;
+  const ages = text.match(/\d+\s*대/g) || [];
+  if (ages.some(age => !factual.replace(/\s/g, '').includes(age.replace(/\s/g, '')))) return true;
+  // Require at least one subject word from the question in the answer; allow
+  // generic '어디' questions, with the topic/count checks above doing the hard work.
+  const subjects = question.replaceAll(name, '').split(/\s+/).map(s => s.replace(/(?:에서는|에서|으로|이나|하고|랑|이라|을|를|은|는|이|가|에|와|과|도|[?!.])+$|(?:할|하는|먹을|마실|찾는|갈)$/g, '')).filter(s => s.length >= 2 && !/어디|어떤|있나|있을|좋을|있어|가게|찾아|싶어|가능|괜찮/.test(s));
+  return subjects.length > 0 && !subjects.some(s => answer.includes(s) || situationTopics.some(t => t.test(s) && t.test(answer)));
+}
+
 export function normalizeDraft(raw, input) {
   if (!object(raw) || !['headline', 'intro', 'sections', 'faqs', 'keywords'].every(k => own(raw, k)) || !['sections', 'faqs', 'keywords'].every(k => Array.isArray(raw[k]))) {
     throw new HttpError(502, 'AI_FORMAT', 'AI 초안 형식이 올바르지 않아요. 자동으로 다시 호출하지 않았어요.');
   }
   const sources = inputEvidence(input);
   let omittedCount = 0;
-  function item(value, fields, keyword = false) {
+  function item(value, fields, keyword = false, situation = false) {
     if (!exact(value, [...Object.keys(fields), 'evidence']) || !Array.isArray(value.evidence) || !value.evidence.length || value.evidence.length > 15 || value.evidence.some(id => typeof id !== 'string' || !own(sources, id))) { omittedCount++; return null; }
     const evidence = [...new Set(value.evidence)];
     const facts = evidence.filter(id => id !== 'keywords');
@@ -120,7 +182,8 @@ export function normalizeDraft(raw, input) {
     // A question about availability is not itself an affirmative claim; inspect it
     // together with its answer to catch both "yes" and a correctly negative answer.
     const claimText = out.question && out.answer ? `${out.question} ${out.answer}`.replace(/[,.!?;\n]+/g, ' ') : text;
-    if (!keyword && (contradictsOwner(claimText, sources) || unsupportedPracticalClaim(text, citedFacts))) { omittedCount++; return null; }
+    if (situation && unsafeSituation(out.question, out.answer, citedFacts, sources, input.store.name)) { omittedCount++; return null; }
+    if (!keyword && (contradictsOwner(situation ? out.answer : claimText, sources) || unsupportedPracticalClaim(text, citedFacts))) { omittedCount++; return null; }
     if (keyword && (contradictsOwner(text, sources) || unsupportedPracticalClaim(text, sources))) { omittedCount++; return null; }
     // Desired keywords alone do not substantiate numerical claims, even in suggestions.
     const numericSources = facts;
@@ -159,7 +222,16 @@ export function normalizeDraft(raw, input) {
     text: `미완성 초안입니다. ${forbidden(input.answers.offer) ? '제공 내용을 사실 중심으로 다시 확인해 주세요.' : `사장님이 입력한 제공 내용: ${input.answers.offer}`}\n\n공개하기 전에 표현과 사실을 직접 확인하고 수정해 주세요. 숫자 검사는 의미의 정확성을 보증하지 않습니다.`,
     evidence: ['offer'],
   };
-  return { headline, intro, sections, faqs, keywords, omittedCount };
+  const beforeSituations = omittedCount;
+  let situations = [], situationsStatus = !own(raw, 'situations') ? 'missing' : !Array.isArray(raw.situations) ? 'invalid' : 'empty';
+  if (Array.isArray(raw.situations)) {
+    omittedCount += Math.max(0, raw.situations.length - OUTPUT_LIMITS.situations);
+    situations = raw.situations.slice(0, OUTPUT_LIMITS.situations).map(v => item(v, { question: OUTPUT_LIMITS.question, answer: OUTPUT_LIMITS.answer }, false, true)).filter(Boolean);
+    situationsStatus = omittedCount > beforeSituations ? 'partial' : situations.length ? 'ready' : 'empty';
+  }
+  const situationsOmittedCount = omittedCount - beforeSituations;
+  const situationsNotice = situationsStatus === 'ready' ? '실제 검색 통계나 후기가 아닌 가상 질문입니다. 사실을 검토한 후 각 항목의 공개 여부를 직접 선택해 주세요.' : situationsStatus === 'empty' ? '근거가 충분한 상황 초안이 생성되지 않았어요. 확인한 사실만으로 직접 입력할 수 있어요. 추가 AI 호출은 하지 않았어요.' : '상황 초안이 누락되었거나 형식·근거 검사를 통과하지 못한 항목이 있어요. 기존 소개글은 유지했고, 확인한 사실만으로 직접 입력할 수 있어요. 추가 AI 호출은 하지 않았어요.';
+  return { headline, intro, sections, faqs, keywords, situations, situationsStatus, situationsOmittedCount, situationsNotice, omittedCount };
 }
 
 const hasUsage = (u) => object(u) && ((Number.isFinite(u.cost) && u.cost >= 0) || ([u.prompt_tokens ?? u.input_tokens, u.completion_tokens ?? u.output_tokens].every(n => Number.isFinite(n) && n >= 0)));
@@ -181,7 +253,7 @@ export async function makePageDraft({ env, fetcher = fetch, input, meter }) {
   let r;
   try {
     r = await chat({ env, fetcher: privateFetch, model, system: PAGE_DRAFT_SYSTEM,
-      user: JSON.stringify({ inputData: inputEvidence(input) }), maxTokens: 2400,
+      user: JSON.stringify({ inputData: inputEvidence(input) }), maxTokens: 3200,
       reasoningEffort: 'low', timeoutMs: 65000, responseFormat: { type: 'json_object' } });
   } catch (err) {
     if (err?.charged === 'unknown') meter.markUnknown();
@@ -219,7 +291,7 @@ export function createHandler(deps = {}) {
           headline: { text: input.store.name, evidence: ['name'] },
           intro: { text: input.answers.offer, evidence: ['offer'] },
           sections: input.store.verifiedFacts.slice(0, 5).map((body, i) => ({ heading: '사장님이 확인한 특징', body, evidence: [`fact${i}`] })),
-          faqs: [], keywords: input.answers.keywords ? [{ text: input.answers.keywords.slice(0, 80), evidence: ['keywords'] }] : [],
+          situations: [], faqs: [], keywords: input.answers.keywords ? [{ text: input.answers.keywords.slice(0, 80), evidence: ['keywords'] }] : [],
         }, input);
         return send(res, 200, { draft, createdAt: new Date().toISOString(), cached: false, mock: true });
       }

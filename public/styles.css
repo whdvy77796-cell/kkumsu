@@ -684,3 +684,11 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
 .public-store dd { margin-left: 0; }
 .public-manage, .public-pagination { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 600px) { .public-grid { grid-template-columns: 1fr; } }
+
+/* 사장님이 고르는 상황별 예상 질문 */
+.page-situations { margin-top: 16px; }
+.page-situation-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-top: 12px; background: var(--card); overflow-wrap: anywhere; }
+.page-situation-card .page-consent { margin: 0 0 12px; }
+.page-situation-question { font-weight: 700; color: var(--ink); margin: 10px 0 6px; }
+.page-situation-answer { white-space: pre-wrap; margin: 0 0 8px; }
+.page-situations .page-evidence { margin-bottom: 0; }

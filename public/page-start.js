@@ -366,6 +366,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     const food = /카페|커피|음식|식당|분식|베이커리|제과|주점|한식|중식|일식|양식/.test(category);
     if (key === 'offer') return food ? '예: 대표 메뉴나 음료. 후보의 업종도 틀릴 수 있으니 실제 제공하는 것만 적어 주세요.' : '예: 대표 상품·서비스와 제공 방식. 업종이나 없는 내용은 추측하지 마세요.';
     if (key === 'difference' && food) return '예: 직접 확인한 맛이나 공간의 특징. 해당하는 내용만 적고 모르면 비워 두세요.';
+    if (key === 'audience') return '예: 친구 두 명, 데이트, 가족 모임 등 실제 가게와 맞는 손님과 방문 상황만 적어 주세요. 상황별 예상 질문에도 활용해요.';
     return fallback;
   }
   // 예시의 대괄호는 실제 가게 정보로 바꾸기 전까지 AI에 보내지 않는다.
@@ -462,7 +463,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
       existing ? h('p', { class: 'card note' }, '이미 초안을 만들었어요. 답변 변경은 AI에 다시 전송하지 않아요. 초안의 문장은 내용 수정에서 직접 고쳐 주세요.') :
         h('div', { class: 'card note page-disclosure' },
           h('h3', null, 'AI 초안 생성을 위한 별도 전송 동의'),
-          h('p', null, '전송 내용: 가게명·주소·직접 선택한 특징·위 5개 답변. 초안 생성 시 OpenRouter 및 연결된 AI 제공자에게 전송해요.'),
+          h('p', null, '전송 내용: 가게명·주소·직접 선택한 특징·위 5개 답변. 초안과 상황별 예상 질문 생성 시 OpenRouter 및 연결된 AI 제공자에게 한 번에 전송해요.'),
           h('p', { class: 'small' }, '답변과 편집 내용은 이 탭의 sessionStorage에 임시저장되며, 새로고침해도 유지돼요. 탭을 닫거나 저장 공간을 지우면 사라질 수 있어요. 외부로 전송된 정보에는 각 제공자의 보관정책이 적용돼요.'),
           h('p', { class: 'small' }, '연락처, 고객 정보 등 개인정보 입력은 자제해 주세요. 이 동의는 앞선 가게 검색 동의와 별도예요.'),
           h('label', { class: 'page-consent', for: 'page-draft-consent' },
@@ -499,7 +500,10 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     try {
       const result = await post('/api/page-draft', { store, answers, consent: true }, 190000);
       if (!result?.draft || typeof result.draft !== 'object' || Array.isArray(result.draft)) throw new Error('초안 응답을 확인하지 못했어요.');
-      d.draft = cleanDraft(result.draft); d.createdAt = string(result.createdAt); d.cached = result.cached === true; d.mock = result.mock === true;
+      d.draft = cleanDraft(result.draft);
+      // AI가 만든 예상 질문은 사장님이 직접 선택하기 전에는 절대 공개하지 않는다.
+      d.draft.situations.forEach(x => { x.selected = false; });
+      d.createdAt = string(result.createdAt); d.cached = result.cached === true; d.mock = result.mock === true;
       d.status = 'ready'; d.view = '#/page-preview'; delete d.edit; delete d.editStore; delete d.regenerate; save();
       draftBusy = false;
       if (location.hash === '#/page-questions') { location.hash = '#/page-preview'; renderPreview(); }
@@ -521,6 +525,10 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     return { headline: obj(raw.headline) ? item(raw.headline, ['text']) : null, intro: obj(raw.intro) ? item(raw.intro, ['text']) : null,
       sections: (Array.isArray(raw.sections) ? raw.sections : []).filter(obj).map(v => item(v, ['heading', 'body'])),
       faqs: (Array.isArray(raw.faqs) ? raw.faqs : []).filter(obj).map(v => item(v, ['question', 'answer'])),
+      situations: (Array.isArray(raw.situations) ? raw.situations : []).filter(obj).map(v => ({ ...item(v, ['question', 'answer']), selected: v.selected === true })),
+      situationsStatus: ['ready', 'partial', 'empty', 'missing', 'invalid'].includes(raw.situationsStatus) ? raw.situationsStatus : 'legacy',
+      situationsNotice: string(raw.situationsNotice).slice(0, 400),
+      situationsOmittedCount: Number.isSafeInteger(raw.situationsOmittedCount) && raw.situationsOmittedCount > 0 ? raw.situationsOmittedCount : 0,
       keywords: (Array.isArray(raw.keywords) ? raw.keywords : []).filter(obj).map(v => item(v, ['text'])),
       omittedCount: Number.isSafeInteger(raw.omittedCount) && raw.omittedCount > 0 ? raw.omittedCount : 0 };
   }
@@ -543,6 +551,8 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     applyEdits(d);
     d.view = '#/page-preview'; save();
     const draft = cleanDraft(d.draft);
+    // 미리보기 체크박스 변경과 새로고침이 같은 원본을 가리키도록 저장한다.
+    d.draft = draft; save();
     show(h('div', { class: 'page-preview' }, privateNote(), h('h2', null, '완성본 비공개 미리보기'),
       h('p', { class: 'small muted' }, d.mock ? '테스트용 모의 초안이에요. 실제 AI 생성 결과가 아니에요.' : 'AI가 작성하고 사장님이 확인·수정하는 초안이에요.'),
       h('p', { class: 'small muted' }, '편집·저장은 이 탭에만 반영돼요. 서버 전송이나 AI 재호출은 하지 않아요.'),
@@ -553,6 +563,17 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
         draft.intro?.text ? h('p', { class: 'page-intro' }, draft.intro.text) : null,
         draft.sections.filter(x => x.heading || x.body).map(x => h('section', { class: 'page-preview-section' }, x.heading ? h('h2', null, x.heading) : null, x.body ? h('p', null, x.body) : null)),
         draft.faqs.some(x => x.question && x.answer) ? h('section', { class: 'page-preview-faq' }, h('h2', null, '자주 묻는 질문'), draft.faqs.filter(x => x.question && x.answer).map(x => h('div', null, h('h3', null, x.question), h('p', null, x.answer)))) : null),
+      h('section', { class: 'card page-situations' },
+        h('h2', null, '이럴 때 찾는 가게'),
+        h('p', { class: 'small muted' }, '사람들이 물어볼 법한 예상 질문이에요. 실제 질문 기록이나 빈도는 확인되지 않았고, AI 검색·추천을 보장하지 않아요.'),
+        h('p', { class: 'small' }, '질문과 답변이 실제 가게에 맞는지 확인한 뒤 원하는 항목만 선택해 주세요. 선택한 항목만 공개돼요. 내용은 아래 ‘내용 수정’에서 고칠 수 있어요.'),
+        ['partial', 'missing', 'invalid'].includes(draft.situationsStatus) && draft.situationsNotice ? h('p', { class: 'card note small', role: 'status' }, draft.situationsNotice) : null,
+        draft.situations.length ? draft.situations.map((x, i) => h('div', { class: 'page-situation-card' },
+          h('label', { class: 'page-consent', for: 'page-situation-select-' + i }, h('input', { id: 'page-situation-select-' + i, type: 'checkbox', checked: x.selected,
+            onchange: e => { x.selected = !!e.target.checked; d.draft = draft; save(); } }), h('span', null, '확인했어요. 이 예상 질문을 공개할게요.')),
+          h('p', { class: 'page-situation-question' }, 'Q. ', x.question || '(질문을 입력해 주세요)'),
+          h('p', { class: 'page-situation-answer' }, 'A. ', x.answer || '(답변을 입력해 주세요)'), evidenceNote(x))) :
+          h('p', { class: 'small muted' }, '아직 예상 질문이 없어요. ‘내용 수정’에서 직접 추가할 수 있어요. 새 AI 초안을 요청하면 추가 비용이 들 수 있어요.')),
       draft.keywords.some(x => x.text) ? h('aside', { class: 'card note page-keywords' }, h('h3', null, '확인할 키워드 제안'), h('p', { class: 'small muted' }, '희망 검색어는 사실 근거가 아니에요. 실제 가게와 맞는지 확인해 주세요. 소개 본문이나 공개 페이지의 확정 키워드·메타데이터로 반영되지 않았으며 검색 노출을 보장하지 않아요.'), draft.keywords.filter(x => x.text).map(x => h('span', null, x.text))) : null,
       h('div', { class: 'page-actions' }, h('button', { class: 'btn block', type: 'button', onclick: () => { location.hash = '#/page-edit'; } }, '내용 수정'),
         h('button', { class: 'btn primary block', type: 'button', onclick: () => { location.hash = '#/page-publish'; } }, '결제하기 · 베타 무료 0원'),
@@ -586,6 +607,14 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
           editField('page-edit-faq-' + i + '-question', 'FAQ 질문', x, 'question', 300), editField('page-edit-faq-' + i + '-answer', 'FAQ 답변', x, 'answer', 2000, true), evidenceNote(x),
           h('button', { class: 'btn small', type: 'button', onclick: () => remove(draft.faqs, i) }, 'FAQ 삭제'))),
         h('button', { class: 'btn small', type: 'button', disabled: draft.faqs.length >= 8, onclick: () => add(draft.faqs, { question: '', answer: '', evidence: [] }, 8) }, 'FAQ 직접 추가'),
+        h('h3', null, '이럴 때 찾는 가게 · 예상 질문'),
+        h('p', { class: 'small muted' }, '실제 질문 기록이 아닌 예상 질문이에요. 사장님이 확인한 사실만 작성하고 공개할 항목을 선택해 주세요.'),
+        draft.situations.map((x, i) => h('fieldset', { class: 'page-edit-section' }, h('legend', null, '예상 질문 ' + (i + 1)),
+          editField('page-edit-situation-' + i + '-question', '예상 질문', x, 'question', 300), editField('page-edit-situation-' + i + '-answer', '답변', x, 'answer', 2000, true), evidenceNote(x),
+          h('label', { class: 'page-consent', for: 'page-edit-situation-' + i + '-select' }, h('input', { id: 'page-edit-situation-' + i + '-select', type: 'checkbox', checked: x.selected,
+            onchange: e => { x.selected = !!e.target.checked; save(); } }), '내용을 확인했고 이 질문을 공개할게요.'),
+          h('button', { class: 'btn small', type: 'button', onclick: () => remove(draft.situations, i) }, '예상 질문 삭제'))),
+        h('button', { class: 'btn small', type: 'button', disabled: draft.situations.length >= 8, onclick: () => add(draft.situations, { question: '', answer: '', evidence: [], selected: false }, 8) }, '예상 질문 직접 추가'),
         draft.keywords.map((x, i) => h('div', { class: 'page-edit-section' }, editField('page-edit-keyword-' + i, '키워드 ' + (i + 1), x, 'text', 100), evidenceNote(x),
           h('button', { class: 'btn small', type: 'button', onclick: () => remove(draft.keywords, i) }, '키워드 삭제'))),
         h('button', { class: 'btn small', type: 'button', disabled: draft.keywords.length >= 12, onclick: () => add(draft.keywords, { text: '', evidence: [] }, 12) }, '키워드 추가'),
@@ -602,6 +631,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
       headline: string(draft.headline?.text).trim(), intro: string(draft.intro?.text).trim(),
       sections: draft.sections.map(x => ({ heading: string(x.heading).trim(), body: string(x.body).trim() })).filter(x => x.heading || x.body),
       faqs: draft.faqs.map(x => ({ question: string(x.question).trim(), answer: string(x.answer).trim() })).filter(x => x.question || x.answer),
+      situations: draft.situations.filter(x => x.selected).map(x => ({ question: string(x.question).trim(), answer: string(x.answer).trim() })),
     };
   }
   function publicationProblem(data) {
@@ -610,8 +640,12 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     if (!data.headline || data.headline.length > 200 || !data.intro || data.intro.length > 2000) return '제목과 소개글을 입력하고 글자 수를 확인해 주세요.';
     if (data.sections.length > 8 || data.sections.some(x => !x.heading || !x.body || x.heading.length > 200 || x.body.length > 4000)) return '소개 항목의 제목과 내용을 모두 확인해 주세요.';
     if (data.faqs.length > 8 || data.faqs.some(x => !x.question || !x.answer || x.question.length > 300 || x.answer.length > 2000)) return '질문과 답변을 모두 확인해 주세요.';
+    // 이전 버전에서 응답이 끊긴 공개 요청은 새 필드를 추가하지 않고 원본 그대로 재확인한다.
+    if (data.situations !== undefined && (!Array.isArray(data.situations) || data.situations.length > 8 || data.situations.some(x => !x.question || !x.answer || x.question.length > 300 || x.answer.length > 2000))) return '공개로 선택한 예상 질문과 답변을 모두 확인해 주세요.';
+    const situationUrl = /(?:\b[a-z][a-z\d+.-]*:\/\/|(?:mailto|tel|file|vbscript|blob):|\/\/[\p{L}\p{N}]|(?:[\p{L}\p{N}-]+\.)+(?:[a-z]{2,63}|한국)(?=$|[^\p{L}\p{N}-]))/iu;
+    if ((data.situations || []).some(x => situationUrl.test(x.question) || situationUrl.test(x.answer))) return '예상 질문과 답변에는 웹 주소를 넣을 수 없어요. 내용을 수정해 주세요.';
     if (/미완성 초안입니다|가게 소개 초안 · 사장님 검토 필요/.test(data.headline + data.intro)) return '미완성 초안 안내를 지우고 실제 소개 내용으로 수정해 주세요.';
-    const all = [data.name, data.address, data.headline, data.intro, ...data.sections.flatMap(x => [x.heading, x.body]), ...data.faqs.flatMap(x => [x.question, x.answer])];
+    const all = [data.name, data.address, data.headline, data.intro, ...data.sections.flatMap(x => [x.heading, x.body]), ...data.faqs.flatMap(x => [x.question, x.answer]), ...(data.situations || []).flatMap(x => [x.question, x.answer])];
     if (all.some(x => /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]|<\s*[!/?a-z][^>]*>|(?:https?:|javascript:|data:|www\.)|\]\s*\(/i.test(x))) return '공개 내용에는 웹 주소나 HTML을 넣을 수 없어요. 내용을 수정해 주세요.';
     if (new TextEncoder().encode(JSON.stringify(data)).length > 64000) return '공개 내용이 너무 길어요. 일부 내용을 줄여 주세요.';
     return '';
@@ -674,7 +708,8 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
       d.publication?.id ? h('p', { class: 'card warn' }, '이미 공개한 페이지가 있어요. 다시 공개하면 별도의 페이지가 만들어져요. 기존 내용을 바꾸려면 ', h('a', { href: '/#/manage/' + d.publication.id }, '기존 페이지 관리'), '를 이용해 주세요.') : null,
       attempt ? h('p', { class: 'card warn', role: 'status' }, '이전 요청이 이미 공개됐을 수 있어요. 같은 내용과 비밀번호로 결과를 확인해요. 확인 전까지 요청 내용은 고정돼요. ', h('a', { href: '/#/manage/' + attempt.id }, '요청한 주소 관리하기')) : null,
       issue ? h('p', { class: 'card warn', role: 'alert' }, issue, ' ', h('a', { href: '#/page-edit' }, '내용 수정')) : null,
-      h('article', { class: 'card page-draft-content' }, h('p', { class: 'small muted' }, data.name, ' · ', data.address), h('h3', null, data.headline), h('p', null, data.intro), data.sections.map(x => h('section', null, h('h3', null, x.heading), h('p', null, x.body))), data.faqs.length ? h('section', null, h('h3', null, '자주 묻는 질문'), data.faqs.map(x => h('div', null, h('h4', null, x.question), h('p', null, x.answer)))) : null),
+      h('article', { class: 'card page-draft-content' }, h('p', { class: 'small muted' }, data.name, ' · ', data.address), h('h3', null, data.headline), h('p', null, data.intro), data.sections.map(x => h('section', null, h('h3', null, x.heading), h('p', null, x.body))), data.faqs.length ? h('section', null, h('h3', null, '자주 묻는 질문'), data.faqs.map(x => h('div', null, h('h4', null, x.question), h('p', null, x.answer)))) : null,
+        (data.situations || []).length ? h('section', null, h('h3', null, '이럴 때 찾는 가게 · 예상 질문'), h('p', { class: 'small muted' }, '실제 질문 기록이 아닌 예상 질문이에요.'), data.situations.map(x => h('div', null, h('h4', null, x.question), h('p', null, x.answer)))) : null),
       h('form', { class: 'card page-form', novalidate: true, onsubmit: publish },
         h('h3', null, '공개 페이지 관리 비밀번호'),
         h('p', { class: 'small muted' }, '나중에 수정하거나 삭제할 때 필요해요. 비밀번호는 복구할 수 없으니 안전하게 보관해 주세요. 비밀번호는 공개되지 않아요.'),

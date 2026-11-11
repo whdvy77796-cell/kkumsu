@@ -626,7 +626,8 @@ test('publication requires separate consent and never persists password or priva
   getNode(ctx, 'publish-consent').checked = true; await submit(ctx);
   assert.equal(ctx.calls.length, 2); assert.equal(location.hash, '#/page-published');
   const payload = ctx.calls[1].data;
-  assert.equal(payload.consent, true); assert.deepEqual(Object.keys(payload.data), ['name', 'address', 'headline', 'intro', 'sections', 'faqs']);
+  assert.equal(payload.consent, true); assert.deepEqual(Object.keys(payload.data), ['name', 'address', 'headline', 'intro', 'sections', 'faqs', 'situations']);
+  assert.deepEqual(payload.data.situations, []);
   assert.ok(!sessionStorage.getItem('yeogibwa.page.start.v1').includes('sample-test-secret'));
   const updated = { ...payload.data, intro: '수정된 소개' };
   ctx.flow.recordPublicationUpdate(payload.id, updated);
@@ -671,4 +672,66 @@ test('pending or uncertain publication cannot be discarded and retries the same 
   ctx.flow.renderPublish(); assert.match(allText(ctx.state), /요청한 주소 관리하기/); fillPublish(ctx); await submit(ctx);
   assert.equal(ctx.calls.at(-1).data.id, saved.id); assert.deepEqual(ctx.calls.at(-1).data.data, saved.data);
   assert.equal(location.hash, '#/page-published'); assert.equal(ctx.flow.busy(), false);
+});
+
+
+test('situation suggestions are opt-in, survive editing and only selected items reach publication', async () => {
+  const result = draftResult();
+  result.draft.situations = [
+    { question: '친구 둘이 조용히 차를 마실 곳?', answer: '테스트가게에서 차를 마실 수 있어요.', evidence: ['offer'], selected: true },
+    { question: '혼자 차 마시기 좋은 곳?', answer: '테스트가게의 차를 살펴보세요.', evidence: ['offer'] },
+  ];
+  result.draft.situationsStatus = 'partial'; result.draft.situationsNotice = '일부 예상 질문은 근거 부족으로 제외했어요.'; result.draft.situationsOmittedCount = 1;
+  const ctx = await ready(async (url, body) => url === '/api/stores' ? { id: body.id } : result);
+  fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx); ctx.flow.renderPreview();
+  assert.match(allText(ctx.state), /실제 질문 기록이나 빈도는 확인되지 않았/);
+  assert.match(allText(ctx.state), /일부 예상 질문은 근거 부족/);
+  assert.ok(!getNode(ctx, 'page-situation-select-0').attrs.checked, 'returned selected flag cannot self-select');
+  assert.ok(!getNode(ctx, 'page-situation-select-1').attrs.checked);
+  check(ctx, 'page-situation-select-0');
+  reload(ctx); ctx.flow.renderPreview(); assert.equal(getNode(ctx, 'page-situation-select-0').attrs.checked, true);
+  assert.equal(getNode(ctx, 'page-situation-select-1').attrs.checked, false);
+  ctx.flow.renderEdit(); input(ctx, 'page-edit-situation-0-answer', '직접 확인한 차를 소개해요.'); await submit(ctx);
+  assert.match(allText(ctx.state), /직접 확인한 차를 소개해요/);
+  ctx.flow.renderPublish(); assert.match(allText(ctx.state), /이럴 때 찾는 가게 · 예상 질문/);
+  assert.doesNotMatch(allText(ctx.state), /혼자 차 마시기 좋은 곳/);
+  fillPublish(ctx); await submit(ctx);
+  const data = ctx.calls.at(-1).data.data;
+  assert.deepEqual(data.situations, [{ question: '친구 둘이 조용히 차를 마실 곳?', answer: '직접 확인한 차를 소개해요.' }]);
+  assert.ok(!JSON.stringify(data).includes('evidence'));
+  assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
+});
+
+test('legacy drafts support manual situation entry without a new AI request', async () => {
+  const ctx = await ready(); fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  const before = ctx.calls.length; ctx.flow.renderPreview(); assert.match(allText(ctx.state), /아직 예상 질문이 없어요/);
+  ctx.flow.renderEdit();
+  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '예상 질문 직접 추가').attrs.onclick();
+  input(ctx, 'page-edit-situation-0-question', '이 가게는 무슨 차를 파나요?');
+  input(ctx, 'page-edit-situation-0-answer', '따뜻한 차를 팔아요.');
+  check(ctx, 'page-edit-situation-0-select'); await submit(ctx);
+  assert.match(allText(ctx.state), /이 가게는 무슨 차를 파나요/); assert.equal(ctx.calls.length, before);
+  ctx.flow.renderPublish(); assert.match(allText(ctx.state), /따뜻한 차를 팔아요/); assert.equal(ctx.calls.length, before);
+});
+
+test('a frozen legacy publish retry keeps its original six-field request untouched', async () => {
+  const ctx = await ready(async (url, body) => url === '/api/stores' ? { id: body.id } : draftResult());
+  fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  const saved = JSON.parse(sessionStorage.getItem('yeogibwa.page.start.v1'));
+  const oldData = { name: '테스트가게', address: '서울 마포구 망원로 12', headline: '기존 제목', intro: '기존 소개', sections: [], faqs: [] };
+  saved.pageDraft.publishAttempt = { id: 'a'.repeat(22), data: oldData, status: 'uncertain' };
+  sessionStorage.setItem('yeogibwa.page.start.v1', JSON.stringify(saved)); reload(ctx); ctx.flow.renderPublish();
+  fillPublish(ctx); await submit(ctx); assert.deepEqual(ctx.calls.at(-1).data.data, oldData);
+});
+
+
+test('selected situation links are rejected before attempting publication', async () => {
+  const ctx = await ready(); fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  ctx.flow.renderEdit();
+  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '예상 질문 직접 추가').attrs.onclick();
+  input(ctx, 'page-edit-situation-0-question', '이 가게는 무엇을 파나요?');
+  input(ctx, 'page-edit-situation-0-answer', 'example.com');
+  check(ctx, 'page-edit-situation-0-select'); await submit(ctx);
+  ctx.flow.renderPublish(); assert.match(allText(ctx.state), /웹 주소를 넣을 수 없어요/);
+  assert.equal(ctx.calls.length, 1, 'no publication request sent');
 });
