@@ -14,6 +14,8 @@ import { makeDiagnosisStart } from './diagnosis-start.js';
 import { makeHomeExample } from './home-example.js';
 import { makeHomeExplainer } from './home-explainer.js';
 import { setupHomeLogo } from './logo-home.js';
+import { makeAccountUI } from './account-ui.js';
+import { allowOwnerHashChange } from './account-navigation.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -96,6 +98,7 @@ async function post(path, body, timeoutMs) {
     if (!res.ok || !data) {
       const err = new Error(data?.error || `요청이 실패했어요. (${res.status})`);
       err.code = data?.code || `HTTP_${res.status}`;
+      err.status = res.status;
       throw err;
     }
     return data;
@@ -125,11 +128,14 @@ function route() {
   const policy = { '#/terms': 'terms', '#/privacy': 'privacy', '#/refund': 'refund' }[hash];
   const manage = /^#\/manage\/([A-Za-z0-9_-]{22})$/.exec(hash);
   const reportStore = /^#\/report-store\/([A-Za-z0-9_-]{22})$/.exec(hash);
-  // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다 (home·find·survey·done·report·policy)
-  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/page-search': 'find', '#/page-confirmed': 'find', '#/page-questions': 'find', '#/page-preview': 'find', '#/page-edit': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
+  const ownerEdit = /^#\/my-stores\/([A-Za-z0-9_-]{22})$/.exec(hash);
+  // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다.
+  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : (ownerEdit || hash === '#/my-stores') ? 'account' : ({ '#/find': 'find', '#/page-search': 'find', '#/page-confirmed': 'find', '#/page-questions': 'find', '#/page-preview': 'find', '#/page-edit': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
   if (linked) renderLinked(linked[1], linked[2]);
   else if (manage) storeTools.renderManage(manage[1]);
   else if (reportStore) storeTools.renderReport(reportStore[1]);
+  else if (ownerEdit) { storeName.textContent = ''; accountUI.renderAccountEdit(ownerEdit[1]); }
+  else if (hash === '#/my-stores') { storeName.textContent = ''; accountUI.renderDashboard(); }
   else if (policy) renderPolicy(policy);
   else if (hash === '#/sample') renderSample();
   else if (hash === '#/page-search') pageStartFlow.renderSearch();
@@ -146,7 +152,9 @@ function route() {
   else if (hash === '#/report') renderReport();
   else renderHome();
 }
-window.addEventListener('hashchange', () => {
+window.addEventListener('hashchange', (event) => {
+  // 계정 편집의 미저장 내용은 뒤로 가기·로고·메뉴 이동 시 먼저 확인한다.
+  if (!allowOwnerHashChange(event, accountUI, history)) return;
   route();
   window.scrollTo(0, 0);
 });
@@ -172,6 +180,9 @@ function showError(e, retry) {
 }
 
 const storeTools = makeStoreTools({ h, show, setNavbar, btn, post, onDeleted: id => pageStartFlow.clearPublication(id), onUpdated: (id, data) => pageStartFlow.recordPublicationUpdate(id, data) });
+const accountUI = makeAccountUI({ h, show, setNavbar, btn, post, fetcher: (url, options) => fetch(url, options), storeName,
+  getDraftResume: () => { const info = pageStartFlow.info(); return info.draftStatus === 'ready' && /^#\/page-(preview|edit|publish)$/.test(info.resumeHash) ? info.resumeHash : ''; },
+});
 const pageStartFlow = makePageStart({ h, show, setNavbar, btn, post, storeName, onPublished: (id, data) => storeTools.renderPublished(id, data) });
 let diagnosisFindAuthorized = false;
 const diagnosisStartFlow = makeDiagnosisStart({
@@ -271,6 +282,7 @@ function renderHome() {
     makeHomeExample(h),
     makeHomeExplainer(h, focusStart),
     pageSearchWarning, pendingDiagnosis,
+    paidReportRecoveryCard(),
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
       h('h2', null, '가게 이름과 주소를 알려주세요'),
@@ -1500,6 +1512,20 @@ function payReminder(data) {
     priceTag(),
     h('button', { class: 'btn primary block', type: 'button', onclick: focusPayCard }, '결제 안내 보기'));
 }
+function paidReportRecoveryLinks() {
+  const links = [];
+  // Include the legacy entry without replacing it; only exact rid/token duplicates collapse.
+  for (const p of [S.paidReportLink, ...(Array.isArray(S.paidReportLinks) ? S.paidReportLinks : [])]) {
+    if (p?.rid && p?.token && !links.some((x) => x.rid === p.rid && x.token === p.token)) links.push(p);
+  }
+  return links;
+}
+function paidReportRecoveryCard() {
+  const links = paidReportRecoveryLinks();
+  return links.length ? h('div', { class: 'card note' }, links.map((p, i) =>
+    h('p', null, h('a', { class: 'btn small', href: `#/r/${p.rid}.${p.token}` },
+      `결제한 보고서 다시 보기${links.length > 1 ? ` ${i + 1}` : ''}`)))) : null;
+}
 function paidCard(data) {
   const p = data.payment || {};
   let when = '';
@@ -1532,19 +1558,23 @@ async function startPayment(data, button) {
     return;
   }
   if (!data?.rid || !data?.token) { toast('보고서 번호가 없어요. 보고서를 다시 만든 뒤 결제해 주세요.', 5000); return; }
+  const seq = navSeq;
   payBusy = true;
   const label = button?.textContent;
   if (button) { button.disabled = true; button.textContent = '결제창을 여는 중…'; }
   try {
     const o = await post('/api/pay', { action: 'order', rid: data.rid, token: data.token }, 20000);
-    if (o.paid) { await reopenReport(data); return; }
+    if (o.paid) { await reopenReport(data, seq); return; }
+    if (seq !== navSeq) return;
     if (!window.TossPayments) await loadScript(TOSS_SDK);
+    if (seq !== navSeq) return;
     if (!window.TossPayments) throw new Error('결제창을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     S.pendingPay = { orderId: o.orderId, rid: data.rid, token: data.token, at: Date.now() };
     save();
     await openTossCheckout(o);
   } catch (e) {
     console.error('[pay]', e);
+    if (seq !== navSeq) return;
     const canceled = /CANCEL/i.test(String(e?.code || ''));
     toast(canceled ? '결제를 취소했어요.' : e?.message || '결제창을 열지 못했어요. 잠시 후 다시 시도해 주세요.', 5000);
   } finally {
@@ -1593,9 +1623,10 @@ async function openTossCheckout(o) {
     card: { flowMode: 'DEFAULT', useEscrow: false, useCardPoint: false, useAppCardOnly: false },
   });
 }
-async function reopenReport(data) {
+async function reopenReport(data, seq = navSeq) {
   const fresh = await post('/api/pay', { action: 'view', rid: data.rid, token: data.token }, 20000);
   if (S.report?.data?.rid === fresh.rid) { S.report.data = { ...fresh, token: data.token }; save(); }
+  if (seq !== navSeq) return;
   route();
 }
 // 결제창에서 돌아왔을 때 (?pay=success|fail)
@@ -1618,6 +1649,7 @@ async function handlePayReturn() {
   return true;
 }
 async function confirmPayment() {
+  const seq = navSeq;
   const p = S.pendingPay;
   if (!p?.paymentKey) { route(); return; }
   document.body.dataset.page = 'report';
@@ -1637,18 +1669,21 @@ async function confirmPayment() {
         throw e;
       }
     }
-    S.pendingPay = null;
+    if (S.pendingPay === p) S.pendingPay = null;
     const token = data.token || p.token;
-    if (S.report?.data?.rid && S.report.data.rid === data.rid) {
-      S.report.data = { ...data, token };
-      save();
-      route();
-    } else {
-      save();
-      location.hash = `#/r/${data.rid}.${token}`;
-    }
+    const mine = S.report?.data?.rid && S.report.data.rid === data.rid;
+    if (mine) S.report.data = { ...data, token };
+    // Keep access even if confirmation finishes after leaving, without moving the current screen.
+    const links = paidReportRecoveryLinks();
+    if (!links.some((p) => p.rid === data.rid && p.token === token)) links.push({ rid: data.rid, token });
+    S.paidReportLinks = links;
+    save();
+    if (seq !== navSeq) return;
+    if (mine) route();
+    else location.hash = `#/r/${data.rid}.${token}`;
     toast('결제가 완료됐어요. 맞춤 실행 패키지와 PDF 저장이 열렸어요.', 6000);
   } catch (e) {
+    if (seq !== navSeq) return;
     show(h('div', { class: 'card warn' },
       h('h2', null, '결제를 확인하지 못했어요'),
       h('p', null, e.message || '잠시 후 다시 확인해 주세요.'),
@@ -1773,6 +1808,7 @@ function reportBody(data, { stale = false, sample = false, linked = false } = {}
   ];
 }
 async function deleteServerCopy(data) {
+  const seq = navSeq;
   const paidNote = data.paid ? ' 결제한 보고서라면 다시 보기 링크가 더 이상 열리지 않아요(결제 기록은 법에 따라 5년 보관해요).' : ' 지우면 이 보고서로는 결제할 수 없어요.';
   if (!confirm(`서버에 보관된 이 보고서를 지울까요? 이 브라우저에 저장된 화면은 남아 있어요.${paidNote}`)) return;
   try {
@@ -1782,9 +1818,17 @@ async function deleteServerCopy(data) {
       S.report.data = rest;
       save();
     }
+    const links = paidReportRecoveryLinks();
+    if (links.some((p) => p.rid === data.rid)) {
+      S.paidReportLinks = links.filter((p) => p.rid !== data.rid);
+      if (S.paidReportLink?.rid === data.rid) S.paidReportLink = null;
+      save();
+    }
+    if (seq !== navSeq) return;
     toast('서버에 보관된 보고서를 지웠어요.', 4000);
     route();
   } catch (e) {
+    if (seq !== navSeq) return;
     toast(e.message || '지우지 못했어요. 잠시 후 다시 시도해 주세요.', 5000);
   }
 }
@@ -1887,7 +1931,7 @@ function renderPolicy(kind) {
           '무료 핵심 진단: 상호명·주소, 인터뷰 답변, 인터넷 공개 정보를 바탕으로 AI가 만든 진단 보고서 중 핵심 진단(한 줄 진단과 핵심 숫자, 가장 중요한 문제, 지금 바로 할 일, 위생·안전, 인터넷에서 본 우리 가게, 숫자로 본 우리 가게, 우선 개선안 목록과 1순위 개선안, 확인할 것)을 무료로 제공합니다.',
           `맞춤 실행 패키지(유료, 보고서 1건 ${price}): 같은 보고서의 나머지 개선안별 확인 근거·실행 방법·기대 효과·담당·비용과 기간·준비물·확인 지표, 수익 구조·메뉴·고객 경험 연결 분석, 실행 계획, PDF 저장, 결제일부터 90일 동안의 다시 보기 링크를 제공합니다.`,
           '보고서는 AI가 이용자의 답변과 인터넷 공개 정보로 만든 참고 자료예요. 매출·이익 증가 같은 결과를 보장하지 않으며, 중요한 결정 전에는 장부와 현장에서 확인해야 합니다.']],
-      ['제3조 (이용 방법)', '회원가입 없이 이용합니다. 진행 중인 답변과 보고서는 이용자의 브라우저에 저장되며, 브라우저 저장소를 지우면 다시 볼 수 없을 수 있습니다. 결제한 보고서는 다시 보기 링크로 결제일부터 90일 동안 열 수 있습니다.'],
+      ['제3조 (이용 방법)', '가게 정보 입력과 미리보기는 회원가입 없이 시작할 수 있습니다. 간편 로그인은 선택 사항이며, 기존 페이지를 계정에 연결하려면 관리 비밀번호로 소유를 확인해야 합니다. 진행 중인 답변과 보고서는 이용자의 브라우저에 저장되며, 브라우저 저장소를 지우면 다시 볼 수 없을 수 있습니다. 결제한 보고서는 다시 보기 링크로 결제일부터 90일 동안 열 수 있습니다.'], 
       ['제4조 (가격과 결제)', `맞춤 실행 패키지의 가격은 보고서 1건당 ${price}이며 부가세가 포함된 최종 결제 금액입니다. 결제는 토스페이먼츠 결제창(카드·간편결제)으로 하며, 결제가 승인되면 즉시 해당 보고서의 잠긴 내용이 열립니다. 가격이 바뀌어도 이미 결제한 건에는 영향이 없습니다.`],
       ['제5조 (청약철회와 환불)', '맞춤 실행 패키지는 결제와 동시에 제공이 시작되는 디지털 콘텐츠예요. 단순 변심에 의한 청약철회 제한과 환불 기준은 환불 정책에 따릅니다. 이 내용은 결제 전에 안내하고 동의를 받습니다.'],
       ['제6조 (이용자의 의무)', ['다른 사람의 가게를 사칭하거나 권한 없는 내용, 타인의 개인정보, 허위·불법 자료를 게시하거나 서비스 운영을 방해해서는 안 됩니다.', '받은 보고서를 다른 사람에게 판매하거나, 다시 보기 링크를 대가를 받고 배포해서는 안 됩니다.']],
@@ -1903,8 +1947,9 @@ function renderPolicy(kind) {
       ['환불 요청 방법', `고객센터(${biz('email')} · ${biz('phone')})로 주문번호(결제 영수증에 있어요)와 사유를 알려 주세요. 환불이 결정되면 3영업일 안에 결제를 취소해요. 카드사 반영에는 영업일 기준 3~7일이 걸릴 수 있어요.`],
       ['운영자 정보', operatorLine()],
     ]),
-    privacy: () => policyDoc('개인정보처리방침', `${biz('name', '매출올려드림 AI 운영자')}(이하 '운영자')는 개인정보 보호법에 따라 이용자의 개인정보를 보호하고 관련 고충을 신속하게 처리하기 위해 이 방침을 둡니다. 회원가입이 없고, 쿠키를 쓰지 않아요.`, [
+    privacy: () => policyDoc('개인정보처리방침', `${biz('name', '매출올려드림 AI 운영자')}(이하 '운영자')는 개인정보 보호법에 따라 이용자의 개인정보를 보호하고 관련 고충을 신속하게 처리하기 위해 이 방침을 둡니다. 가입 없이 시작할 수 있으며, 선택적으로 간편 로그인할 때 보안 쿠키와 서버 세션을 사용해요.`, [
       ['1. 처리하는 정보와 목적', [
+        '간편 로그인·가게 관리: 선택한 로그인 제공자가 알려주는 서비스별 식별값을 가명 식별값으로 변환해 계정을 구분하고, 계정에 연결한 가게의 식별번호를 관리해요. 로그인 유지와 보안을 위해 필수 쿠키와 서버 세션을 사용해요. 제공자 비밀번호는 받지 않고 제공자의 액세스 토큰은 별도 저장하지 않아요. 로그인 요청 주소 등 기술 정보는 호스팅 사업자의 접속·보안 로그에 기록될 수 있어요.',
         '가게 찾기: 상호명과 주소를 받아 AI가 인터넷 공개 정보로 가게를 찾는 데 써요. 후보가 맞지 않아 다시 찾을 때 별도 동의를 받으면 사용자가 선택적으로 입력한 공개 사이트 주소와 맞지 않는 이전 후보의 이름·주소도 검색에 참고해요.',
         '가게 소개 초안: 별도 동의를 받은 경우에만 상호명·주소, 사장님이 확인한 특징, AI가 검색에서 찾았으나 확인되지 않은 가게 특징과 질문 답변을 AI에 보내 비공개 소개와 고객 예상 질문·답변 초안을 만들어요. 초안 생성 서버는 답변 원문이나 생성된 초안을 별도 캐시에 저장하지 않도록 설계돼 있어요. 서비스 운영·보안 로그와 외부 AI 제공자의 처리·보관 정책은 별도로 적용될 수 있어요.',
         '가게 소개 공개: 공개에 별도 동의한 가게명·가게 주소·제목·소개·섹션·질문과 답변을 누구나 볼 수 있는 페이지와 목록에 저장합니다. 질문과 답변에는 실제 검색 기록이 아닌 예상 질문이 포함될 수 있습니다. 관리 비밀번호는 원문이 아닌 해시 형태로 저장하며, 수정과 삭제에 사용합니다. 신고 사유와 중복 신고 방지를 위한 IP 해시를 처리할 수 있습니다. 검색엔진과 제3자는 공개 정보를 수집하거나 복사할 수 있습니다.',
@@ -1913,13 +1958,16 @@ function renderPolicy(kind) {
         '이용량 관리: 접속 IP 주소를 되돌릴 수 없게 바꾼 값(해시)으로 하루 이용 횟수를 세고, 중복 요청 방지를 위한 임시 잠금을 사용해요.',
         '브라우저 저장소: 기존 진단의 진행 답변은 localStorage에, 가게 소개 확인·재검색 참고 사이트 주소·질문 답변·초안은 해당 탭의 sessionStorage에 임시 저장될 수 있어요. 브라우저 데이터를 삭제하면 기기의 저장 내용을 지울 수 있으나 외부 제공자가 보관한 자료까지 지워지는 것은 아니에요.']],
       ['2. 보관 기간', [
+        '간편 로그인 보안 상태: 최대 10분. 로그인 세션: 최대 7일이며, 로그아웃하면 해당 브라우저의 세션을 종료해요.',
+        '계정과 가게의 연결: 사용자가 연결을 해제하거나 서비스가 종료될 때까지. 연결을 해제해도 공개 페이지와 기존 관리 비밀번호는 별도로 남아요.',
         '가게 찾기 결과와 인터넷 조사 결과: 3일',
         '공개 가게 소개와 관리 비밀번호 해시: 이용자가 삭제하거나 서비스가 종료될 때까지. 삭제하면 소개 내용, 비밀번호 해시와 신고 사유를 지웁니다. 삭제된 주소의 재사용을 막기 위한 임의 식별번호와 삭제 표시는 서비스 종료까지 남을 수 있습니다. 신고 및 보안에 필요한 정보는 운영과 권리 보호에 필요한 기간 보관될 수 있습니다.',
         '보고서: 만든 날부터 7일. 맞춤 실행 패키지를 결제하면 결제일부터 90일(다시 보기 링크)',
         '결제 기록(주문번호·결제 고유번호·금액·일시·수단·보고서 번호): 5년 (전자상거래법의 대금결제 및 재화 등의 공급에 관한 기록). 보고서 내용은 포함하지 않아요.',
         '이용량 집계(IP 해시): 2일',
         '위에서 자동 삭제 기간을 정한 항목은 해당 기간이 지나면 저장소에서 지워지도록 설정합니다. 공개 페이지 삭제 후에도 외부 검색 결과나 복사본은 즉시 지워지지 않을 수 있어요.']],
-      ['3. 처리 위탁과 국외 이전', [
+      ['3. 외부 서비스·처리 위탁과 국외 이전', [
+        '카카오 또는 네이버: 이용자가 선택한 제공자가 로그인 인증을 담당하며 각 제공자의 개인정보 처리방침이 별도로 적용돼요.',
         'OpenRouter, Inc.(미국): AI 요청 중계. 동의한 상호명·주소·재검색 참고 사이트 주소·이전 후보 정보·가게 정보와 질문 답변을 요청할 때 네트워크로 전송해요. 데이터 수집을 허용하지 않는 제공 경로를 요청하지만, 외부 제공자의 보관·삭제는 해당 제공자의 정책이 별도로 적용돼요.',
         'Anthropic, PBC 등 OpenRouter가 연결하는 Claude 모델 제공자(미국): 동의한 정보의 AI 처리.',
         '웹 검색 제공자: 가게 찾기와 재검색에서 동의한 상호·주소와 참고 사이트 주소, 이전 후보 정보가 검색 처리에 전달될 수 있어요. 제공자는 연결 방식에 따라 달라질 수 있으며 각 제공자의 정책이 적용돼요.',
@@ -1927,7 +1975,7 @@ function renderPolicy(kind) {
         'Upstash, Inc.(미국 회사, 저장 위치: 일본 도쿄 AWS 데이터센터): 보고서·조사 결과·결제 기록 및 별도 동의한 공개 가게 소개와 관리·신고 정보 저장소.',
         '토스페이먼츠(주)(대한민국): 결제 처리.',
         '가게 검색과 AI 초안·보고서 요청은 각각의 전송 동의 후 처리하며, 공개 페이지를 게시하면 공개 내용이 저장소와 웹사이트 운영 제공자에게 전송됩니다.']],
-      ['4. 이용자의 권리', ['언제든지 개인정보의 열람·정정·삭제·처리정지를 요청할 수 있어요.', '보고서 화면 맨 아래 \'서버에 보관된 이 보고서 지우기\'로 직접 지울 수 있어요. 공개 가게 페이지는 관리 화면에서 비밀번호로 수정하거나 삭제할 수 있어요. 결제 기록은 법정 보관 기간 동안 남아요.', `요청: ${biz('email')}`]],
+      ['4. 이용자의 권리', ['언제든지 개인정보의 열람·정정·삭제·처리정지를 요청할 수 있어요.', '내 가게 관리에서 계정 연결을 해제할 수 있고, 공개 가게 페이지는 기존 관리 비밀번호로 수정하거나 삭제할 수 있어요. 연결 해제는 페이지 삭제가 아니에요. 보고서 화면 맨 아래에서 보관된 보고서를 지울 수 있어요. 결제 기록은 법정 보관 기간 동안 남아요.', `요청: ${biz('email')}`]],
       ['5. 안전성 확보 조치', ['모든 통신은 HTTPS로 암호화해요.', '보고서는 추측할 수 없는 보고서 번호와 비밀 토큰이 있어야 열리고, 토큰은 서버에 해시로만 저장해요.', '결제 시크릿 키와 AI 키는 서버에만 두고 화면에 보내지 않아요.']],
       ['6. 개인정보 보호책임자', `${String(BUSINESS.privacyOfficer || '').trim() || biz('owner')} · ${biz('email')} · ${biz('phone')}`],
       ['7. 방침 변경', '이 방침을 바꾸면 시행일과 함께 이 화면에 알려드려요.'],
