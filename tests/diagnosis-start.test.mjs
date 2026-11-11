@@ -32,4 +32,5 @@ test('homepage route, protected retry and legacy storage remain integrated',asyn
   assert.match(app,/hash === '#\/diagnosis-start'\) diagnosisStartFlow\.render\(\)/);
   assert.match(app,/S\.findProtected && !diagnosisFindAuthorized/);
   assert.match(app,/자동으로 다시 보내지 않았어요/);assert.match(app,/findProtected: true/);
+  assert.match(app,/진단 검색 이어보기/);assert.match(app,/S\.findProtected \|\| Object\.keys\(S\.answers\)\.length/);
 });
