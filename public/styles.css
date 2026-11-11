@@ -756,3 +756,6 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
   .home-explainer-card { padding: 24px 19px; }
   .home-how-step { grid-template-columns: 32px minmax(0, 1fr); column-gap: 10px; }
 }
+@media (max-width: 1023px) {
+  body[data-page="home"] #view > .home-explainer { margin-bottom: 24px; }
+}
