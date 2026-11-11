@@ -11,6 +11,7 @@ import { BUSINESS, businessReady } from './business.js';
 import { makePageStart } from './page-start.js';
 import { makeStoreTools } from './store-tools.js';
 import { makeDiagnosisStart } from './diagnosis-start.js';
+import { makeHomeExample } from './home-example.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -274,8 +275,9 @@ function renderHome() {
       h('div', { class: 'hero-actions' }, h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료로 페이지 만들기')),
       h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
       h('p', { class: 'small muted page-stage-note' }, '베타 기간에는 공개와 QR·소개글을 무료로 이용할 수 있어요. 검색 노출과 AI 추천은 보장하지 않아요.')),
+    makeHomeExample(h),
     pageResume, oldResume, pendingDiagnosis,
-    h('div', { class: 'card note small' }, h('b', null, '가게 운영을 진단하고 싶으신가요?'), ' 기존 가게 진단도 별도로 이용할 수 있어요. ', h('a', { href: '#/diagnosis-start' }, '가게 진단 시작하기')),
+    h('div', { class: 'card note small diagnosis-promo' }, h('b', null, '가게 운영을 진단하고 싶으신가요?'), ' 기존 가게 진단도 별도로 이용할 수 있어요. ', h('a', { href: '#/diagnosis-start' }, '가게 진단 시작하기')),
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
       h('h2', null, '가게 이름과 주소를 알려주세요'),
