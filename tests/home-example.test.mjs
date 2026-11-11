@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { makeHomeExample } from '../public/home-example.js';
+import { makeHomeExplainer } from '../public/home-explainer.js';
 
 const h = (tag, attrs, ...children) => ({ tag, attrs: attrs || {}, children: children.flat(Infinity).filter(x => x != null && x !== false) });
 const allText = n => n == null ? '' : typeof n === 'object' ? n.children.map(allText).join(' ') : String(n);
@@ -24,7 +25,7 @@ test('the real store preview links to the observed public page without claiming 
 test('home keeps its CTA and input while putting the example in a separate grid item', async () => {
   const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
-  assert.match(app, /makeHomeExample\(h\),\s*pageSearchWarning, pendingDiagnosis/);
+  assert.match(app, /makeHomeExample\(h\),\s*makeHomeExplainer\(h, focusStart\),\s*pageSearchWarning, pendingDiagnosis/);
   assert.match(app, /onclick: focusStart \}, '무료로 페이지 만들기'/); assert.match(app, /id: 'startCard'/);
   assert.match(css, /#view > \.home-sample \{ grid-column: 2; grid-row: 1/);
   assert.match(css, /#view > #startCard \{ grid-column: 1 \/ -1; grid-row: auto/);
@@ -58,4 +59,23 @@ test('homepage introduction uses the requested wording without removing the exis
   assert.match(css, /@media \(max-width: 600px\) \{ \.hero-break-mobile \{ display: inline; \} \}/);
   assert.ok(!app.includes("h('h2', { class: 'hero-sub' }, '가게 이름과 주소를 알려주세요.'"));
   assert.ok(app.includes("onclick: focusStart }, '무료로 페이지 만들기'"));
+});
+
+test('WHY and four-step guide are accessible, use the existing start action and describe the real beta flow', () => {
+  let called = 0; const start = () => { called++; };
+  const node = makeHomeExplainer(h, start);
+  const sections = node.children.filter(n => n.tag === 'section');
+  assert.equal(node.attrs.class, 'home-explainer'); assert.equal(sections.length, 2);
+  const [why, how] = sections; const whyText = allText(why); const howText = allText(how);
+  assert.equal(why.attrs['aria-labelledby'], 'home-why-title');
+  assert.equal(how.attrs['aria-labelledby'], 'home-how-title');
+  assert.match(whyText, /WHY\?/); assert.match(whyText, /외부 AI가 그 내용을 자유롭게 읽을 수 있는 건 아니에요/);
+  assert.match(whyText, /99,000원\s+\(적용 예정\)/); assert.match(whyText, /현재 베타 기간에는 공개와 QR·소개글도 무료/);
+  assert.match(whyText, /결제는 운영하지 않아요/); assert.match(whyText, /검색 노출·AI 추천·인용은 보장하지 않아요/);
+  const button = find(why, n => n.tag === 'button'); assert.equal(button.attrs.type, 'button');
+  assert.equal(button.attrs.onclick, start); button.attrs.onclick(); assert.equal(called, 1);
+  const list = find(how, n => n.tag === 'ol'); assert.equal(list.children.filter(n => n.tag === 'li').length, 4);
+  assert.match(howText, /동의 후/); assert.match(howText, /5개 항목/); assert.match(howText, /대표 메뉴·서비스만 필수/);
+  assert.match(howText, /실제 고객의 질문 기록은 아니에요/); assert.match(howText, /99,000원은 적용 예정/);
+  assert.match(howText, /현재 베타 기간에는 무료/); assert.match(howText, /QR코드/);
 });
