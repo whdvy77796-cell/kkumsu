@@ -776,3 +776,9 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
 .account-provider { display: block; width: min(100%, 230px); margin: 10px 0; line-height: 0; border-radius: 8px; }
 .account-provider:focus-visible { outline: 3px solid #315ed4; outline-offset: 3px; }
 .account-provider-image { display: block; width: 100%; height: auto; }
+
+/* Google 공식 커스텀 버튼 규격(Light): 채움 #FFF, 테두리 #747775 1px(안쪽), 글자 #1F1F1F 14/20 Medium, 높이 40px, 좌 12px · G 20px · 간격 10px · 우 12px. Google Sans는 불러오지 않아 시스템 글꼴로 대체. */
+.account-provider-text { box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 10px; width: min(100%, 230px); height: 40px; padding: 0 12px; line-height: 20px; font-size: 14px; font-weight: 500; color: #1f1f1f; background: #fff; border: 1px solid #747775; border-radius: 4px; text-decoration: none; }
+.account-provider-text:hover { background: #f8f9fa; }
+.account-provider-icon { display: block; width: 20px; height: 20px; flex: none; }
+.account-provider-label { white-space: nowrap; }

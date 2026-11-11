@@ -10,8 +10,10 @@ const msgOf = (e) => (e && typeof e.message === 'string' && e.message) || '요�
 const PROVIDER_IMAGES = {
   kakao: { src: '/kakao-login.svg', alt: '카카오 로그인' },
   naver: { src: '/naver-login.png', alt: '네이버 로그인' },
+  // 구글: Google 공식 브랜딩 가이드의 '커스텀 버튼' 형식. 표준 컬러 G(공식 signin-assets.zip의 Light 아이콘에서 G만 자른 /google-g.svg) + 한국어 문구.
+  google: { iconSrc: '/google-g.svg' },
 };
-const PROVIDERS = [['kakao', '카카오로 로그인'], ['naver', '네이버로 로그인']];
+const PROVIDERS = [['kakao', '카카오로 로그인'], ['naver', '네이버로 로그인'], ['google', 'Google 계정으로 로그인']];
 const LEAVE_MESSAGE = '저장하지 않은 변경사항이 있어요. 이 화면을 나가면 입력한 내용이 사라져요. 나갈까요?';
 
 // 22자 페이지 ID 또는 공개(/stores/ID)·관리(#/manage/ID) 주소 전체에서 ID만 뽑는다. 못 찾으면 ''.
@@ -28,7 +30,7 @@ export function loginLinks(status) {
   const p = status && typeof status.providers === 'object' && status.providers ? status.providers : {};
   return PROVIDERS.filter(([k]) => p[k] === true).map(([k, label]) => ({
     provider: k, label, href: `/api/owner-auth?op=start&provider=${k}&return=dashboard`,
-    imageSrc: PROVIDER_IMAGES[k].src, imageAlt: PROVIDER_IMAGES[k].alt,
+    imageSrc: PROVIDER_IMAGES[k]?.src ?? '', imageAlt: PROVIDER_IMAGES[k]?.alt ?? '', iconSrc: PROVIDER_IMAGES[k]?.iconSrc ?? '',
   }));
 }
 
@@ -175,8 +177,8 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
         h('h1', null, '내 가게 계정'),
         h('p', { class: 'muted' }, '로그인하면 만든 가게 페이지를 한곳에서 보고 고칠 수 있어요. 로그인 없이도 지금처럼 페이지를 만들 수 있어요.'),
         links.length
-          ? h('div', { class: 'field' }, links.map((l) => h('a', { class: `account-provider account-provider-${l.provider}`, href: l.href, 'data-provider': l.provider },
-            h('img', { class: 'account-provider-image', src: l.imageSrc, alt: l.imageAlt }))))
+          ? h('div', { class: 'field' }, links.map((l) => h('a', { class: `account-provider account-provider-${l.provider}${l.imageSrc ? '' : ' account-provider-text'}`, href: l.href, 'data-provider': l.provider },
+            l.imageSrc ? h('img', { class: 'account-provider-image', src: l.imageSrc, alt: l.imageAlt }) : [l.iconSrc ? h('img', { class: 'account-provider-icon', src: l.iconSrc, alt: '', width: 20, height: 20, 'aria-hidden': 'true' }) : null, h('span', { class: 'account-provider-label' }, l.label)])))
           : h('p', { class: 'card note', role: 'status' }, '계정 로그인은 아직 준비 중이에요. 지금은 로그인할 수 없어요.'),
         btn('로그인 없이 시작하기', toHome, links.length === 0)),
       resumeBlock());
@@ -271,7 +273,7 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
     show(
       h('section', { class: 'card' },
         h('h1', null, '내 가게 계정'),
-        h('p', { class: 'muted' }, `로그인됨${status.provider ? ` (${status.provider === 'kakao' ? '카카오' : status.provider === 'naver' ? '네이버' : '소셜'} 계정)` : ''}. 가게 페이지는 로그인 없이도 계속 공개 주소로 열려요.`),
+        h('p', { class: 'muted' }, `로그인됨${status.provider ? ` (${status.provider === 'kakao' ? '카카오' : status.provider === 'naver' ? '네이버' : status.provider === 'google' ? '구글' : '소셜'} 계정)` : ''}. 가게 페이지는 로그인 없이도 계속 공개 주소로 열려요.`),
         outBtn),
       resumeBlock(),
       stores.length
