@@ -5,7 +5,8 @@ import { chat, extractJson, DEFAULT_MODEL, costMicro } from '../lib/ai.mjs';
 import { mockEnabled } from '../lib/mock.mjs';
 
 export const INPUT_LIMITS = Object.freeze({ name: 60, address: 120, fact: 200, facts: 8, offer: 500, difference: 500, audience: 500, visit: 500, keywords: 300, bytes: 18000 });
-export const OUTPUT_LIMITS = Object.freeze({ headline: 120, intro: 800, heading: 100, body: 1000, question: 160, answer: 700, keyword: 80, sections: 5, faqs: 4, keywords: 8, situations: 5 });
+export const OUTPUT_LIMITS = Object.freeze({ headline: 120, intro: 800, heading: 100, body: 1000, question: 160, answer: 700, keyword: 80, sections: 5, faqs: 4, keywords: 8, situations: 8 });
+const PUBLIC_SITUATION_TARGET = 5;
 const ANSWERS = ['offer', 'difference', 'audience', 'visit', 'keywords'];
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const object = (o) => o !== null && typeof o === 'object' && !Array.isArray(o) && [Object.prototype, null].includes(Object.getPrototypeOf(o));
@@ -59,9 +60,9 @@ name/address는 사장님이 가게를 확인한 후 수정할 수 있는 기본
 부정과 불확실성을 보존하세요. 주차 안 됨/모름/미확인은 주차 가능이나 무료주차가 아니며 반려견 동반 불가도 가능으로 바꾸면 안 됩니다.
 추측, 사실 발명, 매출/성과/순위/AI 노출 보장, 확인되지 않은 가격/영업시간/숫자, 과장 표현을 금지합니다. 항목마다 직접 뒷받침하는 입력 ID만 evidence에 넣으세요. name만으로 메뉴나 시설을 추측하지 마세요. 사실 근거가 없거나 keywords만 근거인 소개/제목/섹션/FAQ는 생략하세요. 숫자는 해당 항목이 인용한 사실 evidence 원문에 실제 있는 숫자만 사용하세요. keywords 숫자는 사실 숫자 근거가 아닙니다.
 읽기 쉽게 한 단락 한 주제로 쓰고, 제목·소개·가게만의 구체적인 가치·고객 상황·방문 정보에 집중하세요. 미리보기에서 사장님에게 미확인 검색 정보가 사용되었다는 안내를 별도로 표시하므로, 고객이 읽을 소개·답변에 '참고 정보에 따르면', 'AI 검색 결과', '아직 확인되지 않은 정보'처럼 작성 과정을 반복하지 마세요. 제공된 정보의 범위 내에서 자연스러운 초안을 쓰고, 사장님이 공개 전에 사실을 확인합니다. FAQ는 질문에 바로 답하세요. 답변 근거 없는 질문은 만들지 마세요. 이 글은 실제 손님이 가게 홈페이지에서 읽는 소개글입니다. '사장님이 알려주셨습니다', '입력하신 정보', '손님에게 알리고 싶은 곳', 'AI가 작성했습니다'처럼 설문이나 작성 과정을 설명하지 말고, 확인한 사실과 이용 상황을 손님에게 자연스럽게 직접 안내하세요. 정상적인 문장과 자연스러운 바꿔쓰기는 허용하되 의미를 보태지 마세요. HTML/마크다운/링크/코드 없이 일반 텍스트만 씁니다.
-situations는 공개 소개 페이지의 고객 질문·답변에 자동으로 함께 들어갈 자연스러운 가상 질문과 답변입니다. 실제 검색량·인기 질문·추천 보증·후기·고객 경험이 아닙니다. 손님이 AI에게 '여성 두 명이 종로에서 식사할 곳 추천좀?'처럼 실제로 물을 법한 대화체 질문과, 가게 이름을 자연스럽게 넣어 질문에 관련된 메뉴·위치·분위기를 설명하는 답변을 서로 다르게 5개 만드세요. 예를 들어 근거에 메뉴와 공간·분위기가 있으면 동행, 지역, 대표 메뉴 등 질문 관점을 달리해 다섯 가지를 만드세요. 제공 정보가 너무 부족하여 다섯 질문을 뒷받침할 수 없다면 더 적게 또는 []로 둡니다. 새 조사나 외부 호출은 없습니다. 질문의 여성 두 명 등 동행 인원은 가상의 손님 상황일 수 있지만, 답변에서 해당 손님에게 적합하다거나 출입·예약이 가능하다고 단정하려면 근거가 있어야 합니다. 인원이 명시되지 않았더라도 질문에서 '여자 둘이 가기 좋은 곳?'이라고 물을 수 있습니다. 이때 답변은 인원 적합성을 만들어내지 말고 가게의 확인된 메뉴·공간·분위기를 자연스럽게 설명하면 됩니다. 질문의 구체적 시설, 영업시간, 가격, 이용 조건, 헌팅·합석 같은 특수 서비스는 확인된 내용 또는 research에 있을 때만 쓰세요. 답변에서는 제공된 사실로 해당 질문에 관련된 가게 정보를 설명하고 근거 없는 조건을 붙이지 마세요. keywords와 상호·주소만으로 방문 자격이나 분위기를 추론하지 마세요. evidence는 실질적으로 뒷받침하는 사실 ID를 반드시 포함하세요. answer는 가게명을 포함하며 부정/불확실성을 그대로 보존합니다. '헌팅 불가'에서 헌팅을 권하거나 '주차 모름'에서 주차 가능을 말하지 마세요. 실제 사람이 방문했다는 1인칭 후기, 인기/자주 찾는/추천/유명/최고 등의 주장은 답변에 쓰지 마세요. selected 및 기타 추가 필드를 만들지 마세요.
+situations는 공개 소개 페이지의 고객 질문·답변에 자동으로 함께 들어갈 자연스러운 가상 질문과 답변입니다. 실제 검색량·인기 질문·추천 보증·후기·고객 경험이 아닙니다. 손님이 AI에게 '여성 두 명이 종로에서 식사할 곳 추천좀?'처럼 실제로 물을 법한 대화체 질문과, 가게 이름을 자연스럽게 넣어 질문에 관련된 메뉴·위치·분위기를 설명하는 답변을 서로 다르게 후보 7개 만드세요. 시스템이 검증을 통과한 후보에서 최대 5개를 골라 기존 질문과 함께 보여줍니다. 예를 들어 근거에 메뉴와 공간·분위기가 있으면 동행, 지역, 대표 메뉴 등 질문 관점을 달리해 다섯 가지 이상을 만드세요. 제공 정보가 너무 부족하여 질문을 뒷받침할 수 없다면 후보를 더 적게 만들거나 []로 둡니다. 새 조사나 외부 호출은 없습니다. 질문의 여성 두 명 등 동행 인원은 가상의 손님 상황일 수 있지만, 답변에서 해당 손님에게 적합하다거나 출입·예약이 가능하다고 단정하려면 근거가 있어야 합니다. 인원이 명시되지 않았더라도 질문에서 '여자 둘이 가기 좋은 곳?'이라고 물을 수 있습니다. 이때 답변은 인원 적합성을 만들어내지 말고 가게의 확인된 메뉴·공간·분위기를 자연스럽게 설명하면 됩니다. 질문의 구체적 시설, 영업시간, 가격, 이용 조건, 헌팅·합석 같은 특수 서비스는 확인된 내용 또는 research에 있을 때만 쓰세요. 답변에서는 제공된 사실로 해당 질문에 관련된 가게 정보를 설명하고 근거 없는 조건을 붙이지 마세요. keywords와 상호·주소만으로 방문 자격이나 분위기를 추론하지 마세요. evidence는 실질적으로 뒷받침하는 사실 ID를 반드시 포함하세요. answer는 가게명을 포함하며 부정/불확실성을 그대로 보존합니다. '헌팅 불가'에서 헌팅을 권하거나 '주차 모름'에서 주차 가능을 말하지 마세요. 실제 사람이 방문했다는 1인칭 후기, 인기/자주 찾는/추천/유명/최고 등의 주장은 답변에 쓰지 마세요. selected 및 기타 추가 필드를 만들지 마세요.
 형식: {"headline":{"text":"제목","evidence":["offer"]},"intro":{"text":"소개","evidence":["offer"]},"sections":[{"heading":"제목","body":"본문","evidence":["fact0"]}],"faqs":[{"question":"질문?","answer":"직접 답변","evidence":["visit"]}],"keywords":[{"text":"검색어 제안","evidence":["offer"]}],"situations":[{"question":"자연스러운 가상 질문?","answer":"가게명을 넣은 사실 기반 직접 답변","evidence":["offer"]}]}
-headline/intro는 근거 없으면 null, 나머지는 빈 배열로 둡니다. 최대 글자 수: 제목120, 소개800, 섹션 제목100/본문1000, FAQ 질문160/답700, 키워드80. 섹션 최대5개, FAQ 최대4개, 키워드 최대8개, situations 최대5개(질문160/답700). 실제 제공되지 않은 evidence ID를 쓰지 마세요.`;
+headline/intro는 근거 없으면 null, 나머지는 빈 배열로 둡니다. 최대 글자 수: 제목120, 소개800, 섹션 제목100/본문1000, FAQ 질문160/답700, 키워드80. 섹션 최대5개, FAQ 최대4개, 키워드 최대8개, situations 후보 최대8개(질문160/답700). 실제 제공되지 않은 evidence ID를 쓰지 마세요.`;
 
 // This is a syntactic support check, NOT semantic verification. The owner must review.
 // Normalize separators so 10,000 and 10000 agree; do not use substring matching (3 != 30).
@@ -244,7 +245,7 @@ export function normalizeDraft(raw, input) {
   if (Array.isArray(raw.situations)) {
     omittedCount += Math.max(0, raw.situations.length - OUTPUT_LIMITS.situations);
     situations = raw.situations.slice(0, OUTPUT_LIMITS.situations).map(v => item(v, { question: OUTPUT_LIMITS.question, answer: OUTPUT_LIMITS.answer }, false, true)).filter(Boolean);
-    situationsStatus = !situations.length ? (omittedCount > beforeSituations ? 'partial' : 'empty') : (omittedCount > beforeSituations || situations.length < OUTPUT_LIMITS.situations) ? 'partial' : 'ready';
+    situationsStatus = !situations.length ? (omittedCount > beforeSituations ? 'partial' : 'empty') : (omittedCount > beforeSituations || situations.length < PUBLIC_SITUATION_TARGET) ? 'partial' : 'ready';
   }
   const situationsOmittedCount = omittedCount - beforeSituations;
   const situationsNotice = situationsStatus === 'ready' ? '실제 검색 기록이 아닌 예상 질문이에요. 다른 소개 내용과 함께 사실을 확인해 주세요.' : situationsStatus === 'empty' ? '근거가 충분한 고객 예상 질문이 생성되지 않았어요. 내용 수정에서 직접 추가할 수 있어요. 추가 AI 호출은 하지 않았어요.' : '고객 예상 질문이 누락되었거나 일부가 근거 검사를 통과하지 못했어요. 기존 소개는 유지했고, 내용 수정에서 직접 추가할 수 있어요. 추가 AI 호출은 하지 않았어요.';
@@ -257,11 +258,14 @@ export function normalizeDraft(raw, input) {
 export function mergeCustomerQuestions(draft) {
   const faqs = [...draft.faqs];
   const seen = new Set(faqs.map(f => f.question.normalize('NFKC').replace(/\s+/g, '').toLowerCase()));
+  let added = 0;
   for (const item of draft.situations) {
     const key = item.question.normalize('NFKC').replace(/\s+/g, '').toLowerCase();
-    if (!seen.has(key)) { faqs.push(item); seen.add(key); }
+    if (!seen.has(key) && added < PUBLIC_SITUATION_TARGET) { faqs.push(item); seen.add(key); added++; }
   }
-  return { ...draft, faqs, situations: [] };
+  const situationsStatus = draft.situationsStatus === 'ready' && added < PUBLIC_SITUATION_TARGET ? 'partial' : draft.situationsStatus;
+  const situationsNotice = situationsStatus === 'partial' && draft.situationsStatus === 'ready' ? '겹치거나 근거를 확인하기 어려운 고객 예상 질문이 있어 일부만 추가했어요. 내용 수정에서 직접 보완할 수 있어요.' : draft.situationsNotice;
+  return { ...draft, faqs, situations: [], situationsStatus, situationsNotice };
 }
 
 const hasUsage = (u) => object(u) && ((Number.isFinite(u.cost) && u.cost >= 0) || ([u.prompt_tokens ?? u.input_tokens, u.completion_tokens ?? u.output_tokens].every(n => Number.isFinite(n) && n >= 0)));
