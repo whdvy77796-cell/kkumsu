@@ -248,7 +248,11 @@ function renderHome() {
   };
   nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addrIn.focus(); } });
   addrIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); go(); } });
-  const prior = Number.isInteger(S.chosen) && S.answers && Object.keys(S.answers).length;
+  const prior = Number.isInteger(S.chosen) && S.answers && (S.findProtected || Object.keys(S.answers).length);
+  const pendingDiagnosis = S.findProtected && S.name && S.address && !Number.isInteger(S.chosen)
+    ? h('div', { class: 'card note resume' }, h('b', null, '진단 가게 검색을 확인해 주세요'),
+        h('p', { class: 'small', style: { margin: '4px 0 8px' } }, S.name),
+        h('a', { class: 'btn small', href: '#/find' }, '진단 검색 이어보기')) : null;
   const oldResume = prior ? h('div', { class: 'card note resume' },
     h('b', null, '이전에 작성한 진단이 있어요'),
     h('p', { class: 'small', style: { margin: '4px 0 8px' } }, chosenStore()?.name || S.name),
@@ -270,7 +274,7 @@ function renderHome() {
       h('div', { class: 'hero-actions' }, h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료로 페이지 만들기')),
       h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
       h('p', { class: 'small muted page-stage-note' }, '베타 기간에는 공개와 QR·소개글을 무료로 이용할 수 있어요. 검색 노출과 AI 추천은 보장하지 않아요.')),
-    pageResume, oldResume,
+    pageResume, oldResume, pendingDiagnosis,
     h('div', { class: 'card note small' }, h('b', null, '가게 운영을 진단하고 싶으신가요?'), ' 기존 가게 진단도 별도로 이용할 수 있어요. ', h('a', { href: '#/diagnosis-start' }, '가게 진단 시작하기')),
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
