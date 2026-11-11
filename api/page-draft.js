@@ -126,12 +126,22 @@ const situationTopics = [
 const noOrUnknown = /불가|없|안\s*(?:되|돼|됩|받|하)|못\s*(?:해|하|받)|않|금지|모르|모름|모릅|미확인|불확실|확인\s*필요|어려/;
 const unknown = /모르|모름|모릅|미확인|불확실|확인\s*필요/;
 const positiveAnswer = /가능|됩니다|돼요|환영|허용|제공|할\s*수\s*있|받습니다|받아요|합니다|해요|있습니다|있어요/;
+// A restriction or unknown admission condition anywhere in supplied facts
+// makes group-specific suggestion questions unsafe, including negations such
+// as '여성 고객은 입장하실 수 없습니다' and numeric-only restrictions.
+function hasRestrictedAccess(sources) {
+  return Object.entries(sources).filter(([id]) => !['name', 'address', 'keywords'].includes(id))
+    .flatMap(([, value]) => String(value).split(/[.!?\n,;]+/))
+    .some(part => /여성|여자|남성|남자|커플|연인|기혼|성인|인원|단체|동반|입장|출입|미성년|혼자|(?:\d+|한|두|세|네)\s*(?:명|인|분)/.test(part)
+      && /불가|금지|제한|전용|한정|없|않|못|불허|거부|제외|모르|모름|미확인|불확실|확인\s*필요|어려|안\s*(?:되|돼|됩|받|하|가)|만\s*(?:이용|입장|출입|가능)|(?:여성|여자|남성|남자|손님|고객)\s*만|(?:\d+|한|두|세|네)\s*(?:명|인|분)[^.!?\n]{0,20}(?:만|이상)/.test(part));
+}
 // A hypothetical customer's gender and group size in a question are not claims
 // about the store. Do not apply this exception to the answer, time, age or price.
 function hypotheticalPeople(question) {
   return String(question)
     .replace(/(?:여성|여자|남성|남자|친구|동료|일행)\s*(?:(?:한|두|세|네|다섯|여섯|여덟|일곱|아홉|열)\s*(?:명|분|인|사람)|(?:혼자|둘|셋|넷)(?:이서|끼리|이|만)?|\d+\s*(?:명|분|인))(?:이서|끼리|이|가|랑|와|과)?/g, '손님')
     .replace(/(?:여성|여자|남성|남자)(?:끼리|분들끼리)/g, '손님')
+    .replace(/(?:친구|동료)(?:랑|하고|와|과|끼리)/g, '손님')
     .replace(/(?:혼자|둘|셋|넷)(?:이서|끼리|이|만)?/g, '손님')
     .replace(/\d+\s*(?:명|인)(?:이서|끼리|이|가|만)?/g, '손님');
 }
@@ -139,6 +149,7 @@ function unsafeSituation(question, answer, cited, sources, name) {
   const substantive = Object.entries(cited).filter(([id]) => !['name', 'address', 'keywords'].includes(id));
   if (!substantive.length || !answer.includes(name)) return true;
   const factual = substantive.map(([, text]) => text).join('\n');
+  if (hasRestrictedAccess(sources) && /여성|여자|남성|남자|친구|동료|일행|동반|단체|혼자|둘|셋|넷|(?:\d+|한|두|세|네)\s*(?:명|인|분)/.test(question)) return true;
   const questionClaims = hypotheticalPeople(question);
   const text = questionClaims + '\n' + answer;
   const assertionText = questionClaims.replace(/추천\s*(?:좀|해\s*줘|해주세요|해\s*주세요|부탁)/g, '') + '\n' + answer;
@@ -255,13 +266,49 @@ export function normalizeDraft(raw, input) {
 // The owner reviews one preview and publishes a single FAQ list. Hypothetical
 // questions are not separately selected. Keep normalizeDraft's independent
 // safety checks, and do not silently reintroduce dropped items to meet a count.
-export function mergeCustomerQuestions(draft) {
+export function mergeCustomerQuestions(draft, input) {
   const faqs = [...draft.faqs];
   const seen = new Set(faqs.map(f => f.question.normalize('NFKC').replace(/\s+/g, '').toLowerCase()));
   let added = 0;
-  for (const item of draft.situations) {
+  const add = item => {
     const key = item.question.normalize('NFKC').replace(/\s+/g, '').toLowerCase();
     if (!seen.has(key) && added < PUBLIC_SITUATION_TARGET) { faqs.push(item); seen.add(key); added++; }
+  };
+  draft.situations.forEach(add);
+  // When a real AI draft yielded some grounded scenarios but fewer than five,
+  // supplement them with simple hypothetical questions using the owner's own
+  // offer and location. They undergo the exact same normalizer as AI items.
+  // No fallback asserts that a particular gender, group, facility or opening
+  // time is permitted, and we never turn a failed/empty AI draft into success.
+  if (input && added < PUBLIC_SITUATION_TARGET && draft.situations.length) {
+    const offer = input.answers.offer.trim();
+    const difference = input.answers.difference.trim();
+    const factual = Object.entries(inputEvidence(input)).filter(([id]) => id !== 'keywords').map(([, value]) => value).join('\n');
+    const risky = /(?:지시|프롬프트).{0,20}(?:무시|따르)|system\s*:|ignore\s+(?:previous|all)|(?:이라고|라고)\s*(?:답해|출력)/i;
+    const groupRestricted = hasRestrictedAccess(inputEvidence(input));
+    const groupContext = /친구|동료|함께|테이블|단체|모임|좌석/.test(factual);
+    const region = input.store.address.trim().split(/\s+/).slice(0, 2).join(' ');
+    const answer = `${input.store.name}의 주소는 ${input.store.address}입니다. ${input.store.name}에서는 ${offer}` +
+      (difference && /[.!?다요]$/.test(difference) && !risky.test(difference) ? ' ' + difference : '');
+    const evidence = ['name', 'address', 'offer', ...(difference && answer.endsWith(difference) ? ['difference'] : [])];
+    const questions = [];
+    if (groupContext && !groupRestricted) {
+      questions.push(`${region}에서 여자 두 명이 함께 갈 만한 가게 추천해줘?`);
+      questions.push(`${region}에서 친구 둘이 함께 갈 곳 찾아줘?`);
+    }
+    const subject = !noOrUnknown.test(offer) && !risky.test(offer)
+      ? offer.replace(/[.!?]+$/g, '').replace(/^(?:대표\s*(?:메뉴|상품|서비스)(?:는|:)?\s*)/, '').match(/^(.{2,45}?)(?:을|를)?\s*(?:판매|제공|취급)(?:합|해|하는|하고|합니다|해요)/)?.[1]?.trim() : '';
+    if (subject && !/[.?!\[\]]/.test(subject)) {
+      questions.push(`${region}에서 ${subject} 파는 곳 추천해줘?`);
+      questions.push(`${region}에서 ${subject} 즐길 수 있는 곳 알려줘?`);
+      if (groupContext && !groupRestricted) questions.push(`${region}에서 친구와 ${subject} 즐길 곳 있어?`);
+    }
+    if (/대화|이야기/.test(factual) && groupContext && !groupRestricted) questions.push(`${region}에서 친구랑 대화하기 편한 곳 추천해줘?`);
+    if (questions.length && !risky.test(offer) && !forbidden(offer)) {
+      const synthetic = normalizeDraft({ headline: {text: input.store.name, evidence:['name']}, intro: {text:offer,evidence:['offer']}, sections:[], faqs:[], keywords:[],
+        situations: questions.map(question => ({question, answer, evidence})) }, input);
+      synthetic.situations.forEach(add);
+    }
   }
   const situationsStatus = draft.situationsStatus === 'ready' && added < PUBLIC_SITUATION_TARGET ? 'partial' : draft.situationsStatus;
   const situationsNotice = situationsStatus === 'partial' && draft.situationsStatus === 'ready' ? '겹치거나 근거를 확인하기 어려운 고객 예상 질문이 있어 일부만 추가했어요. 내용 수정에서 직접 보완할 수 있어요.' : draft.situationsNotice;
@@ -298,7 +345,7 @@ export async function makePageDraft({ env, fetcher = fetch, input, meter }) {
   meter.add(r.costMicro);
   if (!r.text.trim()) throw new HttpError(502, 'AI_EMPTY', 'AI 초안 내용이 비어 있어요. 자동으로 다시 호출하지 않았어요.');
   if (r.text.length > 50000) throw new HttpError(502, 'AI_FORMAT', 'AI 초안이 허용된 크기를 넘었어요.');
-  const draft = mergeCustomerQuestions(normalizeDraft(extractJson(r.text), input));
+  const draft = mergeCustomerQuestions(normalizeDraft(extractJson(r.text), input), input);
   return { draft, createdAt: new Date().toISOString(), cached: false, mock: false };
 }
 
