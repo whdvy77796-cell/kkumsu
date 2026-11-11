@@ -249,23 +249,12 @@ function renderHome() {
   };
   nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addrIn.focus(); } });
   addrIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); go(); } });
-  const prior = Number.isInteger(S.chosen) && S.answers && (S.findProtected || Object.keys(S.answers).length);
   const pendingDiagnosis = S.findProtected && S.name && S.address && !Number.isInteger(S.chosen)
     ? h('div', { class: 'card note resume' }, h('b', null, '진단 가게 검색을 확인해 주세요'),
         h('p', { class: 'small', style: { margin: '4px 0 8px' } }, S.name),
         h('a', { class: 'btn small', href: '#/find' }, '진단 검색 이어보기')) : null;
-  const oldResume = prior ? h('div', { class: 'card note resume' },
-    h('b', null, '이전에 작성한 진단이 있어요'),
-    h('p', { class: 'small', style: { margin: '4px 0 8px' } }, chosenStore()?.name || S.name),
-    h('a', { class: 'btn small', href: S.doneAt ? '#/done' : '#/survey' }, S.doneAt ? '이전 결과 보기' : '이전 답변 이어보기'),
-    S.doneAt && S.report?.data ? h('a', { class: 'btn small', href: '#/report', style: { marginLeft: '6px' } }, '이전 보고서 보기') : null) : null;
-  const draftResume = ['#/page-questions', '#/page-preview', '#/page-edit', '#/page-publish', '#/page-published'].includes(existing.resumeHash) ? existing.resumeHash : '';
-  const pageResume = ['result', 'confirmed'].includes(existing.status)
-    ? h('div', { class: 'card note resume' }, h('b', null, draftResume ? '작성하던 가게 소개가 있어요' : '확인하던 가게 정보가 있어요'),
-        h('p', { class: 'small', style: { margin: '4px 0 8px' } }, existing.name),
-        h('a', { class: 'btn small', href: draftResume || (existing.status === 'confirmed' ? '#/page-confirmed' : '#/page-search') }, draftResume ? '가게 소개 이어보기' : '가게 정보 이어보기'))
-    : (existing.status === 'pending' && !pageStartFlow.busy()) || existing.status === 'uncertain'
-      ? h('div', { class: 'card warn small' }, '이전 가게 조회가 이미 처리됐을 수 있어요. 자동 재시도하지 않았으며, 같은 가게를 다시 검색하면 비용이 중복될 수 있어요.') : null;
+  const pageSearchWarning = (existing.status === 'pending' && !pageStartFlow.busy()) || existing.status === 'uncertain'
+    ? h('div', { class: 'card warn small' }, '이전 가게 조회가 이미 처리됐을 수 있어요. 자동 재시도하지 않았으며, 같은 가게를 다시 검색하면 비용이 중복될 수 있어요.') : null;
 
   show(
     h('section', { class: 'hero' },
@@ -277,11 +266,11 @@ function renderHome() {
       h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
       h('p', { class: 'small muted page-stage-note' }, '베타 기간에는 공개와 QR·소개글을 무료로 이용할 수 있어요. 검색 노출과 AI 추천은 보장하지 않아요.')),
     makeHomeExample(h),
-    pageResume, oldResume, pendingDiagnosis,
-    h('div', { class: 'card note small diagnosis-promo' }, h('b', null, '가게 운영을 진단하고 싶으신가요?'), ' 기존 가게 진단도 별도로 이용할 수 있어요. ', h('a', { href: '#/diagnosis-start' }, '가게 진단 시작하기')),
+    pageSearchWarning, pendingDiagnosis,
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
       h('h2', null, '가게 이름과 주소를 알려주세요'),
+      h('p', { class: 'small muted start-intro' }, '몇 가지 질문에 답하면, 우리 가게의 특징을 고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.'),
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '상호명'), nameIn),
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '주소'), addrIn),
       h('p', { class: 'small muted' }, '동의 후 AI가 인터넷에 공개된 가게 정보와 특징을 찾아요. 보통 30초~1분 정도 걸려요.'),
