@@ -210,7 +210,7 @@ test('rich owner-confirmed bar situations keep literal gender, party size and so
   assert.deepEqual(out.body.draft.situations, []); assert.equal(out.body.draft.situationsStatus, 'partial');
   assert.deepEqual(out.body.draft.faqs.at(-1), entry);
   assert.equal(out.body.draft.situationsOmittedCount, 0); assert.equal('selected' in out.body.draft.faqs.at(-1), false);
-  assert.match(PAGE_DRAFT_SYSTEM, /다섯 가지/); assert.match(PAGE_DRAFT_SYSTEM, /더 적게 또는 \[\]/);
+  assert.match(PAGE_DRAFT_SYSTEM, /다섯 가지/); assert.match(PAGE_DRAFT_SYSTEM, /더 적게 만들거나 \[\]/);
 });
 
 test('questions cannot smuggle unsupported hunting, affirmative group size, hours or parking', () => {
@@ -281,7 +281,7 @@ test('situation counts, Korean counts, prices, times and occasions require the r
   for (const body of ['종로달빛은 여성 3명 방문이 가능합니다.', '종로달빛은 여성 2명에게 2시간 이용이 가능합니다.', '종로달빛은 여성 2명에게 칵테일 2원입니다.']) {
     assert.deepEqual(normalizeDraft(withSituations([situation('여자 둘이 갈 곳 있어?', body, ['fact0', 'audience'])]), input).situations, []);
   }
-  const capped = normalizeDraft(withSituations(Array(7).fill(situation())), validateDraftInput(OK)); assert.equal(capped.situations.length, 5); assert.equal(capped.situationsOmittedCount, 2);
+  const capped = normalizeDraft(withSituations(Array(10).fill(situation())), validateDraftInput(OK)); assert.equal(capped.situations.length, 8); assert.equal(capped.situationsOmittedCount, 2);
 });
 
 test('mock contains no real or invented scenario and no extra request or storage', async () => {
@@ -365,4 +365,25 @@ test('hypothetical party in a question does not license unsupported answer claim
   const contradictory = clone(body); contradictory.answers.visit = '주차 불가'; contradictory.store.researchedFacts = ['주차 가능합니다'];
   const bad = situation('주차 가능한 김밥 가게?', '골목분식은 주차 가능합니다.', ['research0']);
   assert.deepEqual(normalizeDraft(withSituations([bad]), validateDraftInput(contradictory)).situations, []);
+});
+
+
+test('extra AI candidates fill five useful questions after filtering and deduplication', async () => {
+  const body = { store: { name: '종로달빛', address: '서울 종로구 종로 12', verifiedFacts: [], researchedFacts: ['맥주와 과일 안주를 제공합니다'] }, answers: { offer: '맥주와 과일 안주를 제공합니다', difference: '', audience: '', visit: '', keywords: '' }, consent: true };
+  const answer = '종로달빛은 종로에 있으며 맥주와 과일 안주를 제공합니다.';
+  const questions = [
+    '여자 두 명이 종로에서 맥주 마실 곳 추천좀?',
+    '종로에 맥주랑 과일 안주 파는 곳 추천해줘?',
+    '친구 두 명이 종로에서 맥주 마실 술집 어디야?',
+    '여성 2명이 종로에서 과일 안주 먹을 곳은?',
+    '둘이서 종로에 맥주 파는 가게 찾아줘?',
+    '종로에서 과일 안주와 맥주를 즐길 곳은?',
+  ];
+  const valid = questions.map(question => situation(question, answer, ['address', 'research0']));
+  const raw = { headline:{text:'종로달빛',evidence:['name']},intro:{text:answer,evidence:['address','research0']},sections:[],faqs:[valid[1]],keywords:[],situations:[situation('24시간 영업하는 종로 맥주집?', '종로달빛은 24시간 영업합니다.', ['research0']), ...valid] };
+  const out = await call(body, { fetcher: fake(reply(raw)) });
+  assert.equal(out.statusCode, 200); assert.equal(out.body.draft.faqs.length, 6);
+  assert.deepEqual(out.body.draft.faqs.map(x => x.question), [questions[1], questions[0], ...questions.slice(2)]);
+  assert.equal(out.body.draft.situations.length, 0);
+  assert.equal(out.body.draft.situationsOmittedCount, 1);
 });
