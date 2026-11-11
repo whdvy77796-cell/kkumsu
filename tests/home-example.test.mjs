@@ -24,10 +24,21 @@ test('the real store preview links to the observed public page without claiming 
 test('home keeps its CTA and input while putting the example in a separate grid item', async () => {
   const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
-  assert.match(app, /makeHomeExample\(h\),\s*pageResume, oldResume, pendingDiagnosis/);
+  assert.match(app, /makeHomeExample\(h\),\s*pageSearchWarning, pendingDiagnosis/);
   assert.match(app, /onclick: focusStart \}, '무료로 페이지 만들기'/); assert.match(app, /id: 'startCard'/);
   assert.match(css, /#view > \.home-sample \{ grid-column: 2; grid-row: 1/);
   assert.match(css, /#view > #startCard \{ grid-column: 1 \/ -1; grid-row: auto/);
+});
+
+test('home hides the three pictured cards but keeps interrupted-search protection and input instructions', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const home = app.slice(app.indexOf('function renderHome()'), app.indexOf('// ───────── 2.'));
+  assert.doesNotMatch(home, /작성하던 가게 소개가 있어요|이전에 작성한 진단이 있어요|가게 운영을 진단하고 싶으신가요/);
+  assert.match(home, /이전 가게 조회가 이미 처리됐을 수 있어요/);
+  const title = home.indexOf("h('h2', null, '가게 이름과 주소를 알려주세요')");
+  const description = home.indexOf('몇 가지 질문에 답하면, 우리 가게의 특징을 고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.');
+  const input = home.indexOf("h('label', { class: 'field' }");
+  assert.ok(title >= 0 && title < description && description < input);
 });
 
 test('portrait asset exists and has dimensions matching the reserved image space', async () => {

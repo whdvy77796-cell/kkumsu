@@ -28,9 +28,10 @@ test('an existing diagnosis is not replaced unless its owner confirms',()=>{
 
 test('homepage route, protected retry and legacy storage remain integrated',async()=>{
   const app=await readFile(new URL('../public/app.js',import.meta.url),'utf8');
-  assert.match(app,/const KEY = 'maechul\.v3'/);assert.match(app,/href: '#\/diagnosis-start'/);
+  assert.match(app,/const KEY = 'maechul\.v3'/);
   assert.match(app,/hash === '#\/diagnosis-start'\) diagnosisStartFlow\.render\(\)/);
   assert.match(app,/S\.findProtected && !diagnosisFindAuthorized/);
   assert.match(app,/자동으로 다시 보내지 않았어요/);assert.match(app,/findProtected: true/);
-  assert.match(app,/진단 검색 이어보기/);assert.match(app,/S\.findProtected \|\| Object\.keys\(S\.answers\)\.length/);
+  assert.match(app,/진단 검색 이어보기/);assert.match(app,/getState: \(\) => S/);
+  assert.match(app,/confirmOverwrite: \(\) => window\.confirm/);
 });
