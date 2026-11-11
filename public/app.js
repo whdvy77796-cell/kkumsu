@@ -270,7 +270,7 @@ function renderHome() {
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
       h('h2', null, '가게 이름과 주소를 알려주세요'),
-      h('p', { class: 'small muted start-intro' }, '몇 가지 질문에 답하면, 우리 가게의 특징을 고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.'),
+      h('p', { class: 'small muted start-intro' }, '몇 가지 질문에 답하면, 우리 가게의 특징을', h('br'), ' 고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.'),
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '상호명'), nameIn),
       h('label', { class: 'field' }, h('span', { class: 'lab' }, '주소'), addrIn),
       h('p', { class: 'small muted' }, '동의 후 AI가 인터넷에 공개된 가게 정보와 특징을 찾아요. 보통 30초~1분 정도 걸려요.'),
