@@ -13,12 +13,14 @@ import { makeStoreTools } from './store-tools.js';
 import { makeDiagnosisStart } from './diagnosis-start.js';
 import { makeHomeExample } from './home-example.js';
 import { makeHomeExplainer } from './home-explainer.js';
+import { setupHomeLogo } from './logo-home.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
 const navbarInner = document.getElementById('navbarInner');
 const storeName = document.getElementById('storeName');
 const toastEl = document.getElementById('toast');
+setupHomeLogo(document, window);
 
 // ───────── 화면 도우미
 function append(el, kids) {
