@@ -270,7 +270,8 @@ function renderHome() {
   show(
     h('section', { class: 'hero' },
       h('h1', null, 'AI 시대,', h('br'), "우리 가게가 '추천' 되는 방법."),
-      h('h2', { class: 'hero-sub' }, '손님이 AI에게 물을 때, 우리 가게도 발견될 수 있도록.', h('br'), '손님이 물어볼 만한 질문과 우리 가게가 그 답이 되는 이유를 담아, AI가 읽기 쉬운 가게 소개 페이지를 만들고 여기봐ai에 배포해 드려요.'),
+      h('h2', { class: 'hero-sub' }, '손님이 AI에게 물을 때, 우리 가게도 발견될 수 있도록.'),
+      h('p', { class: 'hero-intro' }, '손님이 물어볼 만한 질문과 우리 가게가 그 답이 되는 이유를 담아,', h('br'), ' AI가 읽기 쉬운 가게 소개 페이지를 만들고 여기봐ai에 배포해 드려요.'),
       h('p', { class: 'hero-desc' }, '여기봐AI는 AI가 찾은 가게 정보와 사장님의 답변을 바탕으로 소개 페이지와 고객 예상 질문·답변을 만들어요. AI가 찾은 정보는 틀릴 수 있으니 내용을 직접 확인하고 수정한 뒤 공개해 주세요.'),
       h('div', { class: 'hero-actions' }, h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료로 페이지 만들기')),
       h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
