@@ -45,11 +45,11 @@ test('loginLinks only for providers reported true', () => {
 
 test('dashboard logged out: provider anchors, no fake login when none', async () => {
   const urls = [];
-  let { st, env } = makeEnv({ post: async () => ({}), fetcher: async (u) => { urls.push(u); return json({ authenticated: false, providers: { kakao: true, naver: true } }); } });
+  let { st, env } = makeEnv({ post: async () => ({}), fetcher: async (u) => { urls.push(u); return json({ authenticated: false, providers: { kakao: true, naver: true, google: true } }); } });
   await makeAccountUI(env).renderDashboard();
   assert.equal(urls[0], '/api/owner-auth?op=status');
   const anchors = findAll(st, (x) => x.tag === 'a');
-  assert.deepEqual(anchors.map((a) => a.attrs.href), ['/api/owner-auth?op=start&provider=kakao&return=dashboard', '/api/owner-auth?op=start&provider=naver&return=dashboard']);
+  assert.deepEqual(anchors.map((a) => a.attrs.href), ['/api/owner-auth?op=start&provider=kakao&return=dashboard', '/api/owner-auth?op=start&provider=naver&return=dashboard', '/api/owner-auth?op=start&provider=google&return=dashboard']);
   assert.ok(find(st, (x) => x.tag === 'button' && x.children.join('') === '로그인 없이 시작하기'));
 
   ({ st, env } = makeEnv({ post: async () => ({}), fetcher: async () => json({ authenticated: false, providers: { kakao: false, naver: false } }) }));
@@ -998,4 +998,35 @@ test('provider login buttons: official image assets, exact src/alt/href, enabled
   }
   // loginLinks helper exposes the same data
   assert.deepEqual(loginLinks({ providers: { kakao: true } }).map((l) => [l.provider, l.imageSrc, l.imageAlt]), [['kakao', '/kakao-login.svg', '카카오 로그인']]);
+});
+
+test('Google login: text-only neutral button, only when server reports true, no external assets', async () => {
+  const render = async (providers) => {
+    const { st, env } = makeEnv({ post: async () => ({}), fetcher: async () => json({ authenticated: false, providers }) });
+    await makeAccountUI(env).renderDashboard();
+    return st;
+  };
+  const g = (st) => findAll(st, (x) => x.tag === 'a' && x.attrs?.['data-provider'] === 'google');
+  let st = await render({ kakao: true, naver: true, google: true });
+  assert.deepEqual(findAll(st, (x) => x.tag === 'a' && x.attrs?.['data-provider']).map((a) => a.attrs['data-provider']), ['kakao', 'naver', 'google']);
+  const [a] = g(st);
+  assert.equal(a.attrs.href, '/api/owner-auth?op=start&provider=google&return=dashboard');
+  assert.ok(a.attrs.class.includes('account-provider-google') && a.attrs.class.includes('account-provider-text'));
+  const kids = a.children.filter(Boolean);
+  assert.equal(kids.length, 2);
+  assert.equal(kids[0].tag, 'img');
+  assert.equal(kids[0].attrs.src, '/google-g.svg');
+  assert.equal(kids[0].attrs.alt, '');
+  assert.equal(kids[1].tag, 'span');
+  assert.equal(kids[1].children.join(''), 'Google 계정으로 로그인');
+  assert.deepEqual(findAll(st, (x) => x.tag === 'img' && /google/i.test(x.attrs.src)).map((x) => x.attrs.src), ['/google-g.svg']);
+  for (const p of [{ google: false }, { google: 'yes' }, { google: 1 }, { kakao: true }]) assert.equal(g(await render(p)).length, 0);
+  st = await render({ google: true });
+  assert.equal(g(st).length, 1);
+  assert.ok(find(st, (x) => x.tag === 'button' && x.children.join('') === '로그인 없이 시작하기'), 'no-login flow kept');
+  assert.deepEqual(loginLinks({ providers: { google: true } }).map((l) => [l.provider, l.imageSrc]), [['google', '']]);
+  assert.equal(loginLinks({ providers: { google: true } })[0].iconSrc, '/google-g.svg');
+  const { st: s2, env } = makeEnv({ post: async () => ({}), fetcher: async (u) => json(u.includes('owner-auth') ? { authenticated: true, provider: 'google', providers: { google: true } } : { stores: [] }) });
+  await makeAccountUI(env).renderDashboard();
+  assert.match(textOf(s2), /구글 계정/);
 });

@@ -1,12 +1,13 @@
 import { test } from 'node:test';
+import { generateKeyPairSync, sign } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { MemoryStore } from '../lib/guard.mjs';
+import { MemoryStore, OWNER_STORES_LUA } from '../lib/guard.mjs';
 import { createHandler as authHandler } from '../api/owner-auth.js';
 import { createHandler as ownerHandler } from '../api/owner-stores.js';
 import { createHandler as legacyHandler } from '../api/stores.js';
 
 // 전부 합성 데이터와 메모리 저장소·가짜 제공자 응답이다. 외부 요청 없음.
-const env={VERCEL:'1',VERCEL_ENV:'production',SESSION_SECRET:'synthetic-existing-store-secret-0123456789',YB_AUTH_ORIGIN:'https://www.kkumsu.com',YB_AUTH_SECRET:'synthetic-session-signing-secret-0123456789',YB_IDENTITY_KEY:'synthetic-stable-identity-secret-0123456789',YB_KAKAO_CLIENT_ID:'synthetic-client',YB_KAKAO_CLIENT_SECRET:'synthetic-secret'};
+const env={VERCEL:'1',VERCEL_ENV:'production',SESSION_SECRET:'synthetic-existing-store-secret-0123456789',YB_AUTH_ORIGIN:'https://www.kkumsu.com',YB_AUTH_SECRET:'synthetic-session-signing-secret-0123456789',YB_IDENTITY_KEY:'synthetic-stable-identity-secret-0123456789',YB_KAKAO_CLIENT_ID:'synthetic-client',YB_KAKAO_CLIENT_SECRET:'synthetic-secret',YB_GOOGLE_CLIENT_ID:'synthetic-google-client',YB_GOOGLE_CLIENT_SECRET:'synthetic-google-secret'};
 const id='abcdefghijklmnopqrstuv',password='synthetic-password';
 const data={name:'검수용 가게',address:'서울 가상로 12',headline:'검수용 소개',intro:'실제 가게가 아닌 테스트 데이터입니다.',sections:[{heading:'영업시간',body:'월요일 휴무'}],faqs:[{question:'반려견이 함께 갈 수 있나요?',answer:'테라스에서만 가능합니다.'}]};
 function req(url,method='GET',body,headers={}) { return {url,method,body,headers:{host:'www.kkumsu.com','x-forwarded-proto':'https','x-vercel-forwarded-for':'203.0.113.17',...(method==='POST'?{origin:env.YB_AUTH_ORIGIN,'content-type':'application/json'}:{}),...headers},socket:{encrypted:true,remoteAddress:'127.0.0.1'}}; }
@@ -14,11 +15,17 @@ function response(){return {statusCode:200,headers:{},body:'',setHeader(k,v){thi
 async function invoke(handler,url,method,body,headers){const res=response();await handler(req(url,method,body,headers),res);return res;}
 function jar(res){return (res.headers['set-cookie']||[]).filter(s=>!s.includes('Max-Age=0')).map(s=>s.split(';')[0]).join('; ');}
 
-test('synthetic OAuth session links and edits only its own legacy store; URL, QR target and password stay valid',async()=>{
-  const store=new MemoryStore();let subject=111;
-  const fakeProvider=async url=>Response.json(url.includes('/token')?{access_token:'synthetic-not-real',token_type:'bearer'}:{id:subject});
+for (const provider of ['kakao','google']) test(provider+' synthetic OAuth session links and edits only its own legacy store; URL, QR target and password stay valid',async()=>{
+  const store=new MemoryStore();let subject=111,nonce;
+  const rsa=generateKeyPairSync('rsa',{modulusLength:2048}),jwk={...rsa.publicKey.export({format:'jwk'}),kid:'integration-google',alg:'RS256',use:'sig'};
+  const fakeProvider=async url=>{
+    if(url==='https://www.googleapis.com/oauth2/v3/certs')return Response.json({keys:[jwk]});
+    if(!url.includes('/token'))return Response.json({id:subject});
+    const now=Math.floor(Date.now()/1000),h=Buffer.from(JSON.stringify({alg:'RS256',kid:jwk.kid})).toString('base64url'),p=Buffer.from(JSON.stringify({iss:'https://accounts.google.com',sub:String(subject),aud:env.YB_GOOGLE_CLIENT_ID,nonce,iat:now,exp:now+3600,email:'discarded@example.invalid',email_verified:true})).toString('base64url');
+    return Response.json({access_token:'synthetic-not-real',token_type:'bearer',...(provider==='google'?{id_token:h+'.'+p+'.'+sign('RSA-SHA256',Buffer.from(h+'.'+p),rsa.privateKey).toString('base64url')}:{})});
+  };
   const auth=authHandler({env,store,fetcher:fakeProvider}),legacy=legacyHandler({env,store}),owner=ownerHandler({env,store});
-  const login=async()=>{const start=await invoke(auth,'/api/owner-auth?op=start&provider=kakao&return=dashboard');assert.equal(start.statusCode,303,start.body);const a=new URL(start.headers.location),state=a.searchParams.get('state'),callback=new URL(a.searchParams.get('redirect_uri'));callback.searchParams.set('state',state);callback.searchParams.set('code','synthetic-code');const finish=await invoke(auth,callback.pathname+callback.search,'GET',undefined,{cookie:jar(start)});assert.equal(finish.statusCode,303,finish.body);return {cookie:jar(finish),callback:callback.pathname+callback.search,stateCookie:jar(start)};};
+  const login=async()=>{const start=await invoke(auth,'/api/owner-auth?op=start&provider='+provider+'&return=dashboard');assert.equal(start.statusCode,303,start.body);const a=new URL(start.headers.location),state=a.searchParams.get('state'),callback=new URL(a.searchParams.get('redirect_uri'));nonce=a.searchParams.get('nonce');callback.searchParams.set('state',state);callback.searchParams.set('code','synthetic-code');const finish=await invoke(auth,callback.pathname+callback.search,'GET',undefined,{cookie:jar(start)});assert.equal(finish.statusCode,303,finish.body);return {cookie:jar(finish),callback:callback.pathname+callback.search,stateCookie:jar(start)};};
   const created=await invoke(legacy,'/api/stores','POST',{action:'create',id,password,consent:true,data});assert.equal(created.statusCode,201,created.body);assert.equal(created.json().url,'/stores/'+id);
   const a=await login();const status=await invoke(auth,'/api/owner-auth?op=status','GET',undefined,{cookie:a.cookie});assert.equal(status.json().authenticated,true);
   const claim=await invoke(owner,'/api/owner-stores','POST',{action:'claim',id,password},{cookie:a.cookie});assert.equal(claim.statusCode,200,claim.body);assert.equal(claim.json().url,'/stores/'+id);
@@ -79,4 +86,9 @@ test('atomic session: replacing session value with another account after authent
   const pending=invoke(f.owner,'/api/owner-stores','POST',body,{cookie:f.cookie});await gate.entered;
   const current=JSON.parse(f.store.kv.get(f.sessionKey));f.store.kv.set(f.sessionKey,JSON.stringify({...current,accountId:'oa_'+'B'.repeat(43)}));gate.release();
   const result=await pending;assert.equal(result.statusCode,401,result.body);assert.equal(f.store.kv.get(f.recordKey),before);assert.ok(!result.body.includes(f.sessionKey));
+});
+
+test('Redis atomic session provider allowlist matches Google-enabled memory path without accepting arbitrary providers',()=>{
+  assert.ok(OWNER_STORES_LUA.includes("(s.provider~='kakao' and s.provider~='naver' and s.provider~='google')"));
+  assert.ok(OWNER_STORES_LUA.includes('s.provider~=proof.provider'));
 });
