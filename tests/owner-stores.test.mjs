@@ -120,9 +120,9 @@ test('delete race blocks late update and claim, deleted and expired records cann
 
 test('ownership rechecked atomically on update/unlink race and claim checks revision',async()=>{
  const st=new MemoryStore();const old=await seed(st,{ownerAccountId:ACCOUNT}),keys=ownerKeys(scope,ACCOUNT,ID);
- const unlinked=await st.ownerTransaction('unlink',keys,{accountId:ACCOUNT,expected:old.revision,revision:'unlinked',now:Date.now()});assert.equal(unlinked.status,'ok');
- const late=await st.ownerTransaction('update',keys,{accountId:ACCOUNT,expected:old.revision,revision:'late',data:DATA,now:Date.now()});assert.equal(late.status,'denied');
- assert.equal((await st.ownerTransaction('claim',ownerKeys(scope,'new',ID),{accountId:'new',expected:old.revision,revision:'claim',now:Date.now()})).status,'conflict');
+ const unlinked=await st.ownerTransaction('unlink',keys,{accountId:ACCOUNT,expected:old.revision,revision:'a'.repeat(32),now:Date.now()});assert.equal(unlinked.status,'ok');
+ const late=await st.ownerTransaction('update',keys,{accountId:ACCOUNT,expected:old.revision,revision:'b'.repeat(32),data:DATA,now:Date.now()});assert.equal(late.status,'denied');
+ assert.equal((await st.ownerTransaction('claim',ownerKeys(scope,'new',ID),{accountId:'new',expected:old.revision,revision:'c'.repeat(32),now:Date.now()})).status,'conflict');
 });
 
 test('unlink is authorized, idempotence is not assumed, public page/password/ID stay stable',async()=>{
@@ -177,7 +177,9 @@ function redisFixture(){
   if(a[0]==='GET')result=backend.kv.get(a[1]) ?? null;
   else {assert.equal(a[0],'EVAL');const n=Number(a[2]),keys=a.slice(3,3+n),op=a[3+n],p=JSON.parse(a[4+n]);
    assert.ok([OWNER_STORES_LUA,STORES_LUA].includes(a[1]));const out=await backend[a[1]===OWNER_STORES_LUA?'ownerTransaction':'publicTransaction'](op,keys,p);
-   if(keys[0]?.includes(':record:')&&backend.kv.has(keys[0]))backend.kv.set(keys[0],cjson(JSON.parse(backend.kv.get(keys[0]))));result=cjson(out);
+   if(a[1]===STORES_LUA&&keys[0]?.includes(':record:')&&backend.kv.has(keys[0]))backend.kv.set(keys[0],cjson(JSON.parse(backend.kv.get(keys[0]))));
+   // Owner Lua returns a JSON string, never cjson re-encoding the legacy record.
+   if(a[1]===OWNER_STORES_LUA&&out.record){out.recordRaw=backend.kv.get(keys[0]);delete out.record;}result=cjson(out);
   }
   return new Response(JSON.stringify({result}));
  });redis.fixtureBackend=backend;const base=redis.ownerTransaction.bind(redis);redis.ownerTransaction=(op,keys,p)=>{const args=fixtureTx(backend,op,keys,p);return base(op,args.keys,args.p);};return {redis,backend,calls};
@@ -292,3 +294,6 @@ test('raw owner transactions reject absent/substituted session proof, value fiel
  assert.ok(OWNER_STORES_LUA.indexOf("local proof=p.session")<OWNER_STORES_LUA.indexOf("if op=='list'"));
  assert.ok(OWNER_STORES_LUA.includes("redis.call('PTTL',proof.key)<=0"));assert.ok(OWNER_STORES_LUA.includes('s.expiresAt<=p.now'));
 });
+
+for(const action of ['claim','update','unlink'])test('record preservation: wrong index type blocks '+action+' before record writes',async()=>{const st=new MemoryStore();await seed(st,{ownerAccountId:action==='claim'?undefined:ACCOUNT});const keys=ownerKeys(scope,ACCOUNT,ID),before=st.kv.get(keys[0]);st.kv.set(keys[1],'synthetic-wrong-type');const result=await st.ownerTransaction(action,keys,{accountId:ACCOUNT,prefix:scope.namespace+':record:',expected:'0'.repeat(32),revision:'e'.repeat(32),data:DATA,updatedAt:Date.now(),now:Date.now()});assert.equal(result.status,'blocked');assert.equal(st.kv.get(keys[0]),before);assert.equal(st.kv.get(keys[1]),'synthetic-wrong-type');});
+test('record preservation: raw CAS prevents same-revision legacy unknown-field loss',async()=>{const {redis,backend}=redisFixture();await seed(backend,{ownerAccountId:ACCOUNT});const keys=ownerKeys(scope,ACCOUNT,ID),base=redis.cmd.bind(redis);let changed;redis.cmd=async args=>{if(args[0]==='EVAL'&&args[1]===OWNER_STORES_LUA&&args.includes('update')){changed=backend.kv.get(keys[0]).replace('"hidden":false','"hidden":false,"legacyUnknown":[[],{}]');backend.kv.set(keys[0],changed);}return base(args);};const result=await redis.ownerTransaction('update',keys,{accountId:ACCOUNT,prefix:scope.namespace+':record:',expected:'0'.repeat(32),revision:'e'.repeat(32),data:DATA,updatedAt:Date.now(),now:Date.now()});assert.equal(result.status,'conflict');assert.equal(backend.kv.get(keys[0]),changed);});
