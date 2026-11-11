@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {ownerReplacement,patchRawObject,rawObjectMembers,OWNER_STORES_LUA} from '../lib/guard.mjs';
+import {ownerReplacement,patchRawObject,rawObjectMembers,OWNER_STORES_LUA,OWNER_RAW_LIMIT} from '../lib/guard.mjs';
 const id='a'.repeat(22),rev='b'.repeat(32),next='c'.repeat(32);
 const raw='{ "id":"'+id+'", "data" : {"name":"name","address":"address","headline":"h","intro":"i","sections":[],"faqs":[],"situations":[],"future":{"nested":[[],{},[1]]}}, "password":{"salt":"synthetic","hash":"synthetic"}, "unknown":[[],{},900719925474099312345], "revision":"'+rev+'" }';
 test('claim/unlink preserve exact unrelated bytes including unknown arrays and large numbers',()=>{const claimed=ownerReplacement(raw,'claim',{accountId:'synthetic-account',revision:next});assert.equal(claimed,raw.replace(rev,next).replace(' }',' ,"ownerAccountId":"synthetic-account"}'));const unlinked=ownerReplacement(claimed,'unlink',{accountId:'synthetic-account',revision:rev});assert.equal(unlinked,raw);});
@@ -8,3 +8,5 @@ test('update retains unknown data/top-level bytes, password, omitted situations 
 test('escaped duplicate keys and unchanged revision fail closed',()=>{assert.throws(()=>rawObjectMembers('{"revision":1,"revi\\u0073ion":2}'));assert.throws(()=>ownerReplacement(raw,'claim',{accountId:'synthetic',revision:rev}));assert.equal(patchRawObject('{"revi\\u0073ion":1,"nested":[[],{}]}',{revision:'2'}),'{"revi\\u0073ion":2,"nested":[[],{}]}');});
 test('unknown nested members in replaced known array are blocked without dropping data',()=>{const unknown=raw.replace('"sections":[]','"sections":[{"heading":"h","body":"b","future":[]}]');assert.throws(()=>ownerReplacement(unknown,'update',{revision:next,updatedAt:42,data:{sections:[]}}));});
 test('owner Lua uses raw compare-and-set, no whole-record reencoding, preflights index type',()=>{assert.ok(!OWNER_STORES_LUA.includes("cjson.encode(old)"));assert.ok(OWNER_STORES_LUA.includes("p.expectedRaw~=redis.call('GET',KEYS[1])"));assert.ok(OWNER_STORES_LUA.indexOf("compatible(indexKey,'zset')")<OWNER_STORES_LUA.indexOf("redis.call('SET',KEYS[1]"));});
+
+test('defensive record cap is independent of body limit and never truncates',()=>{assert.equal(OWNER_RAW_LIMIT,1024*1024);assert.ok(6*81980+16384<OWNER_RAW_LIMIT);const within='{"unknown":"'+'x'.repeat(OWNER_RAW_LIMIT-14)+'"}';assert.equal(Buffer.byteLength(within),OWNER_RAW_LIMIT);assert.equal(rawObjectMembers(within).value.unknown.length,OWNER_RAW_LIMIT-14);assert.throws(()=>rawObjectMembers(within+' '));});
