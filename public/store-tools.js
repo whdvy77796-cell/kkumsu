@@ -3,7 +3,7 @@
 import qrcode from './vendor/qrcode.mjs';
 
 export const ID_RE = /^[A-Za-z0-9_-]{22}$/;
-export const LIMITS = { name: 60, address: 120, headline: 200, intro: 2000, heading: 200, body: 4000, question: 300, answer: 2000, max: 8 };
+export const LIMITS = { name: 60, address: 120, headline: 200, intro: 2000, heading: 200, body: 4000, question: 300, answer: 2000, max: 8, faqs: 12 };
 export const REPORT_REASONS = [
   { code: 'impersonation', label: '다른 사람이나 가게를 사칭하고 있어요' },
   { code: 'inaccurate', label: '내용이 사실과 달라요' },
@@ -48,7 +48,7 @@ export function cleanStoreData(d) {
   let error = need(data.name, '가게 이름', LIMITS.name) || need(data.address, '주소', LIMITS.address)
     || need(data.headline, '한 줄 소개', LIMITS.headline) || need(data.intro, '소개글', LIMITS.intro);
   if (!error && data.sections.length > LIMITS.max) error = `안내 항목은 ${LIMITS.max}개까지 넣을 수 있어요.`;
-  if (!error && data.faqs.length > LIMITS.max) error = `자주 묻는 질문은 ${LIMITS.max}개까지 넣을 수 있어요.`;
+  if (!error && data.faqs.length > LIMITS.faqs) error = `고객 질문과 답변은 ${LIMITS.faqs}개까지 넣을 수 있어요.`;
   if (!error && data.situations.length > LIMITS.max) error = `예상 질문은 ${LIMITS.max}개까지 넣을 수 있어요.`;
   data.sections.forEach((s, i) => { error ||= need(s.heading, `안내 ${i + 1}의 제목`, LIMITS.heading) || need(s.body, `안내 ${i + 1}의 내용`, LIMITS.body); });
   data.faqs.forEach((f, i) => { error ||= need(f.question, `질문 ${i + 1}`, LIMITS.question) || need(f.answer, `답변 ${i + 1}`, LIMITS.answer); });
@@ -152,6 +152,9 @@ export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpd
         sections: initial.sections.map((s) => ({ ...s })), faqs: initial.faqs.map((f) => ({ ...f })),
         situations: (Array.isArray(initial.situations) ? initial.situations : []).map((f) => ({ question: f.question, answer: f.answer })),
       };
+      // Existing pages that already published the previous separate questions
+      // retain their owner controls. New pages use only the single FAQ list.
+      const hasLegacySituations = d.situations.length > 0;
       let verified = false;
       let status = { text: '', cls: 'muted' };
       let confirmDelete = false;
@@ -168,14 +171,15 @@ export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpd
           const isSec = kind === 'sections';
           const isSit = kind === 'situations';
           const arr = d[kind];
-          const title = isSec ? '안내 항목' : isSit ? '이럴 때 찾는 가게 · 예상 질문' : '자주 묻는 질문';
+          const title = isSec ? '안내 항목' : isSit ? '기존에 공개한 예상 질문' : '고객 질문과 답변';
           const addLabel = isSec ? '안내 항목 추가' : isSit ? '예상 질문 추가' : '질문 추가';
           const delLabel = isSec ? '이 안내 항목 삭제' : isSit ? '이 예상 질문 삭제' : '이 질문 삭제';
           const prefix = isSit ? '예상 질문' : '질문';
-          const add = btn(addLabel, () => { if (arr.length >= LIMITS.max) return; arr.push(isSec ? { heading: '', body: '' } : { question: '', answer: '' }); draw(); });
-          add.disabled = arr.length >= LIMITS.max;
+          const max = isSec || isSit ? LIMITS.max : LIMITS.faqs;
+          const add = btn(addLabel, () => { if (arr.length >= max) return; arr.push(isSec ? { heading: '', body: '' } : { question: '', answer: '' }); draw(); });
+          add.disabled = arr.length >= max;
           return h('fieldset', { class: 'card' },
-            h('legend', null, `${title} (${arr.length}/${LIMITS.max})`),
+            h('legend', null, `${title} (${arr.length}/${max})`),
             isSit ? h('p', { class: 'muted' }, '손님이 이런 상황에서 찾는다고 가정한 예상 질문이에요. 실제 사용자 검색을 측정한 결과가 아니에요. 답변이 사실과 맞는지 직접 확인해 주세요. AI가 가게를 언급해 준다고 보장하지 않아요. 여기서 고치는 데에는 AI를 쓰지 않아요.') : null,
             arr.map((it, i) => h('div', { class: 'field' },
               isSec
@@ -183,7 +187,7 @@ export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpd
                 : [field('question', `${prefix} ${i + 1}`, LIMITS.question, false, it, `${isSit ? '-t' : '-q'}${i}`), field('answer', `답변 ${i + 1}`, LIMITS.answer, true, it, `${isSit ? '-t' : '-q'}${i}`)],
               btn(delLabel, () => { arr.splice(i, 1); draw(); }))),
             add,
-            arr.length >= LIMITS.max ? h('p', { class: 'muted' }, `최대 ${LIMITS.max}개까지예요.`) : null);
+            arr.length >= max ? h('p', { class: 'muted' }, `최대 ${max}개까지예요.`) : null);
         };
         const msg = h('p', { class: status.cls, role: 'status', 'aria-live': 'polite' }, status.text);
         const ok = h('input', { type: 'checkbox', id: 'verified' });
@@ -229,7 +233,7 @@ export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpd
           h('p', { class: 'muted' }, '관리 화면이에요. 손님에게는 공개 페이지(/stores/…)만 보여요. AI는 쓰지 않고, 입력한 내용 그대로 저장돼요.'),
           field('name', '가게 이름', LIMITS.name, false, d, ''), field('address', '주소', LIMITS.address, false, d, ''),
           field('headline', '한 줄 소개', LIMITS.headline, false, d, ''), field('intro', '소개글', LIMITS.intro, true, d, ''),
-          list('sections'), list('faqs'), list('situations'),
+          list('sections'), list('faqs'), hasLegacySituations ? list('situations') : null,
           h('label', { for: 'verified' }, ok, ' 바뀐 내용이 사실과 맞는지 직접 확인했어요.'),
           msg, save, viewLink(),
           h('hr'), h('h2', null, '페이지 삭제'), delArea));
