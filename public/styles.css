@@ -192,6 +192,12 @@ body[data-page="home"] #view, body[data-page="home"] .navbar .wrap { max-width: 
 .spinner { width: 44px; height: 44px; border-radius: 50%; border: 4px solid var(--brand-soft); border-top-color: var(--brand); margin: 4px auto 18px; animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading .elapsed { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--brand); }
+.draft-progress { max-width: 620px; margin: 20px auto; padding: 42px 24px; }
+.draft-progress h2 { font-size: clamp(21px, 4vw, 27px); line-height: 1.4; overflow-wrap: anywhere; }
+.draft-progress-message { min-height: 3.2em; max-width: 35ch; margin: 18px auto; display: flex; align-items: center; justify-content: center; color: var(--ink-2); font-size: 17px; font-weight: 600; line-height: 1.6; }
+.draft-progress-note { border-top: 1px solid var(--line); padding-top: 16px; margin: 16px 0 8px; font-weight: 600; }
+.draft-progress .tiny { margin-bottom: 0; }
+@media (prefers-reduced-motion: reduce) { .draft-progress .spinner { animation: none; } }
 
 /* ───────── 가게 후보 */
 .cand h3 { font-size: 21px; margin-bottom: 6px; }

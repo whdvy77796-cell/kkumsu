@@ -6,6 +6,15 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
   let busy = false;
   let draftBusy = false;
   let publishing = false;
+  let draftTipTimer = null;
+
+  function stopDraftTips() {
+    if (draftTipTimer !== null) clearInterval(draftTipTimer);
+    draftTipTimer = null;
+  }
+  if (typeof window !== 'undefined') window.addEventListener('hashchange', () => {
+    if ((location.hash || '#/') !== '#/page-questions') stopDraftTips();
+  });
 
   function load() {
     try {
@@ -361,6 +370,32 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
       : '이전 요청의 응답을 확인하지 못했어요. 이미 처리됐을 수도 있어요. 자동으로 다시 보내지 않았어요. 응답을 확인한 뒤 원하실 때만 다시 요청해 주세요.';
     return d.status === 'error' ? string(d.error) || '초안을 만들지 못했어요. 답변은 보존했어요. 자동 재시도하지 않았어요.' : '';
   }
+  function draftProgress(d) {
+    const name = string(d.store?.name).trim() || '우리 가게';
+    const tips = [
+      `사장님이 알려주신 ${name}의 매력을 살펴보고 있어요.`,
+      '대표 메뉴·서비스와 가게만의 특징을 알아보기 쉽게 정리하고 있어요.',
+      '손님이 AI에게 물어볼 만한 질문을 예상하고 있어요.',
+      `예상 질문에 ${name}의 정보로 답할 수 있도록 내용을 만들고 있어요.`,
+      `${name}의 가게명·지역·대표 메뉴·서비스를 바탕으로 관련 키워드를 제안하고 있어요.`,
+      '고객과 AI가 이해하기 쉬운 가게 소개를 작성하고 있어요.',
+      `${name}의 매력이 자연스럽게 전달되도록 문장을 다듬고 있어요.`,
+    ];
+    let index = 0;
+    const tip = h('p', { class: 'draft-progress-message', id: 'draft-progress-message', 'aria-live': 'off' }, tips[0]);
+    draftTipTimer = setInterval(() => {
+      if (!draftBusy || (location.hash || '#/') !== '#/page-questions' || tip.isConnected === false) { stopDraftTips(); return; }
+      index = (index + 1) % tips.length;
+      tip.textContent = tips[index];
+    }, 5000);
+    return h('section', { class: 'card loading draft-progress' },
+      h('div', { class: 'spinner', 'aria-hidden': 'true' }),
+      h('div', { role: 'status', 'aria-live': 'polite' }, h('h2', null, name, ' 소개 페이지를 만들고 있어요')),
+      tip,
+      h('p', { class: 'small draft-progress-note' }, '완성된 내용은 사장님이 확인하고 직접 수정할 수 있어요.'),
+      h('p', { class: 'small muted' }, '답변은 이 탭에 임시저장되어 있어요. 중복 요청하지 않아요.'),
+      h('p', { class: 'tiny muted' }, '안내 문구는 제작 내용을 설명하며 실제 처리 순서와 다를 수 있어요.'));
+  }
   function questionHelp(key, fallback) {
     const category = string(chosenStore()?.category);
     const food = /카페|커피|음식|식당|분식|베이커리|제과|주점|한식|중식|일식|양식/.test(category);
@@ -472,9 +507,13 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
             '위 전송 내용과 보관 안내를 확인했고 AI 초안 생성을 위한 전송에 동의합니다.')),
       error,
       existing ? h('div', { class: 'page-actions' }, h('button', { class: 'btn primary block', type: 'button', onclick: () => { location.hash = '#/page-preview'; } }, '작성한 비공개 미리보기 보기'), h('button', { class: 'btn block', type: 'button', onclick: () => { d.regenerate = true; save(); renderQuestions(); } }, '답변으로 새 초안 만들기')) : [submit, d.draft && !draftBusy ? h('button', { class: 'btn block', type: 'button', onclick: () => { delete d.regenerate; d.status = 'ready'; d.view = '#/page-preview'; save(); location.hash = '#/page-preview'; } }, '기존 미리보기 보기') : null]);
-    show(h('div', { class: 'page-questions' }, privateNote(), h('h2', null, '우리 가게를 알려 주세요'),
-      h('p', { class: 'small muted' }, '대표 메뉴·서비스만 필수예요. 나머지는 모르면 비워 두세요. 희망 검색어는 사실 근거로 사용하지 않아요.'),
-      draftMessage(d) ? h('p', { class: 'card warn page-draft-status', role: 'status', 'aria-live': 'polite' }, draftMessage(d)) : null, form));
+    stopDraftTips();
+    const progress = draftBusy ? draftProgress(d) : null;
+    show(h('div', { class: 'page-questions' },
+      draftBusy ? progress : [privateNote(), h('h2', null, '우리 가게를 알려 주세요'),
+        h('p', { class: 'small muted' }, '대표 메뉴·서비스만 필수예요. 나머지는 모르면 비워 두세요. 희망 검색어는 사실 근거로 사용하지 않아요.'),
+        draftMessage(d) ? h('p', { class: 'card warn page-draft-status', role: 'status', 'aria-live': 'polite' }, draftMessage(d)) : null],
+      h('div', { hidden: draftBusy }, form)));
     setNavbar(btn('가게 확인으로', () => { location.hash = '#/page-confirmed'; }), btn('처음으로', home));
   }
   async function generateDraft(consent, error) {
@@ -519,6 +558,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
       save();
     } finally {
       draftBusy = false;
+      stopDraftTips();
       if (location.hash === '#/page-questions') renderQuestions();
     }
   }
