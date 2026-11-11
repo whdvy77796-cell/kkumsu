@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makePageStart } from '../public/page-start.js';
+import { validateDraftInput } from '../api/page-draft.js';
 
 function createStorage() {
   const values = new Map();
@@ -304,7 +305,8 @@ test('only explicitly checked facts are sent, maximum eight, no AI price or hour
   fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
   assert.equal(ctx.calls.length, 1);
   assert.equal(ctx.calls[0].url, '/api/page-draft');
-  assert.deepEqual(ctx.calls[0].data, { store: { name: candidate.name, address: candidate.address, verifiedFacts: ['특징1'] }, answers: { offer: '따뜻한 차', difference: '직접 고른 찻잎', audience: '친구와 이야기할 때', visit: '방문 전 예약해 주세요.', keywords: '지역 인기 카페' }, consent: true });
+  assert.deepEqual(ctx.calls[0].data, { store: { name: candidate.name, address: candidate.address, verifiedFacts: ['특징1'], researchedFacts: ['특징0', '특징2', '특징3', '특징4', '특징5', '특징6', '특징7'] }, answers: { offer: '따뜻한 차', difference: '직접 고른 찻잎', audience: '친구와 이야기할 때', visit: '방문 전 예약해 주세요.', keywords: '지역 인기 카페' }, consent: true });
+  assert.match(allText(ctx.state), /검증되지 않은 참고 정보/);
   assert.equal(location.hash, '#/page-preview');
   assert.match(allText(ctx.state), /비공개 미리보기/); assert.match(allText(ctx.state), /2개를 제외/);
   assert.match(allText(ctx.state), /확인할 키워드 제안/); assert.match(allText(ctx.state), /사실 근거가 아니에요/);
@@ -626,8 +628,8 @@ test('publication requires separate consent and never persists password or priva
   getNode(ctx, 'publish-consent').checked = true; await submit(ctx);
   assert.equal(ctx.calls.length, 2); assert.equal(location.hash, '#/page-published');
   const payload = ctx.calls[1].data;
-  assert.equal(payload.consent, true); assert.deepEqual(Object.keys(payload.data), ['name', 'address', 'headline', 'intro', 'sections', 'faqs', 'situations']);
-  assert.deepEqual(payload.data.situations, []);
+  assert.equal(payload.consent, true); assert.deepEqual(Object.keys(payload.data), ['name', 'address', 'headline', 'intro', 'sections', 'faqs']);
+  assert.equal(payload.data.situations, undefined);
   assert.ok(!sessionStorage.getItem('yeogibwa.page.start.v1').includes('sample-test-secret'));
   const updated = { ...payload.data, intro: '수정된 소개' };
   ctx.flow.recordPublicationUpdate(payload.id, updated);
@@ -675,63 +677,76 @@ test('pending or uncertain publication cannot be discarded and retries the same 
 });
 
 
-test('situation suggestions are opt-in, survive editing and only selected items reach publication', async () => {
+test('predicted questions arrive in the single FAQ section with no per-question selection or situations section', async () => {
   const result = draftResult();
-  result.draft.situations = [
-    { question: '친구 둘이 조용히 차를 마실 곳?', answer: '테스트가게에서 차를 마실 수 있어요.', evidence: ['offer'], selected: true },
-    { question: '혼자 차 마시기 좋은 곳?', answer: '테스트가게의 차를 살펴보세요.', evidence: ['offer'] },
-  ];
-  result.draft.situationsStatus = 'partial'; result.draft.situationsNotice = '일부 예상 질문은 근거 부족으로 제외했어요.'; result.draft.situationsOmittedCount = 1;
+  result.draft.faqs.push({ question: '친구 둘이 조용히 차를 마실 곳?', answer: '테스트가게에서 차를 마실 수 있어요.', evidence: ['offer', 'research0'] });
+  result.draft.situations = []; result.draft.situationsStatus = 'partial'; result.draft.situationsNotice = '일부 예상 질문은 근거 부족으로 제외했어요.';
   const ctx = await ready(async (url, body) => url === '/api/stores' ? { id: body.id } : result);
   fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx); ctx.flow.renderPreview();
-  assert.match(allText(ctx.state), /실제 질문 기록이나 빈도는 확인되지 않았/);
-  assert.match(allText(ctx.state), /일부 예상 질문은 근거 부족/);
-  assert.ok(!getNode(ctx, 'page-situation-select-0').attrs.checked, 'returned selected flag cannot self-select');
-  assert.ok(!getNode(ctx, 'page-situation-select-1').attrs.checked);
-  check(ctx, 'page-situation-select-0');
-  reload(ctx); ctx.flow.renderPreview(); assert.equal(getNode(ctx, 'page-situation-select-0').attrs.checked, true);
-  assert.equal(getNode(ctx, 'page-situation-select-1').attrs.checked, false);
-  ctx.flow.renderEdit(); input(ctx, 'page-edit-situation-0-answer', '직접 확인한 차를 소개해요.'); await submit(ctx);
-  assert.match(allText(ctx.state), /직접 확인한 차를 소개해요/);
-  ctx.flow.renderPublish(); assert.match(allText(ctx.state), /이럴 때 찾는 가게 · 예상 질문/);
-  assert.doesNotMatch(allText(ctx.state), /혼자 차 마시기 좋은 곳/);
-  fillPublish(ctx); await submit(ctx);
+  const t = allText(ctx.state);
+  assert.match(t, /고객 질문과 답변 \(예상\)/); assert.match(t, /실제 고객 질문 기록이 아니라/); assert.match(t, /친구 둘이 조용히/); assert.match(t, /일부 예상 질문은 근거 부족/);
+  assert.doesNotMatch(t, /이럴 때 찾는 가게/); assert.equal(findRendered(ctx.state, n => /page-situation/.test(n.attrs?.id || '')), null);
+  ctx.flow.renderEdit(); assert.ok(getNode(ctx, 'page-edit-faq-1-question')); assert.equal(findRendered(ctx.state, n => /situation/.test(n.attrs?.id || '')), null);
+  assert.match(allText(ctx.state), /AI가 찾은 미확인 정보 1/);
+  input(ctx, 'page-edit-faq-1-answer', '직접 확인한 차를 소개해요.'); await submit(ctx);
+  ctx.flow.renderPublish(); fillPublish(ctx); await submit(ctx);
   const data = ctx.calls.at(-1).data.data;
-  assert.deepEqual(data.situations, [{ question: '친구 둘이 조용히 차를 마실 곳?', answer: '직접 확인한 차를 소개해요.' }]);
-  assert.ok(!JSON.stringify(data).includes('evidence'));
-  assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
+  assert.equal(data.faqs.length, 2); assert.deepEqual(data.faqs[1], { question: '친구 둘이 조용히 차를 마실 곳?', answer: '직접 확인한 차를 소개해요.' });
+  assert.equal(data.situations, undefined); assert.ok(!JSON.stringify(data).includes('evidence'));
 });
 
-test('legacy drafts support manual situation entry without a new AI request', async () => {
-  const ctx = await ready(); fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
-  const before = ctx.calls.length; ctx.flow.renderPreview(); assert.match(allText(ctx.state), /아직 예상 질문이 없어요/);
-  ctx.flow.renderEdit();
-  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '예상 질문 직접 추가').attrs.onclick();
-  input(ctx, 'page-edit-situation-0-question', '이 가게는 무슨 차를 파나요?');
-  input(ctx, 'page-edit-situation-0-answer', '따뜻한 차를 팔아요.');
-  check(ctx, 'page-edit-situation-0-select'); await submit(ctx);
-  assert.match(allText(ctx.state), /이 가게는 무슨 차를 파나요/); assert.equal(ctx.calls.length, before);
-  ctx.flow.renderPublish(); assert.match(allText(ctx.state), /따뜻한 차를 팔아요/); assert.equal(ctx.calls.length, before);
+test('a FAQ can be deleted, and returned situations are never auto-published', async () => {
+  const result = draftResult(); result.draft.situations = [{ question: '숨김?', answer: '숨김', selected: true }];
+  const ctx = await ready(async (url, body) => url === '/api/stores' ? { id: body.id } : result);
+  fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  assert.doesNotMatch(allText(ctx.state), /숨김/);
+  ctx.flow.renderEdit(); findRendered(ctx.state, n => n.tag === 'button' && text(n) === 'FAQ 삭제').attrs.onclick();
+  await submit(ctx); ctx.flow.renderPublish(); fillPublish(ctx); await submit(ctx);
+  assert.deepEqual(ctx.calls.at(-1).data.data.faqs, []);
 });
 
-test('a frozen legacy publish retry keeps its original six-field request untouched', async () => {
+test('older private situations: only explicit selected:true move to FAQ; selected:false never published; no unauthorized conversion of published data', async () => {
   const ctx = await ready(async (url, body) => url === '/api/stores' ? { id: body.id } : draftResult());
   fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
-  const saved = JSON.parse(sessionStorage.getItem('yeogibwa.page.start.v1'));
-  const oldData = { name: '테스트가게', address: '서울 마포구 망원로 12', headline: '기존 제목', intro: '기존 소개', sections: [], faqs: [] };
+  const saved = JSON.parse(sessionStorage.getItem(PAGE_KEY));
+  saved.pageDraft.draft.situations = [
+    { question: '선택한 질문?', answer: '선택한 답변', evidence: [], selected: true },
+    { question: '미선택 질문?', answer: '미선택 답변', evidence: [], selected: false },
+    { question: '플래그 없음?', answer: '플래그 없음 답변', evidence: [] },
+  ];
+  saved.pageDraft.publication = { id: 'p'.repeat(22), data: { name: 'n', faqs: [], situations: [{ question: 'a', answer: 'b' }] } };
+  sessionStorage.setItem(PAGE_KEY, JSON.stringify(saved)); reload(ctx); ctx.flow.renderPreview();
+  assert.match(allText(ctx.state), /선택한 질문/); assert.doesNotMatch(allText(ctx.state), /미선택|플래그 없음/);
+  ctx.flow.renderPreview(); assert.equal((allText(ctx.state).match(/선택한 질문/g) || []).length, 1, 'idempotent');
+  assert.deepEqual(JSON.parse(sessionStorage.getItem(PAGE_KEY)).pageDraft.publication.data.situations, [{ question: 'a', answer: 'b' }]);
+  ctx.flow.renderPublish(); fillPublish(ctx); await submit(ctx);
+  const data = ctx.calls.at(-1).data.data;
+  assert.deepEqual(data.faqs.map(x => x.question), ['예약은 어떻게 하나요?', '선택한 질문?']);
+  assert.ok(!JSON.stringify(data).includes('미선택'));
+});
+
+test('FAQ limit is twelve and a frozen legacy publish retry keeps its original request untouched', async () => {
+  const ctx = await ready(async (url, body) => url === '/api/stores' ? { id: body.id } : draftResult());
+  fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  ctx.flow.renderEdit(); const add = () => findRendered(ctx.state, n => n.tag === 'button' && text(n) === 'FAQ 직접 추가');
+  for (let i = 0; i < 11; i++) add().attrs.onclick();
+  assert.equal(add().attrs.disabled, true);
+  ctx.flow.renderPreview();
+  const saved = JSON.parse(sessionStorage.getItem(PAGE_KEY));
+  const oldData = { name: '테스트가게', address: '서울 마포구 망원로 12', headline: '기존 제목', intro: '기존 소개', sections: [], faqs: [], situations: [] };
   saved.pageDraft.publishAttempt = { id: 'a'.repeat(22), data: oldData, status: 'uncertain' };
-  sessionStorage.setItem('yeogibwa.page.start.v1', JSON.stringify(saved)); reload(ctx); ctx.flow.renderPublish();
+  sessionStorage.setItem(PAGE_KEY, JSON.stringify(saved)); reload(ctx); ctx.flow.renderPublish();
   fillPublish(ctx); await submit(ctx); assert.deepEqual(ctx.calls.at(-1).data.data, oldData);
 });
 
-
-test('selected situation links are rejected before attempting publication', async () => {
-  const ctx = await ready(); fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
-  ctx.flow.renderEdit();
-  findRendered(ctx.state, n => n.tag === 'button' && text(n) === '예상 질문 직접 추가').attrs.onclick();
-  input(ctx, 'page-edit-situation-0-question', '이 가게는 무엇을 파나요?');
-  input(ctx, 'page-edit-situation-0-answer', 'example.com');
-  check(ctx, 'page-edit-situation-0-select'); await submit(ctx);
-  ctx.flow.renderPublish(); assert.match(allText(ctx.state), /웹 주소를 넣을 수 없어요/);
-  assert.equal(ctx.calls.length, 1, 'no publication request sent');
+test('researchedFacts are the unchecked search features, omitted when none, and disclosed before consent', async () => {
+  const c = { ...candidate, features: [], strengths: [], webFeatures: [{ text: '조용해요', sourceUrl: 'https://example.com/a' }, { text: '차가 다양해요', sourceUrl: 'https://example.com/a' }] };
+  const ctx = await ready(undefined, c);
+  assert.match(allText(ctx.state), /검증되지 않은 참고 정보/); assert.match(allText(ctx.state), /실제 고객 질문 기록이 아니라/);
+  check(ctx, 'page-fact-0'); fillAnswers(ctx); check(ctx, 'page-draft-consent'); await submit(ctx);
+  assert.deepEqual(ctx.calls[0].data.store.verifiedFacts, ['조용해요']); assert.deepEqual(ctx.calls[0].data.store.researchedFacts, ['차가 다양해요']);
+  assert.doesNotThrow(() => validateDraftInput(ctx.calls[0].data));
+  const none = await ready(undefined, { ...candidate, webFeatures: [], features: [], strengths: [] });
+  fillAnswers(none); check(none, 'page-draft-consent'); await submit(none);
+  assert.equal('researchedFacts' in none.calls[0].data.store, false);
 });

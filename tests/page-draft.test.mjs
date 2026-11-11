@@ -207,16 +207,15 @@ test('rich owner-confirmed bar situations keep literal gender, party size and so
   const raw = withSituations([entry]); const f = fake(reply(raw));
   const out = await call({ ...input, consent: true }, { fetcher: f });
   assert.equal(out.statusCode, 200); assert.equal(f.calls.length, 1); assert.equal('tools' in f.calls[0].body, false);
-  assert.deepEqual(out.body.draft.situations, [entry]); assert.equal(out.body.draft.situationsStatus, 'ready');
-  assert.equal(out.body.draft.situationsOmittedCount, 0); assert.equal('selected' in out.body.draft.situations[0], false);
-  assert.match(PAGE_DRAFT_SYSTEM, /3~5개/); assert.match(PAGE_DRAFT_SYSTEM, /더 적게 또는 \[\]/);
+  assert.deepEqual(out.body.draft.situations, []); assert.equal(out.body.draft.situationsStatus, 'ready');
+  assert.deepEqual(out.body.draft.faqs.at(-1), entry);
+  assert.equal(out.body.draft.situationsOmittedCount, 0); assert.equal('selected' in out.body.draft.faqs.at(-1), false);
+  assert.match(PAGE_DRAFT_SYSTEM, /5개 목표/); assert.match(PAGE_DRAFT_SYSTEM, /더 적게 또는 \[\]/);
 });
 
-test('questions cannot smuggle unsupported hunting, gender, party size, hours or parking', () => {
+test('questions cannot smuggle unsupported hunting, affirmative group size, hours or parking', () => {
   const cases = [
     situation('헌팅할 수 있는 김밥집 있어?', '골목분식은 김밥을 제공합니다.'),
-    situation('여자끼리 김밥 먹으러 갈 곳은?', '골목분식은 김밥을 제공합니다.'),
-    situation('2명이 김밥 먹으러 갈 곳은?', '골목분식은 김밥을 제공합니다.'),
     situation('둘이 김밥 먹으러 갈 곳은?', '골목분식은 둘이 김밥을 먹을 수 있습니다.'),
     situation('24h 김밥 먹을 수 있어?', '골목분식은 24시간 영업합니다.'),
     situation('주차하면서 김밥 먹을 수 있어?', '골목분식은 주차 가능합니다.'),
@@ -253,7 +252,7 @@ test('missing or malformed optional situations preserve valid legacy fields with
     const f = fake(reply(raw)); const out = await call(OK, { fetcher: f }); const d = out.body.draft;
     assert.equal(out.statusCode, 200); assert.equal(f.calls.length, 1); assert.deepEqual(d.situations, []);
     for (const key of ['headline', 'intro', 'sections', 'faqs', 'keywords']) assert.deepEqual(d[key], raw[key]);
-    assert.equal(d.situationsStatus, 'situations' in raw ? 'invalid' : 'missing'); assert.match(d.situationsNotice, /직접 입력/); assert.equal(d.omittedCount, 0);
+    assert.equal(d.situationsStatus, 'situations' in raw ? 'invalid' : 'missing'); assert.match(d.situationsNotice, /직접 추가/); assert.equal(d.omittedCount, 0);
   }
   assert.throws(() => normalizeDraft({ ...withSituations([]), faqs: null }, validateDraftInput(OK)), e => e.code === 'AI_FORMAT');
 });
@@ -310,4 +309,60 @@ test('explicit gender-qualified honorific people are equivalent, not two minutes
   const entry = situation('여자 둘이 갈 곳 있어?', '종로달빛은 여성 두 분 방문이 가능합니다.', ['fact0']);
   assert.deepEqual(normalizeDraft(withSituations([entry]), input).situations, [entry]);
   assert.deepEqual(normalizeDraft(withSituations([{ ...entry, answer: '종로달빛은 여성 두 분이 2분 동안 이용 가능합니다.' }]), input).situations, []);
+});
+
+
+test('AI-researched features are explicitly separate from checked facts and require consent', async () => {
+  const input = clone(OK);
+  input.store.researchedFacts = ['AI 검색에서 찾은 참고: 맥주와 과일 안주 제공'];
+  input.store.verifiedFacts = [];
+  const f = fake(reply(good()));
+  const r = await call(input, { fetcher: f });
+  assert.equal(r.statusCode, 200); assert.equal(f.calls.length, 1);
+  const userMessage = JSON.parse(f.calls[0].body.messages.find(m => m.role === 'user').content);
+  assert.equal(userMessage.inputData.research0, input.store.researchedFacts[0]);
+  assert.ok(!Object.hasOwn(userMessage.inputData, 'fact0')); // no selected owner facts
+  assert.match(PAGE_DRAFT_SYSTEM, /아직 사장님이 확인하지 않은 참고정보/);
+  for (const bad of [null, {}, Array(9).fill('특징'), ['가'.repeat(201)], ['<script>x</script>']]) {
+    const b = clone(input); b.store.researchedFacts = bad; const f2 = fake();
+    assert.equal((await call(b, { fetcher: f2 })).statusCode, 400); assert.equal(f2.calls.length, 0);
+  }
+  const noConsent = clone(input); noConsent.consent = false; const f3 = fake();
+  assert.equal((await call(noConsent, { fetcher: f3 })).body.code, 'CONSENT'); assert.equal(f3.calls.length, 0);
+});
+
+test('five plausible customer questions are automatically included in one FAQ list', async () => {
+  const body = { store: { name: '종로달빛', address: '서울 종로구 종로 12', verifiedFacts: [], researchedFacts: ['맥주와 과일 안주를 제공합니다'] }, answers: { offer: '맥주와 과일 안주를 제공합니다', difference: '', audience: '', visit: '', keywords: '' }, consent: true };
+  const answer = '종로달빛은 종로에 있으며 맥주와 과일 안주를 제공합니다.';
+  const questions = [
+    '여자 두 명이 종로에서 맥주 마실 곳 추천좀?',
+    '종로에 맥주랑 과일 안주 파는 곳 추천해줘?',
+    '친구 두 명이 종로에서 맥주 마실 술집 어디야?',
+    '여성 2명이 종로에서 과일 안주 먹을 곳은?',
+    '둘이서 종로에 맥주 파는 가게 찾아줘?',
+  ];
+  const rows = questions.map(question => situation(question, answer, ['address', 'research0']));
+  const raw = { headline: { text: '종로달빛', evidence: ['name'] }, intro: { text: answer, evidence: ['address', 'research0'] }, sections: [], faqs: [], keywords: [], situations: rows };
+  const f = fake(reply(raw)); const out = await call(body, { fetcher: f });
+  assert.equal(out.statusCode, 200); assert.equal(f.calls.length, 1);
+  assert.equal(out.body.draft.faqs.length, 5); assert.deepEqual(out.body.draft.situations, []);
+  assert.deepEqual(out.body.draft.faqs.map(row => row.question), questions);
+  assert.ok(out.body.draft.faqs.every(row => !Object.hasOwn(row, 'selected')));
+});
+
+test('hypothetical party in a question does not license unsupported answer claims or conditions', () => {
+  const body = clone(OK); body.store.researchedFacts = ['김밥과 떡볶이를 제공합니다'];
+  const input = validateDraftInput(body);
+  const neutral = situation('여자 두 명이 김밥 먹으러 갈 곳 추천좀?', '골목분식은 김밥과 떡볶이를 제공합니다.', ['research0']);
+  assert.deepEqual(normalizeDraft(withSituations([neutral]), input).situations, [neutral]);
+  const claims = [
+    { ...neutral, answer: '골목분식은 여성 두 명이 방문할 수 있습니다.' },
+    { ...neutral, question: '여자 두 명이 24시간 김밥 먹을 곳?', answer: '골목분식은 24시간 영업합니다.' },
+    { ...neutral, question: '20대 여성 둘이 김밥 먹을 곳?' },
+    { ...neutral, question: '여자 둘이 주차하고 김밥 먹을 곳?', answer: '골목분식은 주차 가능합니다.' },
+  ];
+  for (const row of claims) assert.deepEqual(normalizeDraft(withSituations([row]), input).situations, [], JSON.stringify(row));
+  const contradictory = clone(body); contradictory.answers.visit = '주차 불가'; contradictory.store.researchedFacts = ['주차 가능합니다'];
+  const bad = situation('주차 가능한 김밥 가게?', '골목분식은 주차 가능합니다.', ['research0']);
+  assert.deepEqual(normalizeDraft(withSituations([bad]), validateDraftInput(contradictory)).situations, []);
 });

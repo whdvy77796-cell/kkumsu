@@ -18,7 +18,7 @@ const get=(id=ID)=>({method:'GET',url:'/api/stores?id='+id});
 
 test('strict exact data, consent, lengths, empty pairs, HTML/link rejection',()=>{
  assert.deepEqual(normalizeData({...DATA,sections:[{heading:' ',body:' '}]}).sections,[]);
- for(const data of [null,{...DATA,extra:1},{...DATA,name:''},{...DATA,address:'abc'},{...DATA,headline:'x'.repeat(201)},{...DATA,intro:'<script>alert(1)</script>'},{...DATA,intro:'https://evil.test'},{...DATA,sections:[{heading:'one',body:''}]},{...DATA,faqs:Array(9).fill({question:'q',answer:'a'})}]) assert.throws(()=>validateRequest(create(ID,data)));
+ for(const data of [null,{...DATA,extra:1},{...DATA,name:''},{...DATA,address:'abc'},{...DATA,headline:'x'.repeat(201)},{...DATA,intro:'<script>alert(1)</script>'},{...DATA,intro:'https://evil.test'},{...DATA,sections:[{heading:'one',body:''}]},{...DATA,faqs:Array(13).fill({question:'q',answer:'a'})}]) assert.throws(()=>validateRequest(create(ID,data)));
  assert.throws(()=>validateRequest({...create(),consent:false}));
  assert.throws(()=>validateRequest({...create(),id:'../bad'}));
  assert.throws(()=>validateRequest({...create(),password:'short'}));
@@ -180,7 +180,7 @@ test('new situations create/read/auth/edit/delete keeps FAQs, sections and priva
  const pub=await invoke(h,undefined,get());assert.deepEqual(pub.json(),{id:ID,data});noPrivate(pub);
  const html=await invoke(h,undefined,pageOptions);assert.equal(html.statusCode,200);
  assert.ok(html.body.includes('<h2>이럴 때 찾는 가게</h2>'));assert.ok(html.body.includes('<dt><span>예상 질문</span> '+SITUATIONS[0].question+'</dt>'));
- assert.ok(html.body.includes('실제 검색 내역이나 검색 빈도를 뜻하지 않습니다.'));assert.ok(html.body.includes('<h2>자주 묻는 질문</h2>'));assert.ok(html.body.includes('안내 본문'));
+ assert.ok(html.body.includes('실제 검색 내역이나 검색 빈도를 뜻하지 않습니다.'));assert.ok(html.body.includes('<h2>고객 질문과 답변</h2>'));assert.ok(html.body.includes('안내 본문'));
  const edited={...data,situations:[{question:'가족과 함께 오고 싶다면?',answer:'테이블 좌석을 안내합니다.'}]};
  const update=await invoke(h,owner('update',{consent:true,data:edited}));assert.equal(update.statusCode,200);assert.deepEqual(update.json().data,edited);noPrivate(update);
  assert.deepEqual((await invoke(h,undefined,get())).json().data,edited);
@@ -271,4 +271,13 @@ test('missing and explicit-empty create identities remain distinct, with normali
    assert.equal((await invoke(h,create(ID,{...original,name:'  '+original.name+'  '}))).statusCode,200);
    assert.equal((await invoke(h,create(ID,other))).statusCode,409);assert.deepEqual((await invoke(h,undefined,get())).json().data,original);
  }
+});
+
+
+test('up to twelve customer questions are accepted and server-rendered without claiming search frequency',()=>{
+ const data={...DATA,faqs:Array.from({length:12},(_,i)=>({question:`질문 ${i+1}`,answer:`답변 ${i+1}`}))};
+ const normalized=normalizeData(data); assert.equal(normalized.faqs.length,12);
+ const html=renderStore(scope,{id:ID,data:normalized}); assert.match(html,/고객 질문과 답변/); assert.match(html,/실제 검색 기록이 아닌 예상 질문/);
+ assert.ok(html.includes('질문 12')); assert.ok(html.includes('답변 12'));
+ assert.throws(()=>normalizeData({...data,faqs:[...data.faqs,{question:'초과',answer:'초과'}]}));
 });

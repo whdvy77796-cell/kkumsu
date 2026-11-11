@@ -83,7 +83,7 @@ test('manage: auth, update needs confirmation, password only in requests', async
   assert.deepEqual(Object.keys(calls[1][1].data), KEYS);
 });
 
-const SIT = '이럴 때 찾는 가게 · 예상 질문';
+const SIT = '기존에 공개한 예상 질문';
 async function openManage(data, post2) {
   const calls = [];
   const updated = [];
@@ -97,15 +97,14 @@ const setField = (st, id, v) => { const el = find(st, (x) => x.attrs?.id === id)
 const save = async (st) => { find(st, (x) => x.attrs?.id === 'verified').checked = true; click(st, '저장하기'); await tick(); await tick(); };
 const text = (st) => JSON.stringify(st.shown, (k, v) => (k === 'handlers' || k === 'onclick' ? undefined : v));
 
-test('manage: legacy data without situations is treated as empty, section shows caveat', async () => {
+test('manage: regular pages use one customer question list and no separate scenario section', async () => {
   const { st, calls } = await openManage(legacy());
-  const legend = find(st, (x) => x.tag === 'legend' && labelOf(x).startsWith(SIT));
-  assert.ok(legend && labelOf(legend).includes('(0/8)'));
-  const t = text(st);
-  assert.ok(t.includes('실제 사용자 검색을 측정한 결과가 아니') && t.includes('직접 확인') && t.includes('보장하지 않'));
+  assert.equal(find(st, (x) => x.tag === 'legend' && labelOf(x).startsWith(SIT)), null);
+  assert.ok(find(st, (x) => x.tag === 'legend' && labelOf(x).includes('고객 질문과 답변 (1/12)')));
   assert.ok(!findAll(st, (x) => x.tag === 'button' && labelOf(x) === '이 예상 질문 삭제').length);
   await save(st);
   assert.deepEqual(calls[1].data.situations, []);
+  assert.deepEqual(calls[1].data.faqs, legacy().faqs);
   assert.deepEqual(Object.keys(calls[1].data), KEYS);
 });
 
@@ -137,15 +136,15 @@ test('manage: owner adds, changes, deletes situations; round trip; no secret lea
   assert.ok(calls.every((c) => c.action === 'auth' || c.action === 'update'));
 });
 
-test('manage: empty situation fields blocked, add disabled at 8', async () => {
-  const { st, calls } = await openManage(legacy());
+test('manage: existing separate situation fields remain editable with an eight-item limit', async () => {
+  const { st, calls } = await openManage(good());
   click(st, '예상 질문 추가');
-  setField(st, 'f-question-t0', '질문만');
+  setField(st, 'f-question-t1', '질문만');
   await save(st);
   assert.equal(calls.length, 1, 'no update with empty answer');
-  assert.ok(findAll(st, (x) => x.attrs?.role === 'status' && /예상 질문 1의 답변/.test(x.textContent || '')).length === 1);
-  setField(st, 'f-answer-t0', '답');
-  setField(st, 'f-question-t0', ' ');
+  assert.ok(findAll(st, (x) => x.attrs?.role === 'status' && /예상 질문 2의 답변/.test(x.textContent || '')).length === 1);
+  setField(st, 'f-answer-t1', '답');
+  setField(st, 'f-question-t1', ' ');
   await save(st);
   assert.equal(calls.length, 1);
   for (let i = 0; i < 10; i++) { const b = find(st, (x) => x.tag === 'button' && labelOf(x) === '예상 질문 추가'); if (!b.disabled) click(st, '예상 질문 추가'); }
@@ -211,4 +210,19 @@ test('published: renders link, share text, qr canvas without throwing', () => {
   const ta = find(st, (x) => x.tag === 'textarea');
   assert.ok(ta.value.includes(`https://example.test/stores/${ID}`));
   assert.ok(find(st, (x) => x.tag === 'canvas'));
+});
+
+
+test('manage: a dozen automatic customer questions are editable and save as FAQ', async () => {
+  const data = { ...legacy(), faqs: Array.from({ length: 9 }, (_, i) => ({ question: `질문 ${i+1}`, answer: `답변 ${i+1}` })) };
+  const { st, calls } = await openManage(data);
+  assert.ok(find(st, (x) => x.tag === 'legend' && labelOf(x).includes('(9/12)')));
+  setField(st, 'f-answer-q0', '수정된 답변');
+  await save(st);
+  assert.equal(calls[1].data.faqs.length, 9);
+  assert.equal(calls[1].data.faqs[0].answer, '수정된 답변');
+  for (let i = 0; i < 5; i++) { const b = find(st, x => x.tag === 'button' && labelOf(x) === '질문 추가'); if (!b.disabled) click(st, '질문 추가'); }
+  assert.equal(findAll(st, x => x.tag === 'button' && labelOf(x) === '이 질문 삭제').length, 12);
+  assert.equal(find(st, x => x.tag === 'button' && labelOf(x) === '질문 추가').disabled, true);
+  assert.match(cleanStoreData({ ...data, faqs: Array(13).fill({ question:'q', answer:'a' }) }).error, /12/);
 });
