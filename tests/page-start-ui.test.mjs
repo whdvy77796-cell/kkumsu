@@ -294,7 +294,7 @@ test('five questions, candidate prefill, independent consent and validation bloc
   assert.equal(sessionStorage.getItem('maechul.v3'), '{"answers":{"old":"keep"}}');
 });
 
-test('only explicitly checked facts are sent, maximum eight, no AI price or hours prefill', async () => {
+test('checked facts are distinguished from researched facts, maximum eight, no AI price or hours prefill', async () => {
   const c = { ...candidate, hours: '24시간', priceRange: '무료', webFeatures: Array.from({ length: 10 }, (_, i) => ({ text: '특징' + i, sourceUrl: 'https://example.com/a' })) };
   const ctx = await ready(undefined, c);
   for (let i = 0; i < 8; i++) assert.ok(!getNode(ctx, 'page-fact-' + i).attrs.checked);

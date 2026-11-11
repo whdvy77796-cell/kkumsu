@@ -207,10 +207,10 @@ test('rich owner-confirmed bar situations keep literal gender, party size and so
   const raw = withSituations([entry]); const f = fake(reply(raw));
   const out = await call({ ...input, consent: true }, { fetcher: f });
   assert.equal(out.statusCode, 200); assert.equal(f.calls.length, 1); assert.equal('tools' in f.calls[0].body, false);
-  assert.deepEqual(out.body.draft.situations, []); assert.equal(out.body.draft.situationsStatus, 'ready');
+  assert.deepEqual(out.body.draft.situations, []); assert.equal(out.body.draft.situationsStatus, 'partial');
   assert.deepEqual(out.body.draft.faqs.at(-1), entry);
   assert.equal(out.body.draft.situationsOmittedCount, 0); assert.equal('selected' in out.body.draft.faqs.at(-1), false);
-  assert.match(PAGE_DRAFT_SYSTEM, /5개 목표/); assert.match(PAGE_DRAFT_SYSTEM, /더 적게 또는 \[\]/);
+  assert.match(PAGE_DRAFT_SYSTEM, /다섯 가지/); assert.match(PAGE_DRAFT_SYSTEM, /더 적게 또는 \[\]/);
 });
 
 test('questions cannot smuggle unsupported hunting, affirmative group size, hours or parking', () => {
@@ -345,7 +345,7 @@ test('five plausible customer questions are automatically included in one FAQ li
   const raw = { headline: { text: '종로달빛', evidence: ['name'] }, intro: { text: answer, evidence: ['address', 'research0'] }, sections: [], faqs: [], keywords: [], situations: rows };
   const f = fake(reply(raw)); const out = await call(body, { fetcher: f });
   assert.equal(out.statusCode, 200); assert.equal(f.calls.length, 1);
-  assert.equal(out.body.draft.faqs.length, 5); assert.deepEqual(out.body.draft.situations, []);
+  assert.equal(out.body.draft.faqs.length, 5); assert.equal(out.body.draft.situationsStatus, 'ready'); assert.deepEqual(out.body.draft.situations, []);
   assert.deepEqual(out.body.draft.faqs.map(row => row.question), questions);
   assert.ok(out.body.draft.faqs.every(row => !Object.hasOwn(row, 'selected')));
 });
