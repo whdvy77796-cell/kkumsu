@@ -10,7 +10,7 @@ function find(n, pred) { if (!n || typeof n !== 'object') return null; if (pred(
 test('example is an accessible portrait image with explicit fictional-outcome disclosure', () => {
   const node = makeHomeExample(h); const img = find(node, n => n.tag === 'img');
   assert.equal(node.tag, 'figure'); assert.equal(node.attrs.class, 'home-sample');
-  assert.equal(img.attrs.src, '/yeogibwa-ai-example.png'); assert.equal(img.attrs.width, '1000'); assert.equal(img.attrs.height, '1225');
+  assert.equal(img.attrs.src, '/yeogibwa-ai-example-v2.png'); assert.equal(img.attrs.width, '1000'); assert.equal(img.attrs.height, '1225');
   assert.match(img.attrs.alt, /가상 예시/); assert.match(img.attrs.alt, /실제 AI 답변이나 인용 사례가 아닙니다/);
   assert.match(allText(node), /가상 대화와 가상 출처 연결/); assert.match(allText(node), /보장하지 않아요/);
 });
@@ -31,7 +31,7 @@ test('home keeps its CTA and input while putting the example in a separate grid 
 });
 
 test('portrait asset exists and has dimensions matching the reserved image space', async () => {
-  const image = await readFile(new URL('../public/yeogibwa-ai-example.png', import.meta.url));
+  const image = await readFile(new URL('../public/yeogibwa-ai-example-v2.png', import.meta.url));
   assert.equal(image.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
   assert.equal(image.readUInt32BE(16), 1000); assert.equal(image.readUInt32BE(20), 1225);
 });
