@@ -515,3 +515,53 @@ test('Google callback cleanup preserves pending cookie and state on deliberate r
     assert.equal(r.headers['set-cookie'],undefined); assert.equal(x.calls.length,0); assert.deepEqual([...x.store.kv],before); assert.ok(!r.body.includes('private-rate-message'));
   }
 });
+
+
+test('Kakao raw 64-bit IDs retain exact account derivation including the existing normal account', async () => {
+  const accounts = new Set();
+  for (const subject of ['12345', '9007199254740992', '9007199254740993', '9223372036854775806', '9223372036854775807']) {
+    const seen = [];
+    const x = setup({ fetcher: async (url, options) => {
+      seen.push({ url, options });
+      return url === 'https://kauth.kakao.com/oauth/token'
+        ? Response.json({ access_token: 'synthetic-access-value', token_type: 'bearer' })
+        : new Response('{"nested":{"id":7},"id":' + subject + ',"properties":{"nickname":"discarded"}}');
+    } });
+    const l = await login(x), identity = await session(x, l.cookie);
+    const scope = requestScope(request('/api/owner-auth?op=status'), ENV);
+    const expected = 'oa_' + createHmac('sha256', ENV.YB_IDENTITY_KEY).update(JSON.stringify(['account', ENV.YB_AUTH_ORIGIN, scope.namespace, 'kakao', ENV.YB_KAKAO_CLIENT_ID, subject])).digest('base64url');
+    assert.equal(identity.accountId, expected);
+    accounts.add(identity.accountId);
+    assert.equal(seen[1].url, 'https://kapi.kakao.com/v2/user/me');
+    assert.equal(seen[1].options.redirect, 'error');
+    assert.equal(seen[1].options.body, 'property_keys=%5B%5D');
+    const storage = JSON.stringify([...x.store.kv.values()]);
+    assert.ok(!storage.includes(subject)); assert.ok(!storage.includes('synthetic-access-value')); assert.ok(!storage.includes('discarded'));
+  }
+  assert.equal(accounts.size, 5);
+});
+test('Kakao malformed raw identity, decoys and transport failures never establish a session or leak values', async () => {
+  const rawCases = [
+    '{"id":9223372036854775808}', '{"id":1,"id":2}', '{"id":1,"\\u0069d":2}', '{"nested":{"id":1}}',
+    '{"text":"\\\"id\\\":123"}', '{"user_id":1}', '{"id":1.0}', '{"id":1e0}', '{"id":-1}', '{"id":"1"}',
+    '{"id":1junk}', '{"id":1}{}', '[]', 'null', '{"id":1,"code":0}', '{"id":1,"error":"sensitive-provider-message"}',
+  ];
+  const responses = rawCases.map(raw => () => new Response(raw));
+  responses.push(
+    () => new Response('{"id":1}', { status: 400 }),
+    () => { const r = new Response('{"id":1}'); Object.defineProperty(r, 'redirected', { value: true }); return r; },
+    () => { const r = new Response('{"id":1}'); Object.defineProperty(r, 'url', { value: 'https://evil.invalid/v2/user/me' }); return r; },
+    () => new Response('{"id":1}', { headers: { 'content-length': '65537' } }),
+    () => new Response('{"id":1,"padding":"' + 'x'.repeat(65536) + '"}'),
+    () => ({ ok: true, text: async () => 'x'.repeat(65537) }),
+  );
+  for (const response of responses) {
+    const x = setup({ fetcher: async url => url === 'https://kauth.kakao.com/oauth/token' ? Response.json({ access_token: 'synthetic-access-value', token_type: 'bearer' }) : response() });
+    const s = await start(x), r = await invoke(x.h, callbackUrl(s), { cookie: s.cookie });
+    assert.equal(r.statusCode, 502);
+    assert.ok(!r.body.includes('sensitive-provider-message'));
+    assert.ok(!JSON.stringify(r.headers).includes(SESSION_COOKIE + '='));
+    assert.ok(![...x.store.kv.values()].some(v => String(v).includes('"accountId"')));
+    assert.equal((await invoke(x.h, callbackUrl(s), { cookie: s.cookie })).statusCode, 400);
+  }
+});
