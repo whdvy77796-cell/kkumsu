@@ -334,6 +334,55 @@ test('duplicate submit and pending reentry/reload never repeat automatically', a
   finish(draftResult()); await pending;
 });
 
+test('draft progress cycles seven truthful messages and cleans up on navigation and completion', async () => {
+  const originalSet = globalThis.setInterval, originalClear = globalThis.clearInterval;
+  const timers = new Map(); let nextId = 0, finish;
+  globalThis.setInterval = (fn, ms) => { const id = ++nextId; timers.set(id, { fn, ms }); return id; };
+  globalThis.clearInterval = id => timers.delete(id);
+  try {
+    const ctx = await ready(() => new Promise(resolve => { finish = resolve; }));
+    fillAnswers(ctx); check(ctx, 'page-draft-consent');
+    const originalForm = findRendered(ctx.state, n => n.tag === 'form');
+    const pending = submit(ctx);
+    assert.equal(ctx.calls.length, 1); assert.equal(timers.size, 1);
+    const progress = findRendered(ctx.state, n => n.attrs?.class === 'card loading draft-progress');
+    assert.ok(progress); assert.ok(find(progress, n => n.attrs?.role === 'status' && n.attrs?.['aria-live'] === 'polite'));
+    assert.match(text(progress), /테스트가게\s+소개 페이지를 만들고 있어요/);
+    assert.match(text(progress), /확인하고 직접 수정/);
+    assert.match(text(progress), /실제 처리 순서와 다를 수 있어요/);
+    const tip = getNode(ctx, 'draft-progress-message'); assert.equal(tip.attrs['aria-live'], 'off');
+    const timerId = [...timers.keys()][0]; assert.equal(timers.get(timerId).ms, 5000);
+    const seen = [text(tip)];
+    for (let i = 0; i < 6; i++) { timers.get(timerId).fn(); seen.push(text(tip)); }
+    assert.equal(new Set(seen).size, 7); assert.ok(seen.some(s => /예상 질문/.test(s)));
+    assert.ok(seen.some(s => /키워드/.test(s))); timers.get(timerId).fn(); assert.equal(text(tip), seen[0]);
+    await originalForm.attrs.onsubmit({ preventDefault() {} }); assert.equal(ctx.calls.length, 1);
+    location.hash = '#/'; timers.get(timerId).fn(); assert.equal(timers.size, 0);
+    location.hash = '#/page-questions'; ctx.flow.renderQuestions(); assert.equal(timers.size, 1);
+    finish(draftResult()); await pending;
+    assert.equal(timers.size, 0); assert.equal(location.hash, '#/page-preview');
+    assert.equal(findRendered(ctx.state, n => n.attrs?.id === 'draft-progress-message'), null);
+  } finally { globalThis.setInterval = originalSet; globalThis.clearInterval = originalClear; }
+});
+
+test('draft progress stops after a failed request and leaves answers available for a consented retry', async () => {
+  const originalSet = globalThis.setInterval, originalClear = globalThis.clearInterval;
+  const timers = new Map(); let nextId = 0, fail;
+  globalThis.setInterval = (fn, ms) => { const id = ++nextId; timers.set(id, { fn, ms }); return id; };
+  globalThis.clearInterval = id => timers.delete(id);
+  try {
+    const ctx = await ready(() => new Promise((_, reject) => { fail = reject; }));
+    fillAnswers(ctx); check(ctx, 'page-draft-consent'); const pending = submit(ctx);
+    assert.equal(timers.size, 1);
+    const error = new Error('응답 지연'); error.code = 'TIMEOUT'; fail(error); await pending;
+    assert.equal(timers.size, 0); assert.equal(ctx.calls.length, 1);
+    assert.equal(findRendered(ctx.state, n => n.attrs?.id === 'draft-progress-message'), null);
+    assert.match(allText(ctx.state), /답변은 보존/);
+    assert.equal(getNode(ctx, 'page-answer-offer').attrs.value, '따뜻한 차');
+    assert.ok(!getNode(ctx, 'page-draft-consent').attrs.checked);
+  } finally { globalThis.setInterval = originalSet; globalThis.clearInterval = originalClear; }
+});
+
 test('API errors preserve all answers and selected facts; retry requires a user action and consent', async () => {
   let attempt = 0;
   const ctx = await ready(async () => { if (++attempt === 1) { const e = new Error('응답 지연'); e.code = 'TIMEOUT'; throw e; } return draftResult(); });
