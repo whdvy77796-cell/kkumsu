@@ -35,13 +35,14 @@ local ok,err=pcall(function()
 end)
 local removed=redis.call('DEL',unpack(keys));local left=redis.call('EXISTS',unpack(keys))
 return cjson.encode({status=ok and 'ok' or 'failed',error=ok and cjson.null or tostring(err),removed=removed,left=left})`;
-for (const spec of [{name:'165k',target:165474,fields:10},{name:'near-1m-simple',target:1048000,fields:10},{name:'near-1m-500-fields',target:1048000,fields:500},{name:'near-1m-many-fields',target:1048000,fields:20000,expectComplex:true},{name:'near-1m-many-escapes',target:1048000,fields:10,expectComplex:true,escapeBlob:true}]){
+for (const spec of [{name:'165k',target:165474,fields:10},{name:'near-1m-simple',target:1048000,fields:10},{name:'near-1m-500-fields',target:1048000,fields:500},{name:'near-1m-many-fields',target:1048000,fields:20000,expectComplex:true},{name:'near-1m-many-escapes',target:1048000,fields:10,expectComplex:true,escapeBlob:true},{name:'near-1m-many-objects',target:1048000,fields:10,expectComplex:true,objects:200000}]){
  const opaque=()=>randomBytes(32).toString('base64url'),id='s'.repeat(22),inc=newIncarnation(),binding=opaque(),workerBinding=opaque(),operationId=newOperationId();
  const tuple={accountId:'oa_'+opaque(),provider:'naver',origin:'https://synthetic.invalid',namespace:'yb:qa:isolated:'+randomBytes(12).toString('hex')};
  const k=accountKeys(tuple),sess=k.session(opaque()),rec=tuple.namespace+':record:'+id;
  const p={...tuple,incarnation:inc,operationId,fence:2,binding,workerBinding,expectedRevision:'a'.repeat(32),revision:'b'.repeat(32),stateKey:k.state,sessionKey:sess,workerKey:k.worker,recordKey:rec,base:k.base,expectComplex:spec.expectComplex===true};
  const obj={id,revision:p.expectedRevision,ownerAccountId:tuple.accountId,ownerIncarnation:inc,ownerNamespace:tuple.namespace,ownerOrigin:tuple.origin,ownerProvider:tuple.provider,password:{salt:'synthetic',hash:'synthetic'},data:{name:'가상가게',sections:[],faqs:{}},hidden:true,expiresAt:null};
  for(let i=0;i<spec.fields;i++)obj['unknown_'+String(i).padStart(5,'0')]='v';
+ if(spec.objects)obj.swarm=Array.from({length:spec.objects},()=>({}));
  obj.blob='';const delta=spec.target-Buffer.byteLength(JSON.stringify(obj));if(delta<0)throw Error('fixture too big');obj.blob=spec.escapeBlob?'\\'.repeat(Math.floor(delta/2))+'x'.repeat(delta%2):'x'.repeat(delta);
  const raw=JSON.stringify(obj),replacement=detachReplacement(raw,p);if(Buffer.byteLength(raw)!==spec.target||Buffer.byteLength(raw)>1048576)throw Error('size mismatch');
  const body=JSON.stringify(['EVAL',lua,'0',JSON.stringify(p),raw,replacement]);

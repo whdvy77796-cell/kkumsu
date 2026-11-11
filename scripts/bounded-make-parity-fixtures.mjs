@@ -33,6 +33,17 @@ for(const [label,fragment] of [['nested-values','{"a":1,"b":true,"c":null,"s":"N
 for(const num of ['-0','0','1.0','-1e-4','1e400','0.00000001','9E+30','1e+02','1E-2']){
  const raw=JSON.stringify(values).replace('"expiresAt":null','"expiresAt":null,"validNumber":'+num);const limited=num==='1e400';cases.push({label:'valid-'+num,raw,replacement:limited?raw:detachReplacement(raw,p),expected:limited?'record-unsafe':'detached'});
 }
+// Conservative structural prescan: count punctuation even inside valid strings.
+const rawNote=n=>JSON.stringify({...values,note:':'.repeat(n)});
+const structural=s=>(s.match(/[{}\[\]":,\\]/g)||[]).length;
+const count0=structural(rawNote(0));if(count0>=4096)throw Error('boundary fixture');
+for(const [label,n,expected] of [['prescan-4096',4096-count0,'detached'],['prescan-4097',4097-count0,'record-too-complex']]){
+ const raw=rawNote(n);cases.push({label,raw,replacement:detachReplacement(raw,p),expected});
+}
+for(const depth of [128,129,1000,1500]){
+ const raw=JSON.stringify(values).replace('"expiresAt":null','"expiresAt":null,"deep":'+'['.repeat(depth)+'0'+']'.repeat(depth));
+ cases.push({label:'deep-'+depth,raw,replacement:depth===128?detachReplacement(raw,p):raw,expected:depth===128?'detached':'record-unsafe'});
+}
 const lua=`
 local function begin(KEYS,ARGV) ${BEGIN_LUA} end
 local function detach(KEYS,ARGV) ${DETACH_LUA} end
