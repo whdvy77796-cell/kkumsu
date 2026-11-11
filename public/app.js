@@ -10,6 +10,7 @@ import { redactReport, packageSize, FREE_SOLUTIONS } from './paywall.js';
 import { BUSINESS, businessReady } from './business.js';
 import { makePageStart } from './page-start.js';
 import { makeStoreTools } from './store-tools.js';
+import { makeDiagnosisStart } from './diagnosis-start.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -134,6 +135,7 @@ function route() {
   else if (hash === '#/page-edit') pageStartFlow.renderEdit();
   else if (hash === '#/page-publish') pageStartFlow.renderPublish();
   else if (hash === '#/page-published') pageStartFlow.renderPublished();
+  else if (hash === '#/diagnosis-start') diagnosisStartFlow.render();
   else if (hash === '#/find') renderFind();
   else if (hash === '#/survey') renderSurvey();
   else if (hash === '#/done') renderDone();
@@ -167,6 +169,18 @@ function showError(e, retry) {
 
 const storeTools = makeStoreTools({ h, show, setNavbar, btn, post, onDeleted: id => pageStartFlow.clearPublication(id), onUpdated: (id, data) => pageStartFlow.recordPublicationUpdate(id, data) });
 const pageStartFlow = makePageStart({ h, show, setNavbar, btn, post, storeName, onPublished: (id, data) => storeTools.renderPublished(id, data) });
+let diagnosisFindAuthorized = false;
+const diagnosisStartFlow = makeDiagnosisStart({
+  h, show, setNavbar, btn, storeName,
+  getState: () => S,
+  confirmOverwrite: () => window.confirm('새 진단을 시작하면 이 브라우저의 기존 진단 답변과 결과가 지워집니다. 계속할까요?'),
+  begin: (name, address) => {
+    S = { name, address, answers: {}, findProtected: true };
+    save();
+    diagnosisFindAuthorized = true;
+    location.hash = '#/find';
+  },
+});
 
 // ───────── 1. 첫 화면: 상호명·주소
 // 첫 화면의 '무료 진단 시작': 가게 입력 칸으로 이동해 바로 입력하게 한다
@@ -257,6 +271,7 @@ function renderHome() {
       h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
       h('p', { class: 'small muted page-stage-note' }, '베타 기간에는 공개와 QR·소개글을 무료로 이용할 수 있어요. 검색 노출과 AI 추천은 보장하지 않아요.')),
     pageResume, oldResume,
+    h('div', { class: 'card note small' }, h('b', null, '가게 운영을 진단하고 싶으신가요?'), ' 기존 가게 진단도 별도로 이용할 수 있어요. ', h('a', { href: '#/diagnosis-start' }, '가게 진단 시작하기')),
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
       h('h2', null, '가게 이름과 주소를 알려주세요'),
@@ -297,6 +312,23 @@ async function renderFind() {
   if (!S.name || !S.address) { location.replace('#/'); return; }
   storeName.textContent = S.name;
   if (S.search?.result) { showResult(S.search.result); return; }
+  if (S.findProtected && !diagnosisFindAuthorized) {
+    const consent = h('input', { type: 'checkbox', id: 'diagnosisRetryConsent' });
+    const hint = h('div', { class: 'hint', role: 'alert' }, '');
+    const retry = () => {
+      if (!consent.checked) { hint.textContent = '재검색을 위한 외부 전송에 동의해 주세요.'; return; }
+      diagnosisFindAuthorized = true;
+      route();
+    };
+    show(h('div', { class: 'card' },
+      h('h2', null, '가게 검색을 다시 확인해 주세요'),
+      h('p', null, '이전 검색이 이미 처리됐을 수 있어 자동으로 다시 보내지 않았어요. 다시 검색하면 크레딧이 중복 사용될 수 있어요.'),
+      h('label', { class: 'page-consent' }, consent, h('span', null, '가게 이름과 주소를 OpenRouter, 연결된 AI와 웹 검색 제공자에게 다시 전송하는 데 동의합니다.')),
+      hint, h('button', { class: 'btn primary', type: 'button', onclick: retry }, '동의하고 다시 검색')));
+    setNavbar(btn('처음으로', () => { location.hash = '#/'; }));
+    return;
+  }
+  diagnosisFindAuthorized = false;
   const seq = navSeq;
   const elapsed = h('span', { class: 'elapsed' }, '0초');
   const tip = h('p', { class: 'small muted' }, FIND_TIPS[0]);
