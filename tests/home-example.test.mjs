@@ -36,9 +36,10 @@ test('home hides the three pictured cards but keeps interrupted-search protectio
   assert.doesNotMatch(home, /작성하던 가게 소개가 있어요|이전에 작성한 진단이 있어요|가게 운영을 진단하고 싶으신가요/);
   assert.match(home, /이전 가게 조회가 이미 처리됐을 수 있어요/);
   const title = home.indexOf("h('h2', null, '가게 이름과 주소를 알려주세요')");
-  const description = home.indexOf('몇 가지 질문에 답하면, 우리 가게의 특징을 고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.');
+  const description = home.indexOf('몇 가지 질문에 답하면, 우리 가게의 특징을');
+  const descriptionEnd = home.indexOf(' 고객과 AI가 이해하기 쉬운 소개 페이지로 만들어드립니다.');
   const input = home.indexOf("h('label', { class: 'field' }");
-  assert.ok(title >= 0 && title < description && description < input);
+  assert.ok(title >= 0 && title < description && description < descriptionEnd && descriptionEnd < input);
 });
 
 test('portrait asset exists and has dimensions matching the reserved image space', async () => {
