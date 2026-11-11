@@ -12,6 +12,7 @@ import { makePageStart } from './page-start.js';
 import { makeStoreTools } from './store-tools.js';
 import { makeDiagnosisStart } from './diagnosis-start.js';
 import { makeHomeExample } from './home-example.js';
+import { makeHomeExplainer } from './home-explainer.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -266,6 +267,7 @@ function renderHome() {
       h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
       h('p', { class: 'small muted page-stage-note' }, '베타 기간에는 공개와 QR·소개글을 무료로 이용할 수 있어요. 검색 노출과 AI 추천은 보장하지 않아요.')),
     makeHomeExample(h),
+    makeHomeExplainer(h, focusStart),
     pageSearchWarning, pendingDiagnosis,
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
@@ -279,14 +281,6 @@ function renderHome() {
       h('p', { class: 'tiny muted page-consent-note' }, '조회 결과는 서버에 최대 3일, 이 브라우저 탭의 임시 저장소에 보관될 수 있어요. 사진이나 인터뷰 답변은 보내지 않아요.'),
       hint,
       h('button', { class: 'btn primary block go page-next-button', type: 'submit' }, '다음')),
-    h('div', { class: 'card steps-card' },
-      h('h2', null, '이렇게 진행돼요'),
-      h('ol', { class: 'steps-list' },
-        h('li', null, h('b', null, '가게 정보 입력 '), h('span', { class: 'muted small' }, '상호명과 주소를 알려주세요.')),
-        h('li', null, h('b', null, '가게 정보 확인 '), h('span', { class: 'muted small' }, 'AI가 찾은 공개 정보와 특징을 확인해요.')),
-        h('li', null, h('b', null, '가게에 관한 질문 5개 '), h('span', { class: 'muted small' }, '대표 메뉴와 우리 가게의 특징을 알려주세요.')),
-        h('li', null, h('b', null, '완성본 확인·수정 '), h('span', { class: 'muted small' }, '비공개 초안을 확인하고 직접 고쳐요.')),
-        h('li', null, h('b', null, '무료 공개·QR·소개글 활용 '), h('span', { class: 'muted small' }, '베타 기간 0원')))),
     h('div', { class: 'card note small privacy-card' },
       h('b', null, '입력한 정보는 이렇게 쓰여요'),
       h('p', null, '동의하신 상호명과 주소로 공개 정보를 찾아요. 질문 답변과 확인한 정보를 AI에 보내 초안을 만들 때는 별도로 동의받아요. 초안은 비공개이며 AI가 정리한 내용은 사장님이 직접 확인해 주세요.'),
