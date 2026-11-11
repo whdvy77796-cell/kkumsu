@@ -26,6 +26,12 @@
     },
     "api/stores.js": {
       "maxDuration": 30
+    },
+    "api/owner-auth.js": {
+      "maxDuration": 30
+    },
+    "api/owner-stores.js": {
+      "maxDuration": 30
     }
   },
   "headers": [
