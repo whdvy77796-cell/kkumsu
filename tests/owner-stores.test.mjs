@@ -13,8 +13,9 @@ import { SESSION_BINDING, SESSION_TTL } from '../lib/owner-auth.mjs';
 function fixtureSession(store,accountId,namespace,now=Date.now()) {
  const key='yb:auth:v1:'+createHash('sha256').update(namespace).digest('hex')+':session:'+createHash('sha256').update(accountId).digest('hex');
  let record;try{record=JSON.parse(store.kv.get(key));}catch{}
- if(!store.kv.has(namespace+':account-generation'))store.kv.set(namespace+':account-generation','0');
- if(!record){const issuedAt=Math.min(now,Date.now())-1000;record={generation:0,accountId,provider:'kakao',origin:'https://www.kkumsu.com',namespace,binding:createHash('sha256').update('binding:'+accountId).digest('base64url'),issuedAt,expiresAt:issuedAt+SESSION_TTL*1000};store.kv.set(key,JSON.stringify(record));store.publicExpiry ||= new Map();store.publicExpiry.set(key,record.expiresAt);}
+ const incarnation=createHash('sha256').update('scope-incarnation:'+namespace).digest('hex');
+ if(!store.kv.has(namespace+':account-generation'))store.kv.set(namespace+':account-generation',JSON.stringify({incarnation,generation:0}));
+ if(!record){const issuedAt=Math.min(now,Date.now())-1000;record={incarnation,generation:0,accountId,provider:'kakao',origin:'https://www.kkumsu.com',namespace,binding:createHash('sha256').update('binding:'+accountId).digest('base64url'),issuedAt,expiresAt:issuedAt+SESSION_TTL*1000};store.kv.set(key,JSON.stringify(record));store.publicExpiry ||= new Map();store.publicExpiry.set(key,record.expiresAt);}
  return {key,...record};
 }
 function fixtureTx(store,op,keys,p) {

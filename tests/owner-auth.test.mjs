@@ -388,12 +388,34 @@ test('revision-safe detach preserves exact unrelated bytes, escaped keys and abs
 });
 
 // Executed expected-failure regressions: these are known blockers, not fixes.
-test('BLOCKER: selective generation and barrier loss must not revive old credentials',{todo:'Needs scope/account incarnation and recovery authority; simple counter is insufficient'},async()=>{
- const x=setup(),a=await login(x),old=await start(x),who=await session(x,a.cookie),scope=requestScope(request('/'),ENV),k=lifecycleKeys(scope,who.accountId),args={store:x.store,scope,accountId:who.accountId,operationId:'L'.repeat(22)};
- await beginAccountWithdrawal(args);x.store.kv.delete(k.generation);x.store.kv.delete(k.barrier);x.store.publicExpiry.delete(k.barrier);await start(x);
- const oldSessionAccepted=await session(x,a.cookie).then(()=>true,()=>false),oldCallback=await invoke(x.h,callbackUrl(old),{cookie:old.cookie});assert.deepEqual({oldSessionAccepted,callbackStatus:oldCallback.statusCode},{oldSessionAccepted:false,callbackStatus:401});
-});
 test('BLOCKER: expired operation receipt must not let an ancient begin revoke fresh registration',{todo:'Needs expiring authenticated begin grant bound to account incarnation'},async()=>{
  const x=setup(),a=await login(x),who=await session(x,a.cookie),scope=requestScope(request('/'),ENV),args={store:x.store,scope,accountId:who.accountId,operationId:'T'.repeat(22)},b=await beginAccountWithdrawal(args);await cleanupAccountWithdrawal({...args,cutoff:b.cutoff});const k=lifecycleKeys(scope,who.accountId);x.store.publicExpiry.set(k.barrier,Date.now()-1);
  const fresh=await login(x),replayed=await beginAccountWithdrawal(args),freshStillValid=await session(x,fresh.cookie).then(()=>true,()=>false);assert.deepEqual({status:replayed.status,freshStillValid},{status:'conflict',freshStillValid:true});
+});
+
+
+for(const scenario of ['marker-only','retained-cleanup-barrier','marker-and-barrier'])test('scope incarnation fences old state/session after '+scenario+' loss',async()=>{
+ const x=setup(),a=await login(x),old=await start(x),who=await session(x,a.cookie),scope=requestScope(request('/'),ENV),k=lifecycleKeys(scope,who.accountId),original=JSON.parse(x.store.kv.get(k.generation)),args={store:x.store,scope,accountId:who.accountId,operationId:'L'.repeat(22)};let begun;
+ if(scenario!=='marker-only')begun=await beginAccountWithdrawal(args);const barrierBefore=x.store.kv.get(k.barrier);
+ x.store.kv.delete(k.generation);if(scenario==='marker-and-barrier'){x.store.kv.delete(k.barrier);x.store.publicExpiry.delete(k.barrier);}
+ await assert.rejects(session(x,a.cookie),{status:401});const fresh=await start(x),current=JSON.parse(x.store.kv.get(k.generation));assert.match(current.incarnation,/^[a-f0-9]{64}$/);assert.notEqual(current.incarnation,original.incarnation);assert.equal(current.generation,0);
+ await assert.rejects(session(x,a.cookie),{status:401});assert.equal((await invoke(x.h,callbackUrl(old),{cookie:old.cookie})).statusCode,401);
+ const completed=await invoke(x.h,callbackUrl(fresh),{cookie:fresh.cookie});if(scenario==='retained-cleanup-barrier'){assert.equal(completed.statusCode,401);assert.equal((await cleanupAccountWithdrawal({...args,cutoff:begun.cutoff})).status,'blocked');assert.equal(x.store.kv.get(k.barrier),barrierBefore);}else{assert.equal(completed.statusCode,303);assert.equal((await session(x,jar(completed))).accountId,who.accountId);}
+});
+
+test('scope marker migration preserves legacy numeric generation and public bytes, but rejects unfenced credentials',async()=>{
+ const x=setup(),oldLogin=await login(x),oldState=await start(x),scope=requestScope(request('/'),ENV),k=lifecycleKeys(scope),publicKey=scope.namespace+':record:'+'m'.repeat(22),publicRaw='{"id":"mmmmmmmmmmmmmmmmmmmmmm","data":{"unknown":[[],{}]},"password":{"hash":"synthetic"}}';x.store.kv.set(publicKey,publicRaw);const expiry=Date.now()+600000;x.store.publicExpiry.set(publicKey,expiry);
+ for(const [key,raw]of x.store.kv){if(typeof raw!=='string')continue;let value;try{value=JSON.parse(raw);}catch{continue;}if(value&&(value.stage||value.binding)){delete value.incarnation;x.store.kv.set(key,JSON.stringify(value));}}
+ x.store.kv.set(k.generation,'7');const fresh=await start(x),marker=JSON.parse(x.store.kv.get(k.generation));assert.equal(marker.generation,7);assert.match(marker.incarnation,/^[a-f0-9]{64}$/);await assert.rejects(session(x,oldLogin.cookie),{status:401});assert.equal((await invoke(x.h,callbackUrl(oldState),{cookie:oldState.cookie})).statusCode,401);assert.equal((await invoke(x.h,callbackUrl(fresh),{cookie:fresh.cookie})).statusCode,303);assert.equal(x.store.kv.get(publicKey),publicRaw);assert.equal(x.store.publicExpiry.get(publicKey),expiry);
+});
+
+test('concurrent prepare captures one stable scope incarnation; malformed markers are not reset',async()=>{
+ const x=setup(),scope=requestScope(request('/'),ENV),k=lifecycleKeys(scope);await Promise.all([start(x),start(x)]);const marker=JSON.parse(x.store.kv.get(k.generation));const states=[...x.store.kv.values()].filter(v=>typeof v==='string').map(v=>{try{return JSON.parse(v);}catch{return null;}}).filter(v=>v?.stage==='ready');assert.equal(states.length,2);assert.ok(states.every(v=>v.incarnation===marker.incarnation&&v.generation===marker.generation));
+ for(const bad of ['{}','null','"not-a-marker"',JSON.stringify({incarnation:'a'.repeat(64),generation:-1})]){const y=setup();y.store.kv.set(k.generation,bad);const result=await invoke(y.h,'/api/owner-auth?op=start&provider=kakao');assert.equal(result.statusCode,503);assert.equal(y.store.kv.get(k.generation),bad);}
+});
+
+// Deliberately distinct from scope reset: scope incarnation alone cannot
+// recover a missing account-specific cutoff when the scope marker survives.
+test('BLOCKER: account barrier loss alone must not revive revoked credentials',{todo:'Requires durable account incarnation/cutoff; scope incarnation is unchanged'},async()=>{
+ const x=setup(),a=await login(x),old=await start(x),who=await session(x,a.cookie),scope=requestScope(request('/'),ENV),k=lifecycleKeys(scope,who.accountId);await beginAccountWithdrawal({store:x.store,scope,accountId:who.accountId,operationId:'V'.repeat(22)});const markerBefore=x.store.kv.get(k.generation);x.store.kv.delete(k.barrier);x.store.publicExpiry.delete(k.barrier);const oldSessionAccepted=await session(x,a.cookie).then(()=>true,()=>false),oldCallback=await invoke(x.h,callbackUrl(old),{cookie:old.cookie});assert.equal(x.store.kv.get(k.generation),markerBefore);assert.deepEqual({oldSessionAccepted,callbackStatus:oldCallback.statusCode},{oldSessionAccepted:false,callbackStatus:401});
 });
