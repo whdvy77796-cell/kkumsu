@@ -208,8 +208,8 @@ test('rich owner-confirmed bar situations keep literal gender, party size and so
   const out = await call({ ...input, consent: true }, { fetcher: f });
   assert.equal(out.statusCode, 200); assert.equal(f.calls.length, 1); assert.equal('tools' in f.calls[0].body, false);
   assert.deepEqual(out.body.draft.situations, []); assert.equal(out.body.draft.situationsStatus, 'partial');
-  assert.deepEqual(out.body.draft.faqs.at(-1), entry);
-  assert.equal(out.body.draft.situationsOmittedCount, 0); assert.equal('selected' in out.body.draft.faqs.at(-1), false);
+  assert.ok(out.body.draft.faqs.some(f => f.question === entry.question && f.answer === entry.answer));
+  assert.equal(out.body.draft.situationsOmittedCount, 0); assert.ok(out.body.draft.faqs.every(f => !('selected' in f)));
   assert.match(PAGE_DRAFT_SYSTEM, /다섯 가지/); assert.match(PAGE_DRAFT_SYSTEM, /더 적게 만들거나 \[\]/);
 });
 
@@ -386,4 +386,39 @@ test('extra AI candidates fill five useful questions after filtering and dedupli
   assert.deepEqual(out.body.draft.faqs.map(x => x.question), [questions[1], questions[0], ...questions.slice(2)]);
   assert.equal(out.body.draft.situations.length, 0);
   assert.equal(out.body.draft.situationsOmittedCount, 1);
+});
+
+
+test('limited AI scenarios are supplemented from owner facts without inventing visit eligibility', async () => {
+  const body = { store:{name:'종로 연습가게',address:'서울 종로구 연습로 123',verifiedFacts:[],researchedFacts:['생맥주와 과일 안주를 제공합니다']}, answers:{offer:'생맥주와 과일 안주를 판매합니다.',difference:'실내 테이블에서 대화할 수 있는 편안한 분위기입니다.',audience:'친구와 함께 와서 대화하는 상황에 어울립니다.',visit:'주차는 제공하지 않습니다.',keywords:''},consent:true };
+  const row = situation('종로에서 생맥주 파는 곳 추천해줘?', '종로 연습가게에서는 생맥주와 과일 안주를 판매합니다.', ['address','offer']);
+  const raw = {headline:{text:'종로 연습가게',evidence:['name']},intro:{text:'생맥주와 과일 안주를 판매합니다.',evidence:['offer']},sections:[],faqs:[],keywords:[],situations:[row]};
+  const result = await call(body,{fetcher:fake(reply(raw))});
+  assert.equal(result.statusCode,200); assert.equal(result.body.draft.faqs.length,5);
+  assert.ok(result.body.draft.faqs.some(x => /여자 두 명/.test(x.question)));
+  for (const f of result.body.draft.faqs) {
+    assert.ok(f.answer.includes(body.store.name));
+    if (/여자 두 명/.test(f.question)) assert.doesNotMatch(f.answer,/여자|여성|두 명|2명/);
+    assert.doesNotMatch(f.answer,/24시간|무료주차/);
+  }
+  assert.equal(result.body.draft.situationsStatus,'partial');
+  const restricted=clone(body); restricted.answers.visit='여성 출입 불가. 주차는 제공하지 않습니다.';
+  const r2=await call(restricted,{fetcher:fake(reply(raw))});
+  assert.ok(r2.body.draft.faqs.every(x=>!/여자 두 명|친구 둘/.test(x.question)));
+});
+
+
+test('admission restrictions block group hypotheticals in AI and fallback results', async () => {
+  const body={store:{name:'종로 연습가게',address:'서울 종로구 연습로 123',verifiedFacts:[],researchedFacts:['실내 테이블 좌석이 있습니다']},answers:{offer:'생맥주와 과일 안주를 판매합니다.',difference:'실내 테이블에서 대화할 수 있는 편안한 분위기입니다.',audience:'친구와 대화하는 상황에 어울립니다.',visit:'',keywords:''},consent:true};
+  const person=situation('여자 둘이 종로에서 갈 곳 추천해줘?', '종로 연습가게는 생맥주와 과일 안주를 판매합니다.', ['address','offer']);
+  const generic=situation('종로에서 생맥주를 파는 곳 추천해줘?', '종로 연습가게는 생맥주와 과일 안주를 판매합니다.', ['address','offer']);
+  for(const restriction of ['여성 고객은 입장하실 수 없습니다','여성 출입 불가','남성 전용','남성 손님만 입장','커플 전용','성인 전용','손님은 1인만 입장 가능합니다','2인 이상은 받지 않습니다','단체는 받지 않습니다','출입 가능 여부는 확인 필요']) {
+    const b=clone(body);b.answers.visit=restriction;
+    assert.deepEqual(normalizeDraft(withSituations([person]),validateDraftInput(b)).situations,[],restriction);
+    const raw={headline:{text:b.store.name,evidence:['name']},intro:{text:b.answers.offer,evidence:['offer']},sections:[],faqs:[],keywords:[],situations:[generic]};
+    const out=await call(b,{fetcher:fake(reply(raw))});
+    assert.ok(out.body.draft.faqs.every(f=>!/여자 두 명|친구 둘|친구와|친구랑/.test(f.question)),restriction);
+  }
+  const normal=clone(body);normal.answers.visit='주차는 제공하지 않습니다.';
+  assert.deepEqual(normalizeDraft(withSituations([person]),validateDraftInput(normal)).situations,[person]);
 });
