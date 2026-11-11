@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import { createHash, createHmac, generateKeyPairSync, sign } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { createHandler } from '../api/owner-auth.js';
-import { MemoryStore, RedisStore, HttpError } from '../lib/guard.mjs';
+import { MemoryStore, RedisStore, HttpError, lifecycleKeys, detachOwnerRaw, LIFECYCLE_RETENTION } from '../lib/guard.mjs';
 import { requestScope } from '../lib/stores.mjs';
-import { requireSession, providerSubject, SESSION_COOKIE, STATE_COOKIE, SESSION_TTL, STATE_TTL, AUTH_LUA, AUTH_RATE_LIMITS } from '../lib/owner-auth.mjs';
+import { requireSession, providerSubject, SESSION_COOKIE, STATE_COOKIE, SESSION_TTL, STATE_TTL, AUTH_LUA, AUTH_RATE_LIMITS, beginAccountWithdrawal, cleanupAccountWithdrawal } from '../lib/owner-auth.mjs';
 const ENV = { VERCEL: '1', VERCEL_ENV: 'production', YB_AUTH_ORIGIN: 'https://www.kkumsu.com', YB_AUTH_SECRET: 'synthetic-dedicated-auth-secret-at-least-32-bytes', YB_IDENTITY_KEY: 'synthetic-long-lived-identity-key-at-least-32-bytes', YB_KAKAO_CLIENT_ID: 'synthetic-kakao-client', YB_KAKAO_CLIENT_SECRET: 'synthetic-kakao-secret', YB_NAVER_CLIENT_ID: 'synthetic-naver-client', YB_NAVER_CLIENT_SECRET: 'synthetic-naver-secret' };
 const TIME = 1800000000000;
 const RSA = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -108,9 +108,9 @@ test('issuer identity parsing is strict and no email-based account merging', () 
 });
 test('Redis atomic command wiring and fail-closed storage errors, without external calls', async () => {
   const commands = [];
-  const st = new RedisStore('https://redis.invalid', 'synthetic', async (url, options) => { const cmd = JSON.parse(options.body); commands.push(cmd); return Response.json({ result: cmd[0] === 'EVAL' ? (cmd[1] === AUTH_LUA ? 'no' : JSON.stringify({ status: 'ok' })) : 'OK' }); });
+  const st = new RedisStore('https://redis.invalid', 'synthetic', async (url, options) => { const cmd = JSON.parse(options.body); commands.push(cmd); return Response.json({ result: cmd[0] === 'EVAL' ? (cmd[1] === AUTH_LUA ? (cmd[3+Number(cmd[2])]==='prepare'?'ok':'no') : JSON.stringify({ status: 'ok' })) : 'OK' }); });
   const x = setup({ store: st }), s = await start(x); assert.equal((await invoke(x.h, callbackUrl(s), { cookie: s.cookie })).statusCode, 400);
-  const evalCmd = commands.find(c => c[0] === 'EVAL' && c[1] === AUTH_LUA); assert.equal(evalCmd[1], AUTH_LUA); assert.equal(evalCmd[2], '1'); assert.equal(evalCmd[4], 'claim'); assert.match(AUTH_LUA, /r.stage~='ready'/); assert.match(AUTH_LUA, /redis.call\('DEL',KEYS\[1\]\)/);
+  const evalCmd = commands.find(c => c[0] === 'EVAL' && c[1] === AUTH_LUA && c[3+Number(c[2])]==='claim'); assert.equal(evalCmd[1], AUTH_LUA); assert.equal(evalCmd[2], '1'); assert.equal(evalCmd[4], 'claim'); assert.match(AUTH_LUA, /r.stage~='ready'/); assert.match(AUTH_LUA, /redis.call\('DEL',KEYS\[1\]\)/);
   const bad = setup({ store: { cmd: async () => { throw Error('sensitive-store'); }, setJson: async () => { throw Error('sensitive-store'); }, getJson: async () => { throw Error('sensitive-store'); } } });
   assert.equal((await invoke(bad.h, '/api/owner-auth?op=start&provider=kakao')).statusCode, 503); await assert.rejects(session(bad, SESSION_COOKIE + '=' + 'a'.repeat(43)), { status: 503 });
   assert.equal((await invoke(bad.h, '/api/owner-auth?op=status', { cookie: SESSION_COOKIE + '=' + 'a'.repeat(43) })).statusCode, 503);
@@ -345,4 +345,55 @@ test('Naver signed state still requires per-attempt PKCE verifier and nonce befo
     const before = [...x.store.kv], r = await invoke(x.h, callbackUrl(s), { cookie });
     assert.equal(r.statusCode, 400); assert.equal(r.json().code, 'AUTH_STATE'); assert.equal(x.calls.length, 0); assert.deepEqual([...x.store.kv], before);
   }
+});
+
+
+test('lifecycle: two devices, stalled callback, finite barrier, rotation and fresh re-registration',async()=>{
+ const x=setup(),a=await login(x),b=await login(x),old=await start(x),who=await session(x,a.cookie),scope=requestScope(request('/'),ENV),operationId='A'.repeat(22),args={store:x.store,scope,accountId:who.accountId,operationId};
+ const began=await beginAccountWithdrawal(args);assert.equal(began.status,'cleanup');assert.deepEqual(await beginAccountWithdrawal(args),began);
+ await assert.rejects(session(x,a.cookie),{status:401});await assert.rejects(session(x,b.cookie),{status:401});
+ const during=await start(x);assert.equal((await invoke(x.h,callbackUrl(during),{cookie:during.cookie})).statusCode,401);
+ let done;do{done=await cleanupAccountWithdrawal({...args,cutoff:began.cutoff,limit:1});assert.ok(done.processed<=1);}while(done.status==='cleanup');assert.equal(done.status,'done');assert.equal(done.revoked,2);
+ assert.equal((await invoke(x.h,callbackUrl(old),{cookie:old.cookie})).statusCode,401);
+ const fresh=await login(x);assert.equal((await session(x,fresh.cookie)).accountId,who.accountId);
+ const k=lifecycleKeys(scope,who.accountId);assert.ok(x.store.publicExpiry.get(k.barrier)-Date.now()>LIFECYCLE_RETENTION*1000-10000);
+ assert.equal((await cleanupAccountWithdrawal({...args,cutoff:began.cutoff})).status,'done');assert.equal((await session(x,fresh.cookie)).accountId,who.accountId);
+ const rotated={...ENV,YB_AUTH_SECRET:'synthetic-new-session-secret-at-least-32-bytes'},y=setup({store:x.store,env:rotated});assert.equal((await session(y,(await login(y)).cookie,{env:rotated})).accountId,who.accountId);
+ const again=await beginAccountWithdrawal({...args,operationId:'B'.repeat(22),expectedCutoff:began.cutoff});assert.equal(again.cutoff,began.cutoff+1);assert.equal((await cleanupAccountWithdrawal({...args,cutoff:began.cutoff})).status,'conflict');
+ assert.equal(x.store.publicExpiry.has(k.barrier),false);
+});
+
+test('lifecycle: epoch-less sessions and malformed completed barriers fail closed',async()=>{
+ const x=setup(),a=await login(x),who=await session(x,a.cookie),key=[...x.store.kv.keys()].find(k=>k.includes(':session:')),r=JSON.parse(x.store.kv.get(key));delete r.generation;x.store.kv.set(key,JSON.stringify(r));await assert.rejects(session(x,a.cookie),{status:401});
+ const b=await login(x),scope=requestScope(request('/'),ENV);x.store.kv.set(lifecycleKeys(scope,who.accountId).barrier,JSON.stringify({phase:'done'}));await assert.rejects(session(x,b.cookie),{status:401});
+});
+
+test('lifecycle raw detachment preserves escaped/nested unknown fields and blocks ambiguous JSON',()=>{
+ const revision='f'.repeat(32);
+ const strings=['"',String.fromCharCode(92),'ownerAccountId',String.fromCharCode(10),'한글',String.fromCodePoint(0x1f600),'[{},]'];
+ for(let n=0;n<300;n++){const unknown={nested:[strings[n%strings.length],[],{},[strings[(n+1)%strings.length]]]},data={sections:[],faqs:[],unknown};const record={id:'a'.repeat(22),data,password:{salt:'synthetic',hash:'unchanged'},ownerAccountId:'account',extra:unknown};for(const r of [record,{ownerAccountId:'account',...record},{...record,z:1}]){const raw=JSON.stringify(r,null,n%3),out=detachOwnerRaw(raw,'account',revision);delete r.ownerAccountId;r.revision=revision;assert.deepEqual(JSON.parse(out),r);assert.ok(out.includes(JSON.stringify('ownerAccountId'))===false||out.includes('nested'));}}
+ assert.equal(detachOwnerRaw('{"ownerAccountId":"else","data":[]}','account',revision),'{"ownerAccountId":"else","data":[]}');
+ assert.throws(()=>detachOwnerRaw('{"ownerAccountId":"account","ownerAccountId":"account"}','account',revision));
+ assert.throws(()=>detachOwnerRaw('{"ownerAccountId":"account",bad}','account',revision));
+});
+
+
+test('revision-safe detach preserves exact unrelated bytes, escaped keys and absent revision',()=>{
+ const revision='e'.repeat(32),encoded=JSON.stringify(revision);
+ const raw="{ \"unknown\" : [[],{\"revision\":\"nested\",\"s\":\"\\\\\\\" , }\"}], \"ownerAccountId\":\"account\", \"revi\\u0073ion\" : \"old\", \"tail\" : null }";
+ const expected=raw.replace('"ownerAccountId":"account",','').replace('"old"',encoded);assert.equal(detachOwnerRaw(raw,'account',revision),expected);
+ for(const raw of ['{"ownerAccountId":"account"}','{ "before" : [[],{}], "ownerAccountId":"account", "after" : false }'])assert.equal(detachOwnerRaw(raw,'account',revision),raw.replace('"ownerAccountId":"account"','"revision":'+encoded));
+ for(const raw of ["{\"ownerAccountId\":\"account\",\"revision\":\"old\",\"revision\":\"other\"}","{\"ownerAccountId\":\"account\",\"revision\":\"old\",\"revi\\u0073ion\":\"other\"}"])assert.throws(()=>detachOwnerRaw(raw,'account',revision));
+ assert.throws(()=>detachOwnerRaw('{"ownerAccountId":"account","revision":'+encoded+'}','account',revision));
+});
+
+// Executed expected-failure regressions: these are known blockers, not fixes.
+test('BLOCKER: selective generation and barrier loss must not revive old credentials',{todo:'Needs scope/account incarnation and recovery authority; simple counter is insufficient'},async()=>{
+ const x=setup(),a=await login(x),old=await start(x),who=await session(x,a.cookie),scope=requestScope(request('/'),ENV),k=lifecycleKeys(scope,who.accountId),args={store:x.store,scope,accountId:who.accountId,operationId:'L'.repeat(22)};
+ await beginAccountWithdrawal(args);x.store.kv.delete(k.generation);x.store.kv.delete(k.barrier);x.store.publicExpiry.delete(k.barrier);await start(x);
+ const oldSessionAccepted=await session(x,a.cookie).then(()=>true,()=>false),oldCallback=await invoke(x.h,callbackUrl(old),{cookie:old.cookie});assert.deepEqual({oldSessionAccepted,callbackStatus:oldCallback.statusCode},{oldSessionAccepted:false,callbackStatus:401});
+});
+test('BLOCKER: expired operation receipt must not let an ancient begin revoke fresh registration',{todo:'Needs expiring authenticated begin grant bound to account incarnation'},async()=>{
+ const x=setup(),a=await login(x),who=await session(x,a.cookie),scope=requestScope(request('/'),ENV),args={store:x.store,scope,accountId:who.accountId,operationId:'T'.repeat(22)},b=await beginAccountWithdrawal(args);await cleanupAccountWithdrawal({...args,cutoff:b.cutoff});const k=lifecycleKeys(scope,who.accountId);x.store.publicExpiry.set(k.barrier,Date.now()-1);
+ const fresh=await login(x),replayed=await beginAccountWithdrawal(args),freshStillValid=await session(x,fresh.cookie).then(()=>true,()=>false);assert.deepEqual({status:replayed.status,freshStillValid},{status:'conflict',freshStillValid:true});
 });

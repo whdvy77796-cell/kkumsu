@@ -1,3 +1,6 @@
+import { storeKeys } from '../lib/stores.mjs';
+import { lifecycleKeys } from '../lib/guard.mjs';
+import { beginAccountWithdrawal, cleanupAccountWithdrawal } from '../lib/owner-auth.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryStore } from '../lib/guard.mjs';
@@ -79,4 +82,27 @@ test('atomic session: replacing session value with another account after authent
   const pending=invoke(f.owner,'/api/owner-stores','POST',body,{cookie:f.cookie});await gate.entered;
   const current=JSON.parse(f.store.kv.get(f.sessionKey));f.store.kv.set(f.sessionKey,JSON.stringify({...current,accountId:'oa_'+'B'.repeat(43)}));gate.release();
   const result=await pending;assert.equal(result.statusCode,401,result.body);assert.equal(f.store.kv.get(f.recordKey),before);assert.ok(!result.body.includes(f.sessionKey));
+});
+
+for(const action of ['claim','update','unlink'])test('withdrawal atomically wins pending '+action+' and preserves public record',async()=>{
+ const f=await raceFixture(),body=await mutationInput(f,action),before=JSON.parse(f.store.kv.get(f.recordKey)),s=JSON.parse(f.store.kv.get(f.sessionKey)),scope={namespace:s.namespace},args={store:f.store,scope,accountId:s.accountId,operationId:'W'.repeat(22)},gate=pauseMutation(f.store,action);
+ const pending=invoke(f.owner,'/api/owner-stores','POST',body,{cookie:f.cookie});await gate.entered;const begin=await beginAccountWithdrawal(args);gate.release();assert.equal((await pending).statusCode,401);
+ const expiry=f.store.publicExpiry.get(f.recordKey);const done=await cleanupAccountWithdrawal({...args,cutoff:begin.cutoff});assert.equal(done.status,'done');const after=JSON.parse(f.store.kv.get(f.recordKey));const wasLinked=before.ownerAccountId!==undefined;delete before.ownerAccountId;assert.match(after.revision,/^[a-f0-9]{32}$/);if(wasLinked)assert.notEqual(after.revision,before.revision);else assert.equal(after.revision,before.revision);before.revision=after.revision;assert.deepEqual(after,before);assert.equal(f.store.publicExpiry.get(f.recordKey),expiry);
+});
+
+for(const legacyMissingRevision of [false,true])test('detach revision blocks stale legacy full-record resurrection, missing revision='+legacyMissingRevision,async()=>{
+ const f=await raceFixture();await mutationInput(f,'update');const s=JSON.parse(f.store.kv.get(f.sessionKey)),scope={namespace:s.namespace},record=JSON.parse(f.store.kv.get(f.recordKey));record.unknown={nested:[[],{},'escaped " \\ content']};if(legacyMissingRevision)delete record.revision;f.store.kv.set(f.recordKey,JSON.stringify(record));const expiry=Date.now()+600000;f.store.publicExpiry.set(f.recordKey,expiry);
+ const stale=await f.store.getJson(f.recordKey),args={store:f.store,scope,accountId:s.accountId,operationId:'R'.repeat(22)},began=await beginAccountWithdrawal(args),done=await cleanupAccountWithdrawal({...args,cutoff:began.cutoff});assert.equal(done.status,'done');
+ const cleanRaw=f.store.kv.get(f.recordKey),clean=JSON.parse(cleanRaw);assert.equal(clean.ownerAccountId,undefined);assert.match(clean.revision,/^[a-f0-9]{32}$/);assert.notEqual(clean.revision,stale.revision);assert.deepEqual(clean.data,stale.data);assert.deepEqual(clean.password,stale.password);assert.deepEqual(clean.unknown,stale.unknown);assert.equal(clean.id,stale.id);assert.equal(f.store.publicExpiry.get(f.recordKey),expiry);
+ const update=await f.store.publicTransaction('update',storeKeys(scope,id),{now:Date.now(),expected:stale.revision,record:{...stale,data:{...stale.data,intro:'stale attempted resurrection'}},ttl:0});assert.equal(update.status,'conflict');assert.equal(f.store.kv.get(f.recordKey),cleanRaw);assert.equal(f.store.publicExpiry.get(f.recordKey),expiry);
+});
+
+test('ambiguous revision blocks entire cleanup batch without changing record or TTL',async()=>{
+ const f=await raceFixture();await mutationInput(f,'update');const s=JSON.parse(f.store.kv.get(f.sessionKey)),scope={namespace:s.namespace},raw=f.store.kv.get(f.recordKey),ambiguous=raw.slice(0,-1)+',"revision":"duplicate"}';f.store.kv.set(f.recordKey,ambiguous);const expiry=Date.now()+600000;f.store.publicExpiry.set(f.recordKey,expiry);const args={store:f.store,scope,accountId:s.accountId,operationId:'D'.repeat(22)},began=await beginAccountWithdrawal(args),done=await cleanupAccountWithdrawal({...args,cutoff:began.cutoff});assert.equal(done.status,'blocked');assert.equal(done.reason,'RAW_UNSAFE');assert.equal(f.store.kv.get(f.recordKey),ambiguous);assert.equal(f.store.publicExpiry.get(f.recordKey),expiry);assert.equal(JSON.parse(f.store.kv.get(lifecycleKeys(scope,s.accountId).barrier)).phase,'cleanup');assert.ok(f.store.kv.has(f.sessionKey),'prevalidation rejects batch before deleting any sessions');
+});
+
+for(const partial of [false,true])test('BLOCKER: lost owner index cannot certify all links detached, partial='+partial,{todo:'Needs authoritative account incarnation and index count/membership reconciliation'},async()=>{
+ const f=await raceFixture();await mutationInput(f,'update');const s=JSON.parse(f.store.kv.get(f.sessionKey)),scope={namespace:s.namespace},k=lifecycleKeys(scope,s.accountId);let record2;
+ if(partial){const id2='b'.repeat(22),legacy=legacyHandler({env,store:f.store});assert.equal((await invoke(legacy,'/api/stores','POST',{action:'create',id:id2,password,consent:true,data})).statusCode,201);assert.equal((await invoke(f.owner,'/api/owner-stores','POST',{action:'claim',id:id2,password},{cookie:f.cookie})).statusCode,200);record2=storeKeys(scope,id2)[0];f.store.kv.get(k.owner).delete(id);}else{f.store.kv.delete(k.owner);f.store.publicExpiry.delete(k.owner);}
+ const args={store:f.store,scope,accountId:s.accountId,operationId:'I'.repeat(22)},b=await beginAccountWithdrawal(args),done=await cleanupAccountWithdrawal({...args,cutoff:b.cutoff});const stillOwned=[f.recordKey,...(record2?[record2]:[])].some(key=>JSON.parse(f.store.kv.get(key)).ownerAccountId===s.accountId);assert.equal(done.status==='done'&&stillOwned,false,'must not certify completion while an owned record survives');
 });
