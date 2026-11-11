@@ -1,0 +1,37 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { makeHomeExample } from '../public/home-example.js';
+
+const h = (tag, attrs, ...children) => ({ tag, attrs: attrs || {}, children: children.flat(Infinity).filter(x => x != null && x !== false) });
+const allText = n => n == null ? '' : typeof n === 'object' ? n.children.map(allText).join(' ') : String(n);
+function find(n, pred) { if (!n || typeof n !== 'object') return null; if (pred(n)) return n; for (const c of n.children || []) { const found = find(c, pred); if (found) return found; } return null; }
+
+test('example is an accessible portrait image with explicit fictional-outcome disclosure', () => {
+  const node = makeHomeExample(h); const img = find(node, n => n.tag === 'img');
+  assert.equal(node.tag, 'figure'); assert.equal(node.attrs.class, 'home-sample');
+  assert.equal(img.attrs.src, '/yeogibwa-ai-example.png'); assert.equal(img.attrs.width, '1000'); assert.equal(img.attrs.height, '1225');
+  assert.match(img.attrs.alt, /가상 예시/); assert.match(img.attrs.alt, /실제 AI 답변이나 인용 사례가 아닙니다/);
+  assert.match(allText(node), /가상 대화와 가상 출처 연결/); assert.match(allText(node), /보장하지 않아요/);
+});
+
+test('the real store preview links to the observed public page without claiming a real citation', () => {
+  const node = makeHomeExample(h); const link = find(node, n => n.tag === 'a');
+  assert.equal(link.attrs.href, '/stores/Sv7dlOYSMMVctFPtL1xI8w'); assert.equal(link.attrs.target, '_blank');
+  assert.match(link.attrs.rel, /noopener/); assert.match(allText(link), /실제 연어로 소개 페이지 보기/);
+});
+
+test('home keeps its CTA and input while putting the example in a separate grid item', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+  assert.match(app, /makeHomeExample\(h\),\s*pageResume, oldResume, pendingDiagnosis/);
+  assert.match(app, /onclick: focusStart \}, '무료로 페이지 만들기'/); assert.match(app, /id: 'startCard'/);
+  assert.match(css, /#view > \.home-sample \{ grid-column: 2; grid-row: 1/);
+  assert.match(css, /#view > #startCard \{ grid-column: 1 \/ -1; grid-row: auto/);
+});
+
+test('portrait asset exists and has dimensions matching the reserved image space', async () => {
+  const image = await readFile(new URL('../public/yeogibwa-ai-example.png', import.meta.url));
+  assert.equal(image.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(image.readUInt32BE(16), 1000); assert.equal(image.readUInt32BE(20), 1225);
+});
