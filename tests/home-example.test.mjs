@@ -35,3 +35,12 @@ test('portrait asset exists and has dimensions matching the reserved image space
   assert.equal(image.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
   assert.equal(image.readUInt32BE(16), 1000); assert.equal(image.readUInt32BE(20), 1225);
 });
+
+
+test('homepage introduction uses the requested wording without removing the existing start controls', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes('손님이 AI에게 물을 때, 우리 가게도 발견될 수 있도록.'));
+  assert.ok(app.includes('손님이 물어볼 만한 질문과 우리 가게가 그 답이 되는 이유를 담아, AI가 읽기 쉬운 가게 소개 페이지를 만들고 여기봐ai에 배포해 드려요.'));
+  assert.ok(!app.includes("h('h2', { class: 'hero-sub' }, '가게 이름과 주소를 알려주세요.'"));
+  assert.ok(app.includes("onclick: focusStart }, '무료로 페이지 만들기'"));
+});
