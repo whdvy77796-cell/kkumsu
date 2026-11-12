@@ -44,7 +44,7 @@ test('three providers: fixed authorization/code endpoints, exact callback, no cl
     for (const c of [...l.s.r.headers['set-cookie'], ...l.r.headers['set-cookie']]) { assert.match(c, /; Path=\/; Secure; HttpOnly; SameSite=Lax; Max-Age=/); assert.ok(!c.includes('Domain=')); }
     assert.ok(l.r.headers['set-cookie'].some(c => c.startsWith(SESSION_COOKIE + '=') && c.endsWith('Max-Age=' + SESSION_TTL)));
     const status = await invoke(x.h, '/api/owner-auth?op=status', { cookie: l.cookie });
-    assert.deepEqual(status.json(), { authenticated: true, provider, providers: { kakao: true, naver: true, google: true } });
+    assert.deepEqual(status.json(), { authenticated: true, provider, local: false, providers: { kakao: true, naver: true, google: true } });
     assert.equal(status.headers['referrer-policy'], 'no-referrer'); assert.match(status.headers['content-security-policy'], /default-src 'none'/);
     const identity = await session(x, l.cookie); assert.match(identity.accountId, /^oa_/); assert.equal(identity.expiresAt - identity.issuedAt, SESSION_TTL * 1000);
     assert.equal(x.calls.length, 2); for (const c of x.calls) { assert.equal(c.options.redirect, 'error'); assert.ok(c.options.signal); assert.ok(!c.url.includes('synthetic-access')); }
@@ -54,7 +54,7 @@ test('three providers: fixed authorization/code endpoints, exact callback, no cl
 });
 test('disabled configuration, no Redis default, no unsafe origin or fallback secret', async () => {
   for (const env of [{}, { ...ENV, YB_AUTH_SECRET: '' }, { ...ENV, YB_AUTH_SECRET: 'short' }, { ...ENV, YB_AUTH_ORIGIN: 'http://www.kkumsu.com' }, { ...ENV, YB_AUTH_ORIGIN: 'https://www.kkumsu.com/' }, { ...ENV, YB_AUTH_ORIGIN: 'https://user@www.kkumsu.com' }]) {
-    const x = setup({ env }); assert.deepEqual((await invoke(x.h, '/api/owner-auth?op=status')).json(), { authenticated: false, provider: null, providers: { kakao: false, naver: false, google: false } }); assert.equal((await invoke(x.h, '/api/owner-auth?op=start&provider=kakao')).statusCode, 503); assert.equal(x.calls.length, 0);
+    const x = setup({ env }); assert.deepEqual((await invoke(x.h, '/api/owner-auth?op=status')).json(), { authenticated: false, provider: null, local: false, providers: { kakao: false, naver: false, google: false } }); assert.equal((await invoke(x.h, '/api/owner-auth?op=start&provider=kakao')).statusCode, 503); assert.equal(x.calls.length, 0);
   }
   const disabled = setup({ env: { ...ENV, YB_KAKAO_CLIENT_SECRET: '' } }); assert.equal((await invoke(disabled.h, '/api/owner-auth?op=status')).json().providers.kakao, false);
   const h = createHandler({ env: ENV, fetcher: () => { throw Error('network must not run'); } }); const unavailable = await invoke(h, '/api/owner-auth?op=status'); assert.equal(unavailable.statusCode, 503); assert.equal(unavailable.json().code, 'AUTH_STORE'); assert.equal((await invoke(h, '/api/owner-auth?op=start&provider=naver')).statusCode, 503);
@@ -251,7 +251,7 @@ test('configured status reports absent or structurally unusable datastore as 503
 });
 
 test('unconfigured status stays 200 disabled even without datastore; configured healthy status remains normal', async () => {
-  const disabled = { authenticated: false, provider: null, providers: { kakao: false, naver: false, google: false } };
+  const disabled = { authenticated: false, provider: null, local: false, providers: { kakao: false, naver: false, google: false } };
   for (const env of [{ VERCEL: '1' }, { ...ENV, YB_AUTH_SECRET: '' }]) {
     for (const store of [undefined, null, {}]) {
       const h = createHandler({ env, store, fetcher: () => { throw Error('network must not run'); }, now: TIME });
@@ -259,7 +259,7 @@ test('unconfigured status stays 200 disabled even without datastore; configured 
     }
   }
   const x = setup(), r = await invoke(x.h, '/api/owner-auth?op=status');
-  assert.equal(r.statusCode, 200); assert.deepEqual(r.json(), { authenticated: false, provider: null, providers: { kakao: true, naver: true, google: true } });
+  assert.equal(r.statusCode, 200); assert.deepEqual(r.json(), { authenticated: false, provider: null, local: false, providers: { kakao: true, naver: true, google: true } });
 });
 
 test('configured status preserves operational getJson failures as 503 without clearing session', async () => {
