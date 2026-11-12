@@ -5,7 +5,7 @@ import { createHandler } from '../api/owner-auth.js';
 import { MemoryStore, RedisStore, HttpError } from '../lib/guard.mjs';
 import { requestScope } from '../lib/stores.mjs';
 import { requireSession, providerSubject, SESSION_COOKIE, STATE_COOKIE, SESSION_TTL, STATE_TTL, AUTH_LUA, AUTH_RATE_LIMITS } from '../lib/owner-auth.mjs';
-const ENV = { VERCEL: '1', VERCEL_ENV: 'production', YB_AUTH_ORIGIN: 'https://www.kkumsu.com', YB_AUTH_SECRET: 'synthetic-dedicated-auth-secret-at-least-32-bytes', YB_IDENTITY_KEY: 'synthetic-long-lived-identity-key-at-least-32-bytes', YB_KAKAO_CLIENT_ID: 'synthetic-kakao-client', YB_KAKAO_CLIENT_SECRET: 'synthetic-kakao-secret', YB_NAVER_CLIENT_ID: 'synthetic-naver-client', YB_NAVER_CLIENT_SECRET: 'synthetic-naver-secret', YB_GOOGLE_CLIENT_ID: 'synthetic-google-client', YB_GOOGLE_CLIENT_SECRET: 'synthetic-google-secret' };
+const ENV = { VERCEL: '1', VERCEL_ENV: 'production', YB_ENABLED_LOGIN_PROVIDERS: 'kakao,naver,google', YB_AUTH_ORIGIN: 'https://www.kkumsu.com', YB_AUTH_SECRET: 'synthetic-dedicated-auth-secret-at-least-32-bytes', YB_IDENTITY_KEY: 'synthetic-long-lived-identity-key-at-least-32-bytes', YB_KAKAO_CLIENT_ID: 'synthetic-kakao-client', YB_KAKAO_CLIENT_SECRET: 'synthetic-kakao-secret', YB_NAVER_CLIENT_ID: 'synthetic-naver-client', YB_NAVER_CLIENT_SECRET: 'synthetic-naver-secret', YB_GOOGLE_CLIENT_ID: 'synthetic-google-client', YB_GOOGLE_CLIENT_SECRET: 'synthetic-google-secret' };
 const TIME = 1800000000000;
 const RSA = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const JWK = { ...RSA.publicKey.export({ format: 'jwk' }), kid: 'synthetic-key', alg: 'RS256', use: 'sig' };
@@ -514,4 +514,36 @@ test('Google callback cleanup preserves pending cookie and state on deliberate r
     assert.equal(r.json().code,{limited:'AUTH_RATE_LIMIT',store:'AUTH_RATE_STORE',ip:'AUTH_RATE_IP'}[failure]);
     assert.equal(r.headers['set-cookie'],undefined); assert.equal(x.calls.length,0); assert.deepEqual([...x.store.kv],before); assert.ok(!r.body.includes('private-rate-message'));
   }
+});
+
+
+test('Google-only launch defaults: status and direct starts block other providers even when credentials exist', async () => {
+  const env = { ...ENV }; delete env.YB_ENABLED_LOGIN_PROVIDERS;
+  const x = setup({ env });
+  const status = await invoke(x.h, '/api/owner-auth?op=status');
+  assert.deepEqual(status.json().providers, { kakao: false, naver: false, google: true });
+  for (const provider of ['kakao', 'naver']) {
+    const blocked = await invoke(x.h, '/api/owner-auth?op=start&provider=' + provider);
+    assert.equal(blocked.statusCode, 503); assert.equal(blocked.json().code, 'AUTH_DISABLED');
+  }
+  assert.equal(x.calls.length, 0);
+  const result = await login(x, 'google');
+  const authenticated = await invoke(x.h, '/api/owner-auth?op=status', { cookie: result.cookie });
+  assert.equal(authenticated.json().provider, 'google');
+  assert.deepEqual(authenticated.json().providers, { kakao: false, naver: false, google: true });
+});
+
+test('provider enable configuration fails closed and preserves in-flight callbacks', async () => {
+  for (const value of ['', 'Google', 'google,unknown', 'google, naver', 'google,', 123, null]) {
+    const x = setup({ env: { ...ENV, YB_ENABLED_LOGIN_PROVIDERS: value } });
+    assert.deepEqual((await invoke(x.h, '/api/owner-auth?op=status')).json().providers, { kakao: false, naver: false, google: false });
+    assert.equal((await invoke(x.h, '/api/owner-auth?op=start&provider=google')).json().code, 'AUTH_DISABLED');
+  }
+  const x = setup(), started = await start(x, 'naver');
+  const googleOnly = { ...ENV }; delete googleOnly.YB_ENABLED_LOGIN_PROVIDERS; x.deps.env = googleOnly;
+  const finished = await invoke(x.h, callbackUrl(started), { cookie: started.cookie });
+  assert.equal(finished.statusCode, 303);
+  const current = await invoke(x.h, '/api/owner-auth?op=status', { cookie: jar(finished) });
+  assert.equal(current.json().provider, 'naver');
+  assert.deepEqual(current.json().providers, { kakao: false, naver: false, google: true });
 });

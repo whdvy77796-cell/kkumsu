@@ -7,7 +7,7 @@ import { createHandler as ownerHandler } from '../api/owner-stores.js';
 import { createHandler as legacyHandler } from '../api/stores.js';
 
 // 전부 합성 데이터와 메모리 저장소·가짜 제공자 응답이다. 외부 요청 없음.
-const env={VERCEL:'1',VERCEL_ENV:'production',SESSION_SECRET:'synthetic-existing-store-secret-0123456789',YB_AUTH_ORIGIN:'https://www.kkumsu.com',YB_AUTH_SECRET:'synthetic-session-signing-secret-0123456789',YB_IDENTITY_KEY:'synthetic-stable-identity-secret-0123456789',YB_KAKAO_CLIENT_ID:'synthetic-client',YB_KAKAO_CLIENT_SECRET:'synthetic-secret',YB_GOOGLE_CLIENT_ID:'synthetic-google-client',YB_GOOGLE_CLIENT_SECRET:'synthetic-google-secret'};
+const env={VERCEL:'1',VERCEL_ENV:'production',YB_ENABLED_LOGIN_PROVIDERS:'kakao,google',SESSION_SECRET:'synthetic-existing-store-secret-0123456789',YB_AUTH_ORIGIN:'https://www.kkumsu.com',YB_AUTH_SECRET:'synthetic-session-signing-secret-0123456789',YB_IDENTITY_KEY:'synthetic-stable-identity-secret-0123456789',YB_KAKAO_CLIENT_ID:'synthetic-client',YB_KAKAO_CLIENT_SECRET:'synthetic-secret',YB_GOOGLE_CLIENT_ID:'synthetic-google-client',YB_GOOGLE_CLIENT_SECRET:'synthetic-google-secret'};
 const id='abcdefghijklmnopqrstuv',password='synthetic-password';
 const data={name:'검수용 가게',address:'서울 가상로 12',headline:'검수용 소개',intro:'실제 가게가 아닌 테스트 데이터입니다.',sections:[{heading:'영업시간',body:'월요일 휴무'}],faqs:[{question:'반려견이 함께 갈 수 있나요?',answer:'테라스에서만 가능합니다.'}]};
 function req(url,method='GET',body,headers={}) { return {url,method,body,headers:{host:'www.kkumsu.com','x-forwarded-proto':'https','x-vercel-forwarded-for':'203.0.113.17',...(method==='POST'?{origin:env.YB_AUTH_ORIGIN,'content-type':'application/json'}:{}),...headers},socket:{encrypted:true,remoteAddress:'127.0.0.1'}}; }
