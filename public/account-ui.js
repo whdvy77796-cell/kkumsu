@@ -3,6 +3,7 @@
 // 수정 중인 내용은 브라우저 저장소(localStorage 등)에 저장하지 않고 이 모듈의 메모리에만 둔다.
 // AI·결제 호출은 없다. 사진 기능은 아직 없으며 '준비 중'으로만 안내한다.
 import { ID_RE, LIMITS, cleanStoreData, validStoreShape, buildQrModules, drawQr, publicUrl } from './store-tools.js';
+import { makeAiAccessPanel } from './ai-access-ui.js';
 
 const str = (v) => (typeof v === 'string' ? v : '');
 const msgOf = (e) => (e && typeof e.message === 'string' && e.message) || '요청이 실패했어요. 잠시 후 다시 시도해 주세요.';
@@ -228,6 +229,7 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
         s.hidden === true ? h('p', { class: 'card warn', role: 'status' }, '신고가 쌓여 이 페이지는 현재 숨겨져 있어요. 수정만으로 다시 공개되지는 않아요.') : null,
         when ? h('p', { class: 'small muted' }, `마지막 수정: ${when}`) : null,
         h('p', null, h('a', { href: `/stores/${s.id}`, target: '_blank', rel: 'noopener' }, url)),
+        makeAiAccessPanel({ h, fetcher, kind: 'store', storeId: s.id }),
         h('div', { class: 'field' }, btn('내용 수정', () => { location.hash = `#/my-stores/${s.id}`; }, true), qrBtn),
         supportsUnlink ? unlinkBlock(s) : null,
         qrBox);

@@ -32,6 +32,9 @@
     },
     "api/owner-stores.js": {
       "maxDuration": 30
+    },
+    "api/ai-access-ingest.js": {
+      "maxDuration": 60
     }
   },
   "headers": [
