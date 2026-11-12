@@ -4,7 +4,7 @@ import { Readable } from 'node:stream';
 import { createHandler } from '../api/owner-stores.js';
 import { createHandler as legacyHandler } from '../api/stores.js';
 import { MemoryStore as BaseMemoryStore, RedisStore, HttpError, OWNER_STORES_LUA, STORES_LUA } from '../lib/guard.mjs';
-import { requestScope, storeKeys, hashPassword, renderStore } from '../lib/stores.mjs';
+import { requestScope, storeKeys, hashPassword, renderStore, BODY_LIMIT, normalizeData } from '../lib/stores.mjs';
 import { ownerKeys, validateOwnerRequest } from '../lib/owner-stores.mjs';
 import { createHash } from 'node:crypto';
 import { SESSION_BINDING, SESSION_TTL } from '../lib/owner-auth.mjs';
@@ -17,6 +17,7 @@ function fixtureSession(store,accountId,namespace,now=Date.now()) {
  return {key,...record};
 }
 function fixtureTx(store,op,keys,p) {
+ if(op==='claim'&&!Object.hasOwn(p,'verifiedRaw'))p={...p,verifiedRaw:store.kv.get(keys[0])};
  if(p.session)return {keys,p};
  const namespace=(p.prefix || keys[0]).split(':record:')[0].split(':owner:')[0],proof=fixtureSession(store,p.accountId,namespace,p.now);
  return {keys:[...keys,proof.key],p:{...p,session:proof,scopeNamespace:namespace,authOrigin:proof.origin}};
@@ -120,9 +121,9 @@ test('delete race blocks late update and claim, deleted and expired records cann
 
 test('ownership rechecked atomically on update/unlink race and claim checks revision',async()=>{
  const st=new MemoryStore();const old=await seed(st,{ownerAccountId:ACCOUNT}),keys=ownerKeys(scope,ACCOUNT,ID);
- const unlinked=await st.ownerTransaction('unlink',keys,{accountId:ACCOUNT,expected:old.revision,revision:'unlinked',now:Date.now()});assert.equal(unlinked.status,'ok');
- const late=await st.ownerTransaction('update',keys,{accountId:ACCOUNT,expected:old.revision,revision:'late',data:DATA,now:Date.now()});assert.equal(late.status,'denied');
- assert.equal((await st.ownerTransaction('claim',ownerKeys(scope,'new',ID),{accountId:'new',expected:old.revision,revision:'claim',now:Date.now()})).status,'conflict');
+ const unlinked=await st.ownerTransaction('unlink',keys,{accountId:ACCOUNT,expected:old.revision,revision:'a'.repeat(32),now:Date.now()});assert.equal(unlinked.status,'ok');
+ const late=await st.ownerTransaction('update',keys,{accountId:ACCOUNT,expected:old.revision,revision:'b'.repeat(32),data:DATA,now:Date.now()});assert.equal(late.status,'denied');
+ assert.equal((await st.ownerTransaction('claim',ownerKeys(scope,'new',ID),{accountId:'new',expected:old.revision,revision:'c'.repeat(32),now:Date.now()})).status,'conflict');
 });
 
 test('unlink is authorized, idempotence is not assumed, public page/password/ID stay stable',async()=>{
@@ -177,7 +178,9 @@ function redisFixture(){
   if(a[0]==='GET')result=backend.kv.get(a[1]) ?? null;
   else {assert.equal(a[0],'EVAL');const n=Number(a[2]),keys=a.slice(3,3+n),op=a[3+n],p=JSON.parse(a[4+n]);
    assert.ok([OWNER_STORES_LUA,STORES_LUA].includes(a[1]));const out=await backend[a[1]===OWNER_STORES_LUA?'ownerTransaction':'publicTransaction'](op,keys,p);
-   if(keys[0]?.includes(':record:')&&backend.kv.has(keys[0]))backend.kv.set(keys[0],cjson(JSON.parse(backend.kv.get(keys[0]))));result=cjson(out);
+   if(a[1]===STORES_LUA&&keys[0]?.includes(':record:')&&backend.kv.has(keys[0]))backend.kv.set(keys[0],cjson(JSON.parse(backend.kv.get(keys[0]))));
+   // Owner Lua returns a JSON string, never cjson re-encoding the legacy record.
+   if(a[1]===OWNER_STORES_LUA&&out.record){out.recordRaw=backend.kv.get(keys[0]);delete out.record;}result=cjson(out);
   }
   return new Response(JSON.stringify({result}));
  });redis.fixtureBackend=backend;const base=redis.ownerTransaction.bind(redis);redis.ownerTransaction=(op,keys,p)=>{const args=fixtureTx(backend,op,keys,p);return base(op,args.keys,args.p);};return {redis,backend,calls};
@@ -292,3 +295,23 @@ test('raw owner transactions reject absent/substituted session proof, value fiel
  assert.ok(OWNER_STORES_LUA.indexOf("local proof=p.session")<OWNER_STORES_LUA.indexOf("if op=='list'"));
  assert.ok(OWNER_STORES_LUA.includes("redis.call('PTTL',proof.key)<=0"));assert.ok(OWNER_STORES_LUA.includes('s.expiresAt<=p.now'));
 });
+
+for(const action of ['claim','update','unlink'])test('record preservation: wrong index type blocks '+action+' before record writes',async()=>{const st=new MemoryStore();await seed(st,{ownerAccountId:action==='claim'?undefined:ACCOUNT});const keys=ownerKeys(scope,ACCOUNT,ID),before=st.kv.get(keys[0]);st.kv.set(keys[1],'synthetic-wrong-type');const result=await st.ownerTransaction(action,keys,{accountId:ACCOUNT,prefix:scope.namespace+':record:',expected:'0'.repeat(32),revision:'e'.repeat(32),data:DATA,updatedAt:Date.now(),now:Date.now()});assert.equal(result.status,'blocked');assert.equal(st.kv.get(keys[0]),before);assert.equal(st.kv.get(keys[1]),'synthetic-wrong-type');});
+test('record preservation: raw CAS prevents same-revision legacy unknown-field loss',async()=>{const {redis,backend}=redisFixture();await seed(backend,{ownerAccountId:ACCOUNT});const keys=ownerKeys(scope,ACCOUNT,ID),base=redis.cmd.bind(redis);let changed;redis.cmd=async args=>{if(args[0]==='EVAL'&&args[1]===OWNER_STORES_LUA&&args.includes('update')){changed=backend.kv.get(keys[0]).replace('"hidden":false','"hidden":false,"legacyUnknown":[[],{}]');backend.kv.set(keys[0],changed);}return base(args);};const result=await redis.ownerTransaction('update',keys,{accountId:ACCOUNT,prefix:scope.namespace+':record:',expected:'0'.repeat(32),revision:'e'.repeat(32),data:DATA,updatedAt:Date.now(),now:Date.now()});assert.equal(result.status,'conflict');assert.equal(backend.kv.get(keys[0]),changed);});
+
+// Two body-limit-valid legacy writes retain situations; cjson slash escaping
+// produces exactly 165,011 bytes, exceeding the old 128 KiB record limit.
+test('165011-byte legacy record preserves bytes and TTL through claim/unlink',async()=>{
+ const st=new MemoryStore(),t=1780000000000,key=storeKeys(scope,ID)[0],base=st.publicTransaction.bind(st);
+ st.publicTransaction=async(op,keys,p)=>{const r=await base(op,keys,p);if(['create','update'].includes(op)&&r.record)st.kv.set(keys[0],JSON.stringify(r.record).replaceAll('/','\\/'));return r;};
+ const situations=Array.from({length:8},()=>({question:'/'.repeat(300),answer:'/'.repeat(2000)}));
+ const initial={...DATA,situations},next={name:'/'.repeat(60),address:'/'.repeat(120),headline:'/'.repeat(200),intro:'/'.repeat(2000),sections:Array.from({length:8},()=>({heading:'/'.repeat(200),body:'/'.repeat(4000)})),faqs:Array.from({length:12},()=>({question:'/'.repeat(300),answer:'/'.repeat(2000)}))};
+ const legacy=legacyHandler({store:st,env:ENV,now:t}),create={action:'create',id:ID,password:PASS,consent:true,data:initial};assert.ok(Buffer.byteLength(JSON.stringify(create))<BODY_LIMIT);assert.equal((await call(legacy,create,{legacy:true})).statusCode,201);
+ const before=await st.getJson(key),predicted={...before,data:{...next,situations},revision:'f'.repeat(32),updatedAt:t};const excess=Buffer.byteLength(JSON.stringify(predicted).replaceAll('/','\\/'))-165011;assert.ok(excess>=0&&excess<=2000,excess);next.intro='x'.repeat(excess)+'/'.repeat(2000-excess);
+ assert.deepEqual(normalizeData(next),next);const edit={action:'update',id:ID,password:PASS,consent:true,data:next};assert.ok(Buffer.byteLength(JSON.stringify(edit))<BODY_LIMIT);assert.equal((await call(legacy,edit,{legacy:true})).statusCode,200);
+ const original=st.kv.get(key);assert.equal(Buffer.byteLength(original),165011);const expiry=Date.now()+600000;st.publicExpiry.set(key,expiry);const h=handler(st);assert.equal((await call(h,claim())).statusCode,200);const linked=st.kv.get(key);assert.equal(linked.replace(/,"ownerAccountId":"[^"]+"(?=})/,'').replace(/"revision":"[a-f0-9]{32}"/, '"revision":"'+JSON.parse(original).revision+'"'),original);assert.equal(st.publicExpiry.get(key),expiry);
+ assert.equal((await call(h,{action:'unlink',id:ID})).statusCode,200);assert.equal(st.kv.get(key).replace(/"revision":"[a-f0-9]{32}"/,'"revision":"'+JSON.parse(original).revision+'"'),original);assert.equal(st.publicExpiry.get(key),expiry);
+});
+for(const transport of ['memory','redis-model'])test(transport+': legacy situations object is preserved but update response normalizes []',async()=>{const f=transport==='memory'?{backend:new MemoryStore()}:redisFixture(),st=f.redis||f.backend;await seed(f.backend,{ownerAccountId:ACCOUNT,data:{...DATA,situations:[]}});const key=storeKeys(scope,ID)[0];f.backend.kv.set(key,f.backend.kv.get(key).replace('"situations":[]','"situations":{}'));const r=await call(handler(st),update({...DATA,intro:'changed'}));assert.equal(r.statusCode,200,r.body);assert.deepEqual(r.json().data.situations,[]);assert.ok(f.backend.kv.get(key).includes('"situations":{}'));});
+for(const action of ['list','claim'])for(const invalid of ['{broken','[]','{"id":42,"data":{}}'])test('malformed indexed record blocks without pruning: '+action+' '+invalid,async()=>{const st=new MemoryStore();await seed(st);const keys=ownerKeys(scope,ACCOUNT,ID),idx=keys[1],badId='z'.repeat(22),stale='y'.repeat(22);st.kv.set(scope.namespace+':record:'+badId,invalid);st.kv.set(idx,new Map([[stale,2],[badId,1]]));const before=st.kv.get(keys[0]),members=[...st.kv.get(idx)];const r=await st.ownerTransaction(action,action==='list'?[idx]:keys,{accountId:ACCOUNT,prefix:scope.namespace+':record:',expected:'0'.repeat(32),revision:'e'.repeat(32),scan:500,limit:100,now:Date.now()});assert.equal(r.status,'blocked');assert.equal(st.kv.get(keys[0]),before);assert.deepEqual([...st.kv.get(idx)],members);});
+for(const transport of ['memory','redis-model'])test(transport+': same-revision password change after verification snapshot cannot claim',async()=>{const f=transport==='memory'?{backend:new MemoryStore()}:redisFixture(),st=f.redis||f.backend;await seed(f.backend);const key=storeKeys(scope,ID)[0],newPassword=await hashPassword('synthetic-replacement-password'),get=st.getOwnerSnapshot.bind(st);let swapped=false,changed,reads=0;st.getOwnerSnapshot=async k=>{const checked=await get(k);reads++;if(!swapped){swapped=true;changed=JSON.stringify({...JSON.parse(checked.raw),password:newPassword});f.backend.kv.set(k,changed);}return checked;};const r=await call(handler(st),claim());assert.equal(r.statusCode,403,r.body);assert.equal(reads,2,'CAS conflict must trigger fresh password verification');assert.equal(f.backend.kv.get(key),changed);assert.equal(f.backend.kv.has(ownerKeys(scope,ACCOUNT)[0]),false);});
