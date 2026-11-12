@@ -16,6 +16,7 @@ import { makeHomeExplainer } from './home-explainer.js';
 import { setupHomeLogo } from './logo-home.js';
 import { makeAccountUI } from './account-ui.js';
 import { allowOwnerHashChange } from './account-navigation.js';
+import { makeAiAccessPanel } from './ai-access-ui.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -279,6 +280,7 @@ function renderHome() {
       h('div', { class: 'hero-actions' }, h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료로 페이지 만들기')),
       h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
       h('p', { class: 'small muted page-stage-note' }, '베타 기간에는 공개와 QR·소개글을 무료로 이용할 수 있어요. 검색 노출과 AI 추천은 보장하지 않아요.')),
+    makeAiAccessPanel({ h, fetcher: (url, options) => fetch(url, options), kind: 'site' }),
     makeHomeExample(h),
     makeHomeExplainer(h, focusStart),
     pageSearchWarning, pendingDiagnosis,
