@@ -14,6 +14,8 @@ import { makeDiagnosisStart } from './diagnosis-start.js';
 import { makeHomeExample } from './home-example.js';
 import { makeHomeExplainer } from './home-explainer.js';
 import { setupHomeLogo } from './logo-home.js';
+import { makeAccountUI } from './account-ui.js';
+import { allowOwnerHashChange } from './account-navigation.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -96,6 +98,7 @@ async function post(path, body, timeoutMs) {
     if (!res.ok || !data) {
       const err = new Error(data?.error || `요청이 실패했어요. (${res.status})`);
       err.code = data?.code || `HTTP_${res.status}`;
+      err.status = res.status;
       throw err;
     }
     return data;
@@ -125,11 +128,14 @@ function route() {
   const policy = { '#/terms': 'terms', '#/privacy': 'privacy', '#/refund': 'refund' }[hash];
   const manage = /^#\/manage\/([A-Za-z0-9_-]{22})$/.exec(hash);
   const reportStore = /^#\/report-store\/([A-Za-z0-9_-]{22})$/.exec(hash);
-  // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다 (home·find·survey·done·report·policy)
-  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : ({ '#/find': 'find', '#/page-search': 'find', '#/page-confirmed': 'find', '#/page-questions': 'find', '#/page-preview': 'find', '#/page-edit': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
+  const ownerEdit = /^#\/my-stores\/([A-Za-z0-9_-]{22})$/.exec(hash);
+  // 화면마다 넓이·배치를 다르게 하려고 body에 화면 이름을 남긴다.
+  document.body.dataset.page = linked ? 'report' : policy ? 'policy' : (ownerEdit || hash === '#/my-stores') ? 'account' : ({ '#/find': 'find', '#/page-search': 'find', '#/page-confirmed': 'find', '#/page-questions': 'find', '#/page-preview': 'find', '#/page-edit': 'find', '#/survey': 'survey', '#/done': 'done', '#/report': 'report', '#/sample': 'report' })[hash] || 'home';
   if (linked) renderLinked(linked[1], linked[2]);
   else if (manage) storeTools.renderManage(manage[1]);
   else if (reportStore) storeTools.renderReport(reportStore[1]);
+  else if (ownerEdit) { storeName.textContent = ''; accountUI.renderAccountEdit(ownerEdit[1]); }
+  else if (hash === '#/my-stores') { storeName.textContent = ''; accountUI.renderDashboard(); }
   else if (policy) renderPolicy(policy);
   else if (hash === '#/sample') renderSample();
   else if (hash === '#/page-search') pageStartFlow.renderSearch();
@@ -146,7 +152,9 @@ function route() {
   else if (hash === '#/report') renderReport();
   else renderHome();
 }
-window.addEventListener('hashchange', () => {
+window.addEventListener('hashchange', (event) => {
+  // 계정 편집의 미저장 내용은 뒤로 가기·로고·메뉴 이동 시 먼저 확인한다.
+  if (!allowOwnerHashChange(event, accountUI, history)) return;
   route();
   window.scrollTo(0, 0);
 });
@@ -172,6 +180,9 @@ function showError(e, retry) {
 }
 
 const storeTools = makeStoreTools({ h, show, setNavbar, btn, post, onDeleted: id => pageStartFlow.clearPublication(id), onUpdated: (id, data) => pageStartFlow.recordPublicationUpdate(id, data) });
+const accountUI = makeAccountUI({ h, show, setNavbar, btn, post, fetcher: (url, options) => fetch(url, options), storeName,
+  getDraftResume: () => { const info = pageStartFlow.info(); return info.draftStatus === 'ready' && /^#\/page-(preview|edit|publish)$/.test(info.resumeHash) ? info.resumeHash : ''; },
+});
 const pageStartFlow = makePageStart({ h, show, setNavbar, btn, post, storeName, onPublished: (id, data) => storeTools.renderPublished(id, data) });
 let diagnosisFindAuthorized = false;
 const diagnosisStartFlow = makeDiagnosisStart({
@@ -271,6 +282,7 @@ function renderHome() {
     makeHomeExample(h),
     makeHomeExplainer(h, focusStart),
     pageSearchWarning, pendingDiagnosis,
+    paidReportRecoveryCard(),
     h('form', { class: 'card', id: 'startCard', novalidate: true, onsubmit: (e) => { e.preventDefault(); go(); } },
       h('div', { class: 'qhead' }, h('span', { class: 'area-tag' }, '무료로 페이지 만들기')),
       h('h2', null, '가게 이름과 주소를 알려주세요'),
@@ -1500,6 +1512,20 @@ function payReminder(data) {
     priceTag(),
     h('button', { class: 'btn primary block', type: 'button', onclick: focusPayCard }, '결제 안내 보기'));
 }
+function paidReportRecoveryLinks() {
+  const links = [];
+  // Include the legacy entry without replacing it; only exact rid/token duplicates collapse.
+  for (const p of [S.paidReportLink, ...(Array.isArray(S.paidReportLinks) ? S.paidReportLinks : [])]) {
+    if (p?.rid && p?.token && !links.some((x) => x.rid === p.rid && x.token === p.token)) links.push(p);
+  }
+  return links;
+}
+function paidReportRecoveryCard() {
+  const links = paidReportRecoveryLinks();
+  return links.length ? h('div', { class: 'card note' }, links.map((p, i) =>
+    h('p', null, h('a', { class: 'btn small', href: `#/r/${p.rid}.${p.token}` },
+      `결제한 보고서 다시 보기${links.length > 1 ? ` ${i + 1}` : ''}`)))) : null;
+}
 function paidCard(data) {
   const p = data.payment || {};
   let when = '';
@@ -1532,19 +1558,23 @@ async function startPayment(data, button) {
     return;
   }
   if (!data?.rid || !data?.token) { toast('보고서 번호가 없어요. 보고서를 다시 만든 뒤 결제해 주세요.', 5000); return; }
+  const seq = navSeq;
   payBusy = true;
   const label = button?.textContent;
   if (button) { button.disabled = true; button.textContent = '결제창을 여는 중…'; }
   try {
     const o = await post('/api/pay', { action: 'order', rid: data.rid, token: data.token }, 20000);
-    if (o.paid) { await reopenReport(data); return; }
+    if (o.paid) { await reopenReport(data, seq); return; }
+    if (seq !== navSeq) return;
     if (!window.TossPayments) await loadScript(TOSS_SDK);
+    if (seq !== navSeq) return;
     if (!window.TossPayments) throw new Error('결제창을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     S.pendingPay = { orderId: o.orderId, rid: data.rid, token: data.token, at: Date.now() };
     save();
     await openTossCheckout(o);
   } catch (e) {
     console.error('[pay]', e);
+    if (seq !== navSeq) return;
     const canceled = /CANCEL/i.test(String(e?.code || ''));
     toast(canceled ? '결제를 취소했어요.' : e?.message || '결제창을 열지 못했어요. 잠시 후 다시 시도해 주세요.', 5000);
   } finally {
@@ -1593,9 +1623,10 @@ async function openTossCheckout(o) {
     card: { flowMode: 'DEFAULT', useEscrow: false, useCardPoint: false, useAppCardOnly: false },
   });
 }
-async function reopenReport(data) {
+async function reopenReport(data, seq = navSeq) {
   const fresh = await post('/api/pay', { action: 'view', rid: data.rid, token: data.token }, 20000);
   if (S.report?.data?.rid === fresh.rid) { S.report.data = { ...fresh, token: data.token }; save(); }
+  if (seq !== navSeq) return;
   route();
 }
 // 결제창에서 돌아왔을 때 (?pay=success|fail)
@@ -1618,6 +1649,7 @@ async function handlePayReturn() {
   return true;
 }
 async function confirmPayment() {
+  const seq = navSeq;
   const p = S.pendingPay;
   if (!p?.paymentKey) { route(); return; }
   document.body.dataset.page = 'report';
@@ -1637,18 +1669,21 @@ async function confirmPayment() {
         throw e;
       }
     }
-    S.pendingPay = null;
+    if (S.pendingPay === p) S.pendingPay = null;
     const token = data.token || p.token;
-    if (S.report?.data?.rid && S.report.data.rid === data.rid) {
-      S.report.data = { ...data, token };
-      save();
-      route();
-    } else {
-      save();
-      location.hash = `#/r/${data.rid}.${token}`;
-    }
+    const mine = S.report?.data?.rid && S.report.data.rid === data.rid;
+    if (mine) S.report.data = { ...data, token };
+    // Keep access even if confirmation finishes after leaving, without moving the current screen.
+    const links = paidReportRecoveryLinks();
+    if (!links.some((p) => p.rid === data.rid && p.token === token)) links.push({ rid: data.rid, token });
+    S.paidReportLinks = links;
+    save();
+    if (seq !== navSeq) return;
+    if (mine) route();
+    else location.hash = `#/r/${data.rid}.${token}`;
     toast('결제가 완료됐어요. 맞춤 실행 패키지와 PDF 저장이 열렸어요.', 6000);
   } catch (e) {
+    if (seq !== navSeq) return;
     show(h('div', { class: 'card warn' },
       h('h2', null, '결제를 확인하지 못했어요'),
       h('p', null, e.message || '잠시 후 다시 확인해 주세요.'),
@@ -1773,6 +1808,7 @@ function reportBody(data, { stale = false, sample = false, linked = false } = {}
   ];
 }
 async function deleteServerCopy(data) {
+  const seq = navSeq;
   const paidNote = data.paid ? ' 결제한 보고서라면 다시 보기 링크가 더 이상 열리지 않아요(결제 기록은 법에 따라 5년 보관해요).' : ' 지우면 이 보고서로는 결제할 수 없어요.';
   if (!confirm(`서버에 보관된 이 보고서를 지울까요? 이 브라우저에 저장된 화면은 남아 있어요.${paidNote}`)) return;
   try {
@@ -1782,9 +1818,17 @@ async function deleteServerCopy(data) {
       S.report.data = rest;
       save();
     }
+    const links = paidReportRecoveryLinks();
+    if (links.some((p) => p.rid === data.rid)) {
+      S.paidReportLinks = links.filter((p) => p.rid !== data.rid);
+      if (S.paidReportLink?.rid === data.rid) S.paidReportLink = null;
+      save();
+    }
+    if (seq !== navSeq) return;
     toast('서버에 보관된 보고서를 지웠어요.', 4000);
     route();
   } catch (e) {
+    if (seq !== navSeq) return;
     toast(e.message || '지우지 못했어요. 잠시 후 다시 시도해 주세요.', 5000);
   }
 }
@@ -1887,7 +1931,7 @@ function renderPolicy(kind) {
           '무료 핵심 진단: 상호명·주소, 인터뷰 답변, 인터넷 공개 정보를 바탕으로 AI가 만든 진단 보고서 중 핵심 진단(한 줄 진단과 핵심 숫자, 가장 중요한 문제, 지금 바로 할 일, 위생·안전, 인터넷에서 본 우리 가게, 숫자로 본 우리 가게, 우선 개선안 목록과 1순위 개선안, 확인할 것)을 무료로 제공합니다.',
           `맞춤 실행 패키지(유료, 보고서 1건 ${price}): 같은 보고서의 나머지 개선안별 확인 근거·실행 방법·기대 효과·담당·비용과 기간·준비물·확인 지표, 수익 구조·메뉴·고객 경험 연결 분석, 실행 계획, PDF 저장, 결제일부터 90일 동안의 다시 보기 링크를 제공합니다.`,
           '보고서는 AI가 이용자의 답변과 인터넷 공개 정보로 만든 참고 자료예요. 매출·이익 증가 같은 결과를 보장하지 않으며, 중요한 결정 전에는 장부와 현장에서 확인해야 합니다.']],
-      ['제3조 (이용 방법)', '회원가입 없이 이용합니다. 진행 중인 답변과 보고서는 이용자의 브라우저에 저장되며, 브라우저 저장소를 지우면 다시 볼 수 없을 수 있습니다. 결제한 보고서는 다시 보기 링크로 결제일부터 90일 동안 열 수 있습니다.'],
+      ['제3조 (이용 방법)', '가게 정보 입력과 미리보기는 회원가입 없이 시작할 수 있습니다. 간편 로그인은 선택 사항이며, 기존 페이지를 계정에 연결하려면 관리 비밀번호로 소유를 확인해야 합니다. 진행 중인 답변과 보고서는 이용자의 브라우저에 저장되며, 브라우저 저장소를 지우면 다시 볼 수 없을 수 있습니다. 결제한 보고서는 다시 보기 링크로 결제일부터 90일 동안 열 수 있습니다.'], 
       ['제4조 (가격과 결제)', `맞춤 실행 패키지의 가격은 보고서 1건당 ${price}이며 부가세가 포함된 최종 결제 금액입니다. 결제는 토스페이먼츠 결제창(카드·간편결제)으로 하며, 결제가 승인되면 즉시 해당 보고서의 잠긴 내용이 열립니다. 가격이 바뀌어도 이미 결제한 건에는 영향이 없습니다.`],
       ['제5조 (청약철회와 환불)', '맞춤 실행 패키지는 결제와 동시에 제공이 시작되는 디지털 콘텐츠예요. 단순 변심에 의한 청약철회 제한과 환불 기준은 환불 정책에 따릅니다. 이 내용은 결제 전에 안내하고 동의를 받습니다.'],
       ['제6조 (이용자의 의무)', ['다른 사람의 가게를 사칭하거나 권한 없는 내용, 타인의 개인정보, 허위·불법 자료를 게시하거나 서비스 운영을 방해해서는 안 됩니다.', '받은 보고서를 다른 사람에게 판매하거나, 다시 보기 링크를 대가를 받고 배포해서는 안 됩니다.']],

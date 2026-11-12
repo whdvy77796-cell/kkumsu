@@ -16,6 +16,8 @@ const routes = {
   '/api/report': (await import('../api/report.js')).default,
   '/api/research': (await import('../api/research.js')).default,
   '/api/stores': (await import('../api/stores.js')).default,
+  '/api/owner-auth': (await import('../api/owner-auth.js')).default,
+  '/api/owner-stores': (await import('../api/owner-stores.js')).default,
   '/api/pay': (await import('../api/pay.js')).default,
 };
 const MIME = {

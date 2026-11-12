@@ -333,6 +333,7 @@ export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpd
       h('section', { class: 'card manage-link' },
         h('h2', null, '관리 (만든 사람 전용)'),
         h('p', null, h('a', { href: manageHref(id) }, '내용 수정·삭제하기'), ' (관리 비밀번호가 필요해요)'),
+        h('p', null, h('a', { href: '/#/my-stores' }, '내 가게 계정에 연결하기'), ' (로그인 후 공개 주소와 관리 비밀번호로 연결해요)'),
         h('p', { class: 'muted' }, `관리 주소: ${manageUrl} — 손님에게 공유하지 마세요. 비밀번호는 잃어버리면 복구할 수 없어요.`)));
   }
 

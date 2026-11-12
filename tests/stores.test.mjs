@@ -100,11 +100,11 @@ test('directory is index-paginated at twenty entries and contains no private fie
 });
 
 test('atomic helpers: concurrent create consumes quota once; stale update cannot resurrect delete',async()=>{
- const st=new MemoryStore(),keys=storeKeys(scope,ID),record={id:ID,data:DATA,createdAt:Date.now(),revision:'v1',hidden:false};
+ const st=new MemoryStore(),keys=storeKeys(scope,ID),record={id:ID,data:DATA,password:{salt:'test',hash:'test'},createdAt:Date.now(),revision:'v1',hidden:false};
  const p={now:Date.now(),record,ttl:0,counters:[{key:'create-count',limit:50,ttl:172800}]};
  const results=await Promise.all(Array.from({length:10},()=>st.publicTransaction('create',keys,p)));
  assert.equal(results.filter(r=>r.status==='created').length,1);assert.equal(st.kv.get('create-count'),1);assert.equal(st.kv.get(keys[1]).size,1);
- await st.publicTransaction('delete',keys,{now:Date.now(),expected:'v1',revision:'deleted',tombstoneTtl:86400});
+ await st.publicTransaction('delete',keys,{now:Date.now(),expected:'v1',expectedRaw:st.kv.get(keys[0]),revision:'d'.repeat(32),tombstoneTtl:86400});
  const late=await st.publicTransaction('update',keys,{now:Date.now(),expected:'v1',record:{...record,revision:'v2'},ttl:0});assert.equal(late.status,'missing');assert.equal(st.kv.get(keys[1]).size,0);
 });
 
@@ -203,8 +203,8 @@ test('omitted old-client update preserves situations; explicit [] clears and sta
 
 test('omitted situations merge is immutable and re-read after a CAS conflict',async()=>{
  const st=new MemoryStore(),h=createHandler({store:st,env:ENV});await invoke(h,create(ID,withSituations()));
- const read=st.getJson.bind(st),transaction=st.publicTransaction.bind(st),observed=[];
- st.getJson=async key=>{const record=await read(key);if(record?.data){Object.freeze(record.data.situations);Object.freeze(record.data);Object.freeze(record);observed.push(record);}return record;};
+ const read=st.getJson.bind(st),snapshotRead=st.getLegacySnapshot.bind(st),transaction=st.publicTransaction.bind(st),observed=[];
+ st.getLegacySnapshot=async key=>{const snap=await snapshotRead(key),record=snap.record;if(record?.data){Object.freeze(record.data.situations);Object.freeze(record.data);Object.freeze(record);observed.push(record);}return snap;};
  const latest=[{question:'새로 바뀐 질문?',answer:'다른 편집기에서 저장한 답변'}];let conflicts=0;
  st.publicTransaction=async(op,keys,p)=>{
    if(op==='update' && conflicts++===0){const concurrent=await read(keys[0]);st.kv.set(keys[0],JSON.stringify({...concurrent,data:{...concurrent.data,situations:latest},revision:'concurrent-revision'}));}
@@ -236,7 +236,7 @@ function redisFixture({loseCreate=false}={}){
    }
    assert.equal(args[0],'EVAL');assert.equal(args[1],STORES_LUA);const count=Number(args[2]),keys=args.slice(3,3+count),op=args[3+count],payload=JSON.parse(args[4+count]);
    const result=await backend.publicTransaction(op,keys,payload);
-   if(['create','update','report','delete'].includes(op) && backend.kv.has(keys[0])) backend.kv.set(keys[0],cjsonStringify(JSON.parse(backend.kv.get(keys[0]))));
+   if(op==='create' && backend.kv.has(keys[0])) backend.kv.set(keys[0],cjsonStringify(JSON.parse(backend.kv.get(keys[0]))));
    if(op==='create'&&loseCreate&&!state.lost){state.lost=true;throw new Error('simulated lost response after atomic commit');}
    return new Response(JSON.stringify({result:cjsonStringify(result)}));
  });
