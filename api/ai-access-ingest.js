@@ -30,10 +30,16 @@ async function rawBytes(req){
   if(length!==undefined&&Number(length)!==size)throw new Error('BODY');
   return Buffer.concat(chunks);
 }
+// A production deployment has three confirmed public aliases sharing one
+// store namespace. Preview remains strictly bound to its own branch host.
+const productionHosts=new Set(['www.kkumsu.com','www.kkumsu.net','kkumsu-rho.vercel.app']);
 function candidate(row,scope,project,started,now){
   if(!row||typeof row!=='object'||Array.isArray(row)||!['static','lambda'].includes(row.source)||row.projectId!==project||row.environment!==(scope.production?'production':'preview')||row.customEnvironment)return null;
   const p=row.proxy;
-  if(!p||typeof p!=='object'||Array.isArray(p)||p.host!==scope.host||row.host!==scope.host||p.method!=='GET'||!Number.isInteger(p.statusCode)||p.statusCode<200||p.statusCode>299||[p.wafAction,row.wafAction].some(v=>v!==undefined&&!['log','bypass'].includes(v)))return null;
+  // Vercel's top-level host can be the generated deployment hostname while
+  // proxy.host is the actual requested public host. The signed proxy host,
+  // project and environment together define the allowed collection boundary.
+  if(!p||typeof p!=='object'||Array.isArray(p)||(scope.production?!productionHosts.has(p.host):p.host!==scope.host)||p.method!=='GET'||!Number.isInteger(p.statusCode)||p.statusCode<200||p.statusCode>299||[p.wafAction,row.wafAction].some(v=>v!==undefined&&!['log','bypass'].includes(v)))return null;
   if(!Number.isSafeInteger(p.timestamp)||p.timestamp<started||p.timestamp>now+300000)return null;
   if(typeof p.path!=='string'||p.path.length>8192)return null;
   const pathname=p.path.split('?')[0];
