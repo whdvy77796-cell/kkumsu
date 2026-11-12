@@ -17,8 +17,11 @@ export function strictStartedAt(value){
 async function rawBytes(req){
   const length=req.headers['content-length'];
   if(length!==undefined&&(!/^\d+$/.test(String(length))||Number(length)>RAW_LIMIT))throw new Error('BODY');
-  // Never reserialize pre-parsed JSON or trust a separately supplied body.
-  if(req.body!==undefined)throw new Error('BODY');
+  // Vercel exposes req.body as a lazy getter: touching it would consume/parse
+  // the raw stream before signature verification. Reject an already materialized
+  // own body value without ever invoking a getter.
+  const bodyDescriptor=Object.getOwnPropertyDescriptor(req,'body');
+  if(bodyDescriptor&&Object.hasOwn(bodyDescriptor,'value')&&bodyDescriptor.value!==undefined)throw new Error('BODY');
   const chunks=[];let size=0;
   for await(const chunk of req){
     if(!Buffer.isBuffer(chunk)&&!(chunk instanceof Uint8Array))throw new Error('BODY');
