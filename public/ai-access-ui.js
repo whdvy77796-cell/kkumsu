@@ -142,6 +142,7 @@ export function makeAiAccessPanel({ h, fetcher, kind, storeId } = {}) {
     if (d.since && (d.lifetime.verified > 0 || d.lifetime.unverified > 0)) dates.push(`첫 집계 기록: ${formatDay(d.since)}`);
     dates.push(d.updatedAt ? `마지막 갱신: ${formatMoment(d.updatedAt)}` : '마지막 갱신 정보가 없어요');
     const recent = d.updatedAt ? `마지막 집계: ${formatMoment(d.updatedAt)}` : '마지막 집계 시각을 확인할 수 없어요';
+    const first = d.since && (d.lifetime.verified > 0 || d.lifetime.unverified > 0) ? `첫 집계 ${formatDay(d.since)}부터` : '기록 시작 이후';
     const unverified = `${limited ? '최소 ' : ''}${nf.format(d.lifetime.unverified)}회`;
     setBody(false,
       h('div', { class: 'ai-access-hero' },
@@ -151,7 +152,7 @@ export function makeAiAccessPanel({ h, fetcher, kind, storeId } = {}) {
           h('span', { class: 'ai-access-total-unit' }, '회')),
         h('div', { class: 'ai-access-overview' },
           h('p', { class: 'ai-access-lead' }, h('span', { class: 'ai-access-dot', 'aria-hidden': 'true' }), '확인된 AI·검색 봇 접근'),
-          h('p', { class: 'ai-access-meta' }, '기록 시작 이후 누적 · 미확인 봇 주장 ', h('b', null, unverified)),
+          h('p', { class: 'ai-access-meta' }, `${first} 누적 · 미확인 봇 주장 `, h('b', null, unverified)),
           h('p', { class: 'ai-access-meta' }, recent),
           limited ? h('p', { class: 'ai-access-limited', role: 'note' }, '일부 기록만 집계됨 · 최소치') : null)),
       h('details', { class: 'ai-access-details' },
