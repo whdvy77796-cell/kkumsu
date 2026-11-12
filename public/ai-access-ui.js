@@ -61,12 +61,15 @@ export function aiAccessUrl(kind, storeId) {
 
 export function makeAiAccessPanel({ h, fetcher, kind, storeId } = {}) {
   const isStore = kind === 'store';
+  const host = typeof globalThis.location?.hostname === 'string' ? globalThis.location.hostname : '';
+  const isPreview = host.endsWith('.vercel.app') && host !== 'kkumsu-rho.vercel.app';
   const scopeName = isStore ? '이 가게 페이지' : '여기봐 공개 홈·가게 목록·가게 페이지';
   const url = aiAccessUrl(isStore ? 'store' : 'site', storeId);
   const titleId = `ai-access-title-${Math.random().toString(36).slice(2, 9)}`;
   const body = h('div', { class: 'ai-access-body', 'aria-live': 'polite', 'aria-busy': 'false' });
   const section = h('section', { class: `card ai-access ai-access-${isStore ? 'store' : 'site'}`, 'aria-labelledby': titleId },
     h('h3', { id: titleId, class: 'ai-access-title' }, isStore ? 'AI·검색 봇 접근 현황 (이 가게)' : 'AI·검색 봇 접근 현황 (여기봐 공개 페이지)'),
+    isPreview ? h('p', { class: 'ai-access-badge', role: 'note' }, '시험 화면이에요. 숫자에는 가상 요청이 포함될 수 있어요.') : null,
     body);
   let seq = 0;
   let loading = false;
