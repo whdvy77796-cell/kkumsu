@@ -5,6 +5,8 @@ const STATES = ['not_started', 'active', 'limited', 'unavailable'];
 const PROVIDERS = { openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google' };
 const PURPOSES = { search: '검색 답변용', training: '학습용', user: '사용자 요청 대행', search_engine: '검색엔진' };
 const nf = new Intl.NumberFormat('ko-KR');
+// 화면을 연 동안만 약 1분 간격으로 재조회한다. 실제 전달 지연은 따로 생길 수 있다.
+export const AI_ACCESS_REFRESH_MS = 60_000;
 
 const isCount = (n) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
 const isPair = (p) => !!p && typeof p === 'object' && !Array.isArray(p) && isCount(p.verified) && isCount(p.unverified);
@@ -73,6 +75,8 @@ export function makeAiAccessPanel({ h, fetcher, kind, storeId } = {}) {
     body);
   let seq = 0;
   let loading = false;
+  let started = !isStore;
+  let lastValueKey = null;
 
   const setBody = (busy, ...kids) => {
     body.replaceChildren();
@@ -116,8 +120,9 @@ export function makeAiAccessPanel({ h, fetcher, kind, storeId } = {}) {
           h('td', { class: 'ai-access-r' }, nf.format(r.verified)), h('td', { class: 'ai-access-r' }, nf.format(r.unverified)))))));
   }
 
-  const retryButton = () => h('button', { type: 'button', class: 'ai-access-btn', onclick: () => { load(); } }, '다시 시도');
-  const refreshButton = () => h('button', { type: 'button', class: 'ai-access-btn ai-access-btn-quiet', onclick: () => { load(); } }, '새로고침');
+  const beginLoad = () => { started = true; void load(); };
+  const retryButton = () => h('button', { type: 'button', class: 'ai-access-btn', onclick: beginLoad }, '다시 시도');
+  const refreshButton = () => h('button', { type: 'button', class: 'ai-access-btn ai-access-btn-quiet', onclick: beginLoad }, '새로고침');
 
   function renderUnavailable() {
     setBody(false,
@@ -154,6 +159,7 @@ export function makeAiAccessPanel({ h, fetcher, kind, storeId } = {}) {
           h('p', { class: 'ai-access-lead' }, h('span', { class: 'ai-access-dot', 'aria-hidden': 'true' }), '확인된 AI·검색 봇 접근'),
           h('p', { class: 'ai-access-meta' }, `${first} 누적 · 미확인 봇 주장 `, h('b', null, unverified)),
           h('p', { class: 'ai-access-meta' }, recent),
+          h('p', { class: 'ai-access-meta' }, '화면을 열어두면 약 1분마다 다시 확인해요. 수집 지연이나 누락이 있을 수 있어요.'),
           limited ? h('p', { class: 'ai-access-limited', role: 'note' }, '일부 기록만 집계됨 · 최소치') : null)),
       h('details', { class: 'ai-access-details' },
         h('summary', null,
@@ -176,12 +182,12 @@ export function makeAiAccessPanel({ h, fetcher, kind, storeId } = {}) {
     setBody(true, h('p', { class: 'ai-access-status', role: 'status' }, '접근 현황을 불러오는 중…'));
   }
 
-  async function load() {
+  async function load({ automatic = false } = {}) {
     if (loading) return;
     if (!url || typeof fetcher !== 'function') { renderUnavailable(); return; }
     loading = true;
     const mine = ++seq;
-    renderLoading();
+    if (!automatic || lastValueKey === null) renderLoading();
     let parsed = null;
     try {
       const res = await fetcher(url, { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' } });
@@ -189,19 +195,34 @@ export function makeAiAccessPanel({ h, fetcher, kind, storeId } = {}) {
     } catch { parsed = null; }
     loading = false;
     if (mine !== seq) return;
-    if (parsed) renderData(parsed); else renderUnavailable();
+    if (!parsed) { lastValueKey = null; renderUnavailable(); return; }
+    const nextValueKey = JSON.stringify(parsed);
+    // 동일한 응답을 매번 다시 그리지 않아 화면 낭독과 펼친 내용을 방해하지 않는다.
+    if (automatic && nextValueKey === lastValueKey) return;
+    const expanded = automatic && !!body.querySelector?.('.ai-access-details')?.open;
+    lastValueKey = nextValueKey;
+    renderData(parsed);
+    if (expanded) { const detail = body.querySelector?.('.ai-access-details'); if (detail) detail.open = true; }
   }
 
   function renderIdle() {
     setBody(false,
       h('p', { class: 'muted' }, '이 가게 페이지에 AI·검색 봇이 다녀갔는지 보려면 버튼을 눌러 주세요. 누르기 전에는 불러오지 않아요.'),
-      h('button', { type: 'button', class: 'ai-access-btn', onclick: () => { load(); } }, '접근 현황 보기'));
+      h('button', { type: 'button', class: 'ai-access-btn', onclick: beginLoad }, '접근 현황 보기'));
   }
 
   if (isStore) {
     if (!url) renderUnavailable(); else renderIdle();
   } else {
-    load();
+    void load();
+  }
+  // 숨겨진 탭은 조회하지 않고, 화면을 떠나 DOM에서 제거되면 타이머를 정리한다.
+  const doc = globalThis.document, win = globalThis.window;
+  if (doc && win && typeof win.setInterval === 'function' && typeof win.clearInterval === 'function') {
+    const timer = win.setInterval(() => {
+      if (!section.isConnected) { win.clearInterval(timer); return; }
+      if (started && doc.visibilityState === 'visible') void load({ automatic: true });
+    }, AI_ACCESS_REFRESH_MS);
   }
   return section;
 }
