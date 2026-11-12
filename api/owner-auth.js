@@ -1,3 +1,4 @@
+import { localAuthAvailable } from '../lib/local-auth.mjs';
 import { HttpError, send, createStore } from '../lib/guard.mjs';
 import { requestScope, checkStoreOrigin } from '../lib/stores.mjs';
 import { authConfig, trustedRequest, requireSession, startLogin, finishLogin, logout, cookieHeader, STATE_COOKIE } from '../lib/owner-auth.mjs';
@@ -62,7 +63,7 @@ export function createHandler(deps = {}) {
         if (config && !usable) throw new HttpError(503, 'AUTH_STORE', '로그인 저장소가 준비되지 않았어요.');
         let session = null;
         if (config && usable) { try { session = await requireSession({ req, store, scope, env, now }); } catch (err) { if (!(err instanceof HttpError && err.status === 401)) throw err; } }
-        return send(res, 200, { authenticated: !!session, provider: session?.provider || null, providers: { kakao: !!(enabledProviders.has('kakao') && config?.providers.kakao && usable), naver: !!(enabledProviders.has('naver') && config?.providers.naver && usable), google: !!(enabledProviders.has('google') && config?.providers.google && usable) } });
+        return send(res, 200, { authenticated: !!session, provider: session?.provider || null, local: !!(usable && localAuthAvailable(env)), providers: { kakao: !!(enabledProviders.has('kakao') && config?.providers.kakao && usable), naver: !!(enabledProviders.has('naver') && config?.providers.naver && usable), google: !!(enabledProviders.has('google') && config?.providers.google && usable) } });
       }
       if (!config) throw new HttpError(503, 'AUTH_CONFIG', '소셜 로그인 설정이 아직 준비되지 않았어요.');
       if (!usable) throw new HttpError(503, 'AUTH_STORE', '로그인 저장소가 준비되지 않았어요.');
