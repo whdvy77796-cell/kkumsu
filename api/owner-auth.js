@@ -2,6 +2,15 @@ import { HttpError, send, createStore } from '../lib/guard.mjs';
 import { requestScope, checkStoreOrigin } from '../lib/stores.mjs';
 import { authConfig, trustedRequest, requireSession, startLogin, finishLogin, logout, cookieHeader, STATE_COOKIE } from '../lib/owner-auth.mjs';
 
+// Launch only Google by default. Other providers can be enabled later without
+// deleting account links. Invalid explicit configuration fails closed.
+function enabledLoginProviders(env) {
+  const setting = env.YB_ENABLED_LOGIN_PROVIDERS;
+  if (setting === undefined) return new Set(['google']);
+  if (typeof setting !== 'string' || !/^(?:google|naver|kakao)(?:,(?:google|naver|kakao))*$/.test(setting)) return new Set();
+  return new Set(setting.split(','));
+}
+
 export function createHandler(deps = {}) {
   return async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
@@ -41,7 +50,7 @@ export function createHandler(deps = {}) {
       if ((googleCallback && query('iss') !== null && query('iss') !== 'https://accounts.google.com') || (!googleCallback && op === 'callback' && query('provider') === 'google')) throw new HttpError(400, 'AUTH_QUERY', '요청 주소를 확인해 주세요.');
       const method = op === 'logout' ? 'POST' : 'GET';
       if (req.method !== method) { res.setHeader('Allow', method); throw new HttpError(405, 'METHOD', '요청 방식을 확인해 주세요.'); }
-      const config = authConfig(env);
+      const config = authConfig(env), enabledProviders = enabledLoginProviders(env);
       // Even status cannot enable login on an untrusted alias/preview host.
       if (config) trustedRequest(req, scope, env);
       let store = deps.store;
@@ -53,7 +62,7 @@ export function createHandler(deps = {}) {
         if (config && !usable) throw new HttpError(503, 'AUTH_STORE', '로그인 저장소가 준비되지 않았어요.');
         let session = null;
         if (config && usable) { try { session = await requireSession({ req, store, scope, env, now }); } catch (err) { if (!(err instanceof HttpError && err.status === 401)) throw err; } }
-        return send(res, 200, { authenticated: !!session, provider: session?.provider || null, providers: { kakao: !!(config?.providers.kakao && usable), naver: !!(config?.providers.naver && usable), google: !!(config?.providers.google && usable) } });
+        return send(res, 200, { authenticated: !!session, provider: session?.provider || null, providers: { kakao: !!(enabledProviders.has('kakao') && config?.providers.kakao && usable), naver: !!(enabledProviders.has('naver') && config?.providers.naver && usable), google: !!(enabledProviders.has('google') && config?.providers.google && usable) } });
       }
       if (!config) throw new HttpError(503, 'AUTH_CONFIG', '소셜 로그인 설정이 아직 준비되지 않았어요.');
       if (!usable) throw new HttpError(503, 'AUTH_STORE', '로그인 저장소가 준비되지 않았어요.');
@@ -63,6 +72,7 @@ export function createHandler(deps = {}) {
         res.setHeader('Set-Cookie', await logout({ req, store, scope, env, now }));
         return send(res, 200, { authenticated: false, provider: null });
       }
+      if (op === 'start' && !enabledProviders.has(query('provider'))) throw new HttpError(503, 'AUTH_DISABLED', '로그인 제공자가 아직 준비되지 않았어요.');
       const common = { req, store, scope, env, now, provider: googleCallback ? 'google' : query('provider') };
       const result = op === 'start'
         ? await startLogin({ ...common, destination: query('return') ?? 'dashboard' })
