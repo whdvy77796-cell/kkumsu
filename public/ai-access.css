@@ -31,3 +31,48 @@
   .ai-access-btn { width: 100%; }
 }
 @media (prefers-reduced-motion: no-preference) { .ai-access-btn { transition: background-color .15s; } }
+
+/* 숫자 중심 요약: 여기봐의 밝은 바탕과 브랜드 블루를 사용한다. */
+.card.ai-access {
+  padding: 22px 22px 16px;
+  background: linear-gradient(130deg, #ffffff 25%, #f2f6ff 100%);
+  border: 1px solid #dce6ff;
+  border-radius: 20px;
+  box-shadow: 0 8px 28px rgba(31, 79, 224, .055);
+}
+.ai-access-title { margin: 0 0 12px; color: var(--ink-2); font-size: .95rem; font-weight: 700; }
+.ai-access-badge { background: #fff8e8; border-color: #f4dda6; color: #76530d; }
+.ai-access-hero { display: flex; align-items: center; gap: clamp(22px, 4vw, 48px); padding: 5px 0 15px; min-width: 0; }
+.ai-access-total { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 3px; margin: 0; min-width: 0; color: var(--brand); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.ai-access-total-number { font-size: clamp(2.75rem, 5vw, 4.35rem); font-weight: 800; letter-spacing: -.055em; overflow-wrap: anywhere; }
+.ai-access-total-unit { color: var(--ink-2); font-size: 1.15rem; font-weight: 700; }
+.ai-access-at-least { color: var(--brand-ink); font-size: 1rem; font-weight: 700; }
+.ai-access-overview { min-width: 0; }
+.ai-access-overview p { margin: 0; }
+.ai-access-lead { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 1rem; font-weight: 750; }
+.ai-access-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 4px #e2ebff; }
+.ai-access-meta { margin-top: 4px !important; color: var(--muted); font-size: .83rem; line-height: 1.5; }
+.ai-access-meta b { color: var(--ink-2); font-weight: 700; }
+.ai-access-limited { margin-top: 5px !important; color: #92530a; font-size: .83rem; font-weight: 700; }
+.ai-access-details { border-top: 1px solid #dce5f6; }
+.ai-access-details > summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 3px 14px; min-height: 44px; padding: 10px 0 0; list-style: none; cursor: pointer; }
+.ai-access-details > summary::-webkit-details-marker { display: none; }
+.ai-access-details > summary:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; border-radius: 3px; }
+.ai-access-footnote { color: #657185; font-size: .78rem; line-height: 1.5; }
+.ai-access-more { color: var(--brand-ink); font-size: .8rem; font-weight: 700; white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
+.ai-access-more::after { content: ' ﹀'; display: inline-block; text-decoration: none; }
+.ai-access-details[open] .ai-access-more::after { transform: rotate(180deg); }
+.ai-access-expanded { display: grid; gap: 12px; margin: 15px 0 4px; padding-top: 16px; border-top: 1px solid #e4ebf8; }
+.ai-access-expanded > * { margin: 0; }
+.ai-access-expanded .ai-access-btn { justify-self: start; }
+.ai-access-dates { font-size: .8rem; line-height: 1.6; }
+@media (min-width: 1024px) {
+  body[data-page="home"] #view > .ai-access-site { grid-column: 1 / -1; grid-row: 2; margin: 28px 0 0; }
+}
+@media (max-width: 600px) {
+  .card.ai-access { padding: 19px 18px 13px; border-radius: 18px; }
+  .ai-access-hero { flex-direction: column; align-items: flex-start; gap: 12px; padding: 3px 0 15px; }
+  .ai-access-total-number { font-size: clamp(2.7rem, 12vw, 3.7rem); }
+  .ai-access-details > summary { align-items: flex-start; }
+  .ai-access-expanded .ai-access-btn { width: auto; }
+}
