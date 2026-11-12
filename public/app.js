@@ -16,6 +16,7 @@ import { makeHomeExplainer } from './home-explainer.js';
 import { setupHomeLogo } from './logo-home.js';
 import { makeAccountUI } from './account-ui.js';
 import { allowOwnerHashChange } from './account-navigation.js';
+import { makeAiAccessPanel } from './ai-access-ui.js';
 
 const view = document.getElementById('view');
 const navbar = document.getElementById('navbar');
@@ -279,6 +280,7 @@ function renderHome() {
       h('div', { class: 'hero-actions' }, h('button', { class: 'btn primary go', type: 'button', onclick: focusStart }, '무료로 페이지 만들기')),
       h('p', { class: 'hero-note' }, '회원가입 없이 시작할 수 있어요'),
       h('p', { class: 'small muted page-stage-note' }, '베타 기간에는 공개와 QR·소개글을 무료로 이용할 수 있어요. 검색 노출과 AI 추천은 보장하지 않아요.')),
+    makeAiAccessPanel({ h, fetcher: (url, options) => fetch(url, options), kind: 'site' }),
     makeHomeExample(h),
     makeHomeExplainer(h, focusStart),
     pageSearchWarning, pendingDiagnosis,
@@ -1956,6 +1958,7 @@ function renderPolicy(kind) {
         'AI 진단 보고서: 이용자가 동의한 경우에만 인터뷰 답변(가게 운영 방식, 매출·비용, 사장님·가족 근무 시간 등)을 받아 보고서를 만드는 데 써요. 답변 원문은 서버에 따로 저장하지 않고, 답변으로 만든 보고서(계산값 포함)만 보관해요.',
         '결제: 주문번호, 결제 고유번호(토스페이먼츠가 주는 값), 결제 금액, 결제 일시, 결제 수단 종류를 결제 확인·환불·분쟁 처리와 법정 기록 보존에 써요. 카드 번호 같은 결제 정보는 토스페이먼츠가 처리하며 운영자는 받지 않아요.',
         '이용량 관리: 접속 IP 주소를 되돌릴 수 없게 바꾼 값(해시)으로 하루 이용 횟수를 세고, 중복 요청 방지를 위한 임시 잠금을 사용해요.',
+        'AI·검색 봇 접근 현황: 공개 홈·가게 목록·가게 페이지에 접근한 요청의 경로·시각·User-Agent와 IP 주소를 호스팅 로그에서 받아 알려진 봇 여부와 공식 IP 대역 일치를 확인해요. 통계 저장소에는 가게 식별번호, 집계 숫자·시각과 중복 방지용 요청 식별자 해시만 보관하고 IP 주소, 원본 User-Agent와 원본 요청 로그는 저장하지 않아요. Vercel의 접속·보안 로그에는 별도의 처리·보관 정책이 적용될 수 있어요.',
         '브라우저 저장소: 기존 진단의 진행 답변은 localStorage에, 가게 소개 확인·재검색 참고 사이트 주소·질문 답변·초안은 해당 탭의 sessionStorage에 임시 저장될 수 있어요. 브라우저 데이터를 삭제하면 기기의 저장 내용을 지울 수 있으나 외부 제공자가 보관한 자료까지 지워지는 것은 아니에요.']],
       ['2. 보관 기간', [
         '간편 로그인 보안 상태: 최대 10분. 로그인 세션: 최대 7일이며, 로그아웃하면 해당 브라우저의 세션을 종료해요.',
@@ -1965,13 +1968,15 @@ function renderPolicy(kind) {
         '보고서: 만든 날부터 7일. 맞춤 실행 패키지를 결제하면 결제일부터 90일(다시 보기 링크)',
         '결제 기록(주문번호·결제 고유번호·금액·일시·수단·보고서 번호): 5년 (전자상거래법의 대금결제 및 재화 등의 공급에 관한 기록). 보고서 내용은 포함하지 않아요.',
         '이용량 집계(IP 해시): 2일',
+        'AI·검색 봇 접근 통계: 중복 방지 요청 식별자 해시는 8일, 일별 통계는 15일, 가게별 누적은 마지막 수신부터 180일. 사이트 전체 누적 통계는 별도로 삭제하거나 초기화할 때까지 보관해요. 가게 페이지를 삭제해도 가게별 통계는 즉시 삭제되지 않고 위 기간이 적용돼요.',
         '위에서 자동 삭제 기간을 정한 항목은 해당 기간이 지나면 저장소에서 지워지도록 설정합니다. 공개 페이지 삭제 후에도 외부 검색 결과나 복사본은 즉시 지워지지 않을 수 있어요.']],
       ['3. 외부 서비스·처리 위탁과 국외 이전', [
         'Google: 사용자가 Google 로그인을 선택하면 Google이 인증을 담당하며, Google의 개인정보 처리방침이 별도로 적용돼요.',
         'OpenRouter, Inc.(미국): AI 요청 중계. 동의한 상호명·주소·재검색 참고 사이트 주소·이전 후보 정보·가게 정보와 질문 답변을 요청할 때 네트워크로 전송해요. 데이터 수집을 허용하지 않는 제공 경로를 요청하지만, 외부 제공자의 보관·삭제는 해당 제공자의 정책이 별도로 적용돼요.',
         'Anthropic, PBC 등 OpenRouter가 연결하는 Claude 모델 제공자(미국): 동의한 정보의 AI 처리.',
         '웹 검색 제공자: 가게 찾기와 재검색에서 동의한 상호·주소와 참고 사이트 주소, 이전 후보 정보가 검색 처리에 전달될 수 있어요. 제공자는 연결 방식에 따라 달라질 수 있으며 각 제공자의 정책이 적용돼요.',
-        'Vercel Inc.(미국): 웹사이트와 서버 운영. 서버 함수는 서울 지역에서 실행돼요.',
+        'Vercel Inc.(미국): 웹사이트와 서버 운영 및 봇 접근을 확인하기 위한 호스팅 로그 전달. 서버 함수는 서울 지역에서 실행돼요. 접속·보안 로그는 Vercel의 별도 정책이 적용될 수 있어요.',
+        'Layerbase, LLC(미국, 미국 버지니아): AI·검색 봇 접근 통계의 가게 식별번호, 집계 숫자·시각과 중복 방지용 요청 식별자 해시 저장. 이 통계 저장소에는 IP 주소와 원본 User-Agent를 저장하지 않아요. 백업과 제공자의 접속·보안 로그에는 별도 정책이 적용될 수 있어요.',
         location.hostname === 'kkumsu-git-yeogibwa-account-login-20261111-kkkkkum.vercel.app'
           ? '이 시험 화면의 저장소는 Layerbase(미국 버지니아)이며, 시험 데이터만 사용해요. 백업은 별도 제공자에 저장될 수 있어요.'
           : 'Upstash, Inc.(미국 회사, 주 저장 위치: 일본 도쿄 AWS 데이터센터): 로그인 가명 식별값·세션·가게 연결 정보, 보고서·조사 결과·결제 기록 및 별도 동의한 공개 가게 소개와 관리·신고 정보를 저장해요. 백업과 접속·보안 로그의 보관 위치는 제공자의 정책에 따라 달라질 수 있어요.',
