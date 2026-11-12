@@ -4,6 +4,7 @@ import { HttpError, RedisStore, createStore, send } from '../lib/guard.mjs';
 import { requestScope, validId } from '../lib/stores.mjs';
 import { ownerKeys, actOnOwnerStore } from '../lib/owner-stores.mjs';
 import { readAiSummary } from '../lib/ai-access-core.mjs';
+import { strictStartedAt, validDedicatedRedis, validAiProjectId } from '../lib/ai-access-config.mjs';
 
 const authDefault = async (args) => (await import('../lib/owner-auth.mjs')).requireSession(args);
 const quiet = () => ({ state: 'not_started', since: null, updatedAt: null, lifetime: null, last7Days: null, breakdown: [] });
@@ -38,20 +39,14 @@ export function publicSummary(value) {
   return { state: value.state, since, updatedAt, lifetime, last7Days, breakdown };
 }
 function configured(env, now) {
-  const startedAt = date(env.YB_AI_ACCESS_STARTED_AT);
+  const started = strictStartedAt(env.YB_AI_ACCESS_STARTED_AT);
   return env.YB_AI_ACCESS_ENABLED === 'true' && typeof env.YB_AI_ACCESS_DRAIN_SECRET === 'string' && Buffer.byteLength(env.YB_AI_ACCESS_DRAIN_SECRET) >= 32 &&
-    typeof env.YB_AI_ACCESS_PROJECT_ID === 'string' && /^prj_[A-Za-z0-9]{8,100}$/.test(env.YB_AI_ACCESS_PROJECT_ID) && startedAt && Date.parse(startedAt) <= now ? startedAt : null;
+    validAiProjectId(env.YB_AI_ACCESS_PROJECT_ID) && started !== null && started <= now ? new Date(started).toISOString() : null;
 }
 function telemetryStore(env, fetcher) {
-  const url = env.YB_AI_ACCESS_REDIS_URL, token = env.YB_AI_ACCESS_REDIS_TOKEN;
-  if (typeof url !== 'string' || typeof token !== 'string' || !token || url.length > 2048) return null;
-  let parsed;
-  try { parsed = new URL(url); } catch { return null; }
-  if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.search || parsed.hash) return null;
-  // 설정상 같은 주소를 재사용하는 경우를 차단한다. 별도 저장소인지는 배포 전 추가 확인한다.
-  const canon = (s) => String(s || '').replace(/\/+$/, '');
-  if ([env.KV_REST_API_URL, env.UPSTASH_REDIS_REST_URL].some((x) => x && canon(x) === canon(url))) return null;
-  return new RedisStore(url, token, fetcher);
+  // Both receiver and reader use the same canonical URL and credential checks.
+  if (!validDedicatedRedis(env)) return null;
+  return new RedisStore(env.YB_AI_ACCESS_REDIS_URL, env.YB_AI_ACCESS_REDIS_TOKEN, fetcher);
 }
 export function createHandler(deps = {}) {
   return async function handler(req, res) {

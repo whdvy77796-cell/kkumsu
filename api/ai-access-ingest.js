@@ -1,19 +1,18 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { createStore } from '../lib/guard.mjs';
 import { requestScope } from '../lib/stores.mjs';
-import { recordAiBatch, MAX_BATCH } from '../lib/ai-access-core.mjs';
+import { recordAiBatch, REDIS_BATCH_SIZE } from '../lib/ai-access-core.mjs';
+import { strictStartedAt, validDedicatedRedis, validAiProjectId } from '../lib/ai-access-config.mjs';
+export { strictStartedAt, validDedicatedRedis } from '../lib/ai-access-config.mjs';
 
 export const config = { api: { bodyParser: false } };
 export const RAW_LIMIT = 1100000;
 // Vercel documents a 1 MB payload, not a 500-row transport batch.
 // The larger intake cap is chunked into bounded aggregate transactions.
 export const MAX_ROWS = 10000;
+// Bound processing work; Redis/official-feed network calls also have their own shorter timeouts.
+export const MAX_PROCESSING_MS = 45000;
 const reply=(res,status)=>{res.statusCode=status;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.end(JSON.stringify(status===200?{ok:true}:{error:'Unavailable'}));};
-export function strictStartedAt(value){
-  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value))return null;
-  const ms=Date.parse(value);if(!Number.isFinite(ms))return null;
-  return new Date(ms).toISOString()===value.replace(/Z$/,value.includes('.')?'Z':'.000Z')?ms:null;
-}
 async function rawBytes(req){
   const length=req.headers['content-length'];
   if(length!==undefined&&(!/^\d+$/.test(String(length))||Number(length)>RAW_LIMIT))throw new Error('BODY');
@@ -54,32 +53,27 @@ function candidate(row,scope,project,started,now){
   const clientIp=typeof p.clientIp==='string'&&p.clientIp.length<=64?p.clientIp:null;
   return {id:createHash('sha256').update(requestId).digest('hex'),at:p.timestamp,storeId:match?match[1]:null,userAgent:ua,clientIp};
 }
-export function validDedicatedRedis(env){
-  try{
-    if(typeof env.YB_AI_ACCESS_REDIS_URL!=='string'||typeof env.YB_AI_ACCESS_REDIS_TOKEN!=='string'||!env.YB_AI_ACCESS_REDIS_TOKEN.trim())return false;
-    const url=new URL(env.YB_AI_ACCESS_REDIS_URL);
-    if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash)return false;
-    const canonical=v=>{try{return new URL(v).href.replace(/\/+$/,'');}catch{return null;}};
-    const endpoint=canonical(url.href);
-    return ![env.KV_REST_API_URL,env.UPSTASH_REDIS_REST_URL].filter(Boolean).some(v=>canonical(v)===endpoint);
-  }catch{return false;}
-}
 export function createHandler(deps={}){
   return async function handler(req,res){
     try{
       const env=deps.env||process.env;
+      const clock=typeof deps.clock==='function'?deps.clock:()=>performance.now();
+      const deadline=clock()+MAX_PROCESSING_MS;
+      const checkDeadline=()=>{if(clock()>=deadline)throw new Error('AI_ACCESS_DEADLINE');};
       if(env.YB_AI_ACCESS_ENABLED!=='true')return reply(res,404);
       const secret=env.YB_AI_ACCESS_DRAIN_SECRET,started=strictStartedAt(env.YB_AI_ACCESS_STARTED_AT);
       const now=typeof deps.now==='function'?deps.now():deps.now??Date.now();
-      if(typeof secret!=='string'||Buffer.byteLength(secret)<32||typeof env.YB_AI_ACCESS_PROJECT_ID!=='string'||!env.YB_AI_ACCESS_PROJECT_ID||env.YB_AI_ACCESS_PROJECT_ID.length>128||started===null||started>now)return reply(res,503);
+      if(typeof secret!=='string'||Buffer.byteLength(secret)<32||!validAiProjectId(env.YB_AI_ACCESS_PROJECT_ID)||started===null||started>now)return reply(res,503);
       if(req.method!=='POST'){res.setHeader('Allow','POST');return reply(res,405);}
       // Accept only JSON, optionally declaring UTF-8. Signature verification
       // still uses the original bytes, never decoded/re-serialized content.
       const contentType=req.headers['content-type'];
-      if(typeof contentType!=='string'||!/^application\/json(?:[ \t]*;[ \t]*charset[ \t]*=[ \t]*(?:"utf-8"|utf-8))?[ \t]*$/i.test(contentType))return reply(res,415);
+      const encoding=req.headers['content-encoding'];
+      if((encoding!==undefined&&String(encoding).toLowerCase()!=='identity')||typeof contentType!=='string'||!/^application\/json(?:[ \t]*;[ \t]*charset[ \t]*=[ \t]*(?:"utf-8"|utf-8))?[ \t]*$/i.test(contentType))return reply(res,415);
       const signature=req.headers['x-vercel-signature'];
       if(typeof signature!=='string'||! /^[a-fA-F0-9]{40}$/.test(signature))return reply(res,403);
       const raw=await rawBytes(req),expected=createHmac('sha1',secret).update(raw).digest();
+      checkDeadline();
       if(!timingSafeEqual(expected,Buffer.from(signature,'hex')))return reply(res,403);
       const scope=requestScope(req,env);
       // Isolated credentials only. No fallback to the site's normal KV or dev store.
@@ -96,12 +90,16 @@ export function createHandler(deps={}){
       // Classify the whole batch before writing, so classifier failure is not a
       // partial success. Sequential bounded evaluation avoids lookup fan-out.
       for(const row of rows){
+        checkDeadline();
         const c=candidate(row,scope,env.YB_AI_ACCESS_PROJECT_ID,started,now);if(!c)continue;
         const bot=await classifier({userAgent:c.userAgent,clientIp:c.clientIp,now});if(!bot)continue;
         events.push({id:c.id,at:c.at,storeId:c.storeId,provider:bot.provider,purpose:bot.purpose,verification:bot.verification});
       }
       const record=deps.recordBatch||recordAiBatch;
-      for(let offset=0;offset<events.length;offset+=MAX_BATCH)await record({store,scope,events:events.slice(offset,offset+MAX_BATCH),now});
+      for(let offset=0;offset<events.length;offset+=REDIS_BATCH_SIZE){
+        checkDeadline();
+        await record({store,scope,events:events.slice(offset,offset+REDIS_BATCH_SIZE),now});
+      }
       return reply(res,200);
     }catch{return reply(res,503);}
   };
