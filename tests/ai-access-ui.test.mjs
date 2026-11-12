@@ -54,6 +54,19 @@ test('site: fetches immediately, same-origin GET, shows loading first', async ()
   assert.equal(find(p, (x) => x.tag === 'table').length, 1);
 });
 
+test('preview data is explicitly labeled, but production aliases are not', async () => {
+  const original=globalThis.location;
+  try {
+    globalThis.location={hostname:'example-git-preview.vercel.app'};
+    const a=makeAiAccessPanel({h,fetcher:mk(active()).fetcher,kind:'site'});assert.match(text(a),/시험 화면이에요/);
+    globalThis.location={hostname:'kkumsu-rho.vercel.app'};
+    const b=makeAiAccessPanel({h,fetcher:mk(active()).fetcher,kind:'site'});assert.doesNotMatch(text(b),/시험 화면이에요/);
+    globalThis.location={hostname:'www.kkumsu.com'};
+    const c=makeAiAccessPanel({h,fetcher:mk(active()).fetcher,kind:'site'});assert.doesNotMatch(text(c),/시험 화면이에요/);
+    await tick();
+  } finally {if(original===undefined) delete globalThis.location;else globalThis.location=original;}
+});
+
 test('store: lazy, no fetch until click, validated id, store wording', async () => {
   const m = mk(active());
   const p = makeAiAccessPanel({ h, fetcher: m.fetcher, kind: 'store', storeId: ID });
