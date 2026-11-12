@@ -444,7 +444,7 @@ test('Google minimum documented scope and PKCE; email and verified flag never id
   for (const claims of [{sub:'subject_a',email_verified:true},{sub:'subject_b',email_verified:true},{sub:'subject_a',email_verified:false},{sub:'subject_a',iss:'accounts.google.com'},{sub:'subject_a',azp:undefined}]) {
     const {x,s,r}=await googleOidcAttempt({claims:{email:'same-email@example.invalid',...claims}});
     assert.equal(r.statusCode,303,r.body); identities.push((await session(x,jar(r))).accountId);
-    const u=new URL(s.r.headers.location); assert.equal(u.searchParams.get('scope'),'openid email'); assert.equal(u.searchParams.has('access_type'),false);
+    const u=new URL(s.r.headers.location); assert.equal(u.searchParams.get('scope'),'openid'); assert.equal(u.searchParams.has('access_type'),false);
     const p=JSON.parse(Buffer.from(s.cookie.split('=')[1].split('.')[0],'base64url').toString('utf8'));
     assert.equal(u.searchParams.get('code_challenge_method'),'S256'); assert.equal(u.searchParams.get('code_challenge'),createHash('sha256').update(p.pkce).digest('base64url'));
     assert.ok(!JSON.stringify([...x.store.kv]).includes('same-email'));
