@@ -1,0 +1,40 @@
+/* Isolated account entry styles. No application-wide selectors. */
+.local-login{box-sizing:border-box;width:100%;max-width:460px;margin:24px auto;padding:36px 32px;background:#fff;border:1px solid #e2e8f0;border-radius:24px;box-shadow:0 12px 40px #182c4910;color:#16243a;overflow-wrap:anywhere}
+.local-login *{box-sizing:border-box}
+.local-login .local-login-eyebrow{margin:0 0 10px;color:#38644f;font-size:13px;font-weight:700;letter-spacing:.08em;text-align:center}
+.local-login h1{margin:0;text-align:center;font-size:30px;line-height:1.35;letter-spacing:-.04em}
+.local-login .local-login-subtitle{margin:12px 0 28px;text-align:center;color:#566276;font-size:14px}
+.local-login .local-login-form{display:grid;gap:10px}
+.local-login label{font-weight:650;font-size:14px;margin-top:6px}
+.local-login input{display:block;width:100%;min-width:0;min-height:50px;margin:0;padding:12px 14px;border:1px solid #b5c0ce;border-radius:10px;background:#fff;color:#16243a;font:inherit;font-size:16px}
+.local-login input::placeholder{color:#697586}
+.local-login button,.local-login a{touch-action:manipulation}
+.local-login .local-login-submit{width:100%;min-height:52px;margin-top:10px;border:0;border-radius:10px;background:#246048;color:white;font:inherit;font-weight:700;cursor:pointer}
+.local-login .local-login-submit:disabled,.local-login input:disabled{background:#edf0f3;color:#596575;cursor:not-allowed;opacity:1}
+.local-login .local-login-message{font-size:14px;line-height:1.65;color:#394d67;margin:14px 0 0}
+.local-login .local-login-message:empty{display:none}
+.local-login .local-login-helpers{display:flex;flex-wrap:wrap;justify-content:center;gap:0 10px;margin:12px 0}
+.local-login .local-login-text-button{min-height:44px;padding:8px 4px;background:transparent;border:0;color:#455368;font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+.local-login .local-login-text-button:disabled{color:#697586;cursor:wait}
+.local-login .local-login-divider{display:flex;align-items:center;gap:12px;margin:22px 0 16px;color:#667184;font-size:13px}
+.local-login .local-login-divider::before,.local-login .local-login-divider::after{content:'';height:1px;flex:1;background:#e2e8f0}
+.local-login .local-login-social{display:grid;gap:10px}
+.local-login .account-provider{width:100%;max-width:none;min-height:48px;justify-content:center;border-radius:10px;overflow:hidden}
+.local-login .account-provider-image{display:block;max-width:100%;height:48px;object-fit:contain}
+.local-login .account-provider-text{display:flex;align-items:center;gap:12px;text-decoration:none;border:1px solid #bdc5ce;background:#fff;color:#263445}
+.local-login .local-login-social-disabled{width:100%;min-height:48px;padding:12px;border:1px solid #d7dee6;border-radius:10px;background:#f6f8fa;color:#596575;font:inherit;font-size:14px;cursor:not-allowed;opacity:1}
+.local-login .local-login-hint,.local-login .local-login-unavailable{font-size:13px;line-height:1.7;color:#566276;margin:10px 0}
+.local-login .local-login-unavailable{padding:12px;border-radius:8px;background:#f2f5f8}
+.local-login .local-login-guest{margin-top:22px;padding-top:20px;border-top:1px solid #e2e8f0;text-align:center}
+.local-login .local-login-guest .btn{min-height:48px;width:100%;border:1px solid #b7c2ce;border-radius:10px;color:#33465c;background:white}
+.local-login :focus-visible{outline:3px solid #2273cf;outline-offset:3px}
+@media(max-width:520px){.local-login{margin:12px auto;padding:28px 18px;border-radius:18px}.local-login h1{font-size:28px}}
+@media(prefers-reduced-motion:reduce){.local-login *{transition:none!important;animation:none!important}}
+
+/* Three centered providers, wrapping for very narrow screens. */
+.local-login .local-login-social{grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;gap:8px}
+.local-login .account-provider{margin:0;min-width:0}
+.local-login .account-provider-text{padding:8px 5px;gap:5px;min-height:48px;height:auto;line-height:1.35;font-size:12px}
+.local-login .account-provider-label{white-space:normal;overflow-wrap:normal;word-break:keep-all}
+.local-login .local-login-social-disabled{font-size:12px;padding:8px 5px;line-height:1.5}
+@media(max-width:340px){.local-login .local-login-social{grid-template-columns:1fr}.local-login .account-provider-text{font-size:14px}}

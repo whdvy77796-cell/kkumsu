@@ -170,19 +170,136 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
     renderLoggedIn(status, stores);
   }
 
+  // Local auth is opt-in. Proposed response contract (not backend implementation):
+  // login: HTTP success + {ok:true, authenticated:true}, then authoritative status refresh.
+  // signup: HTTP success + {ok:true, verificationRequired:true}; only an additional
+  // verificationEmailSent:true permits saying a verification email was sent.
+  // reset: HTTP success + {ok:true}; always use non-enumerating conditional copy.
   function renderLoggedOut(status) {
     const links = loginLinks(status);
-    setNavbar(btn('처음으로', toHome));
-    show(
-      h('section', { class: 'card' },
-        h('h1', null, '내 가게 계정'),
-        h('p', { class: 'muted' }, '로그인하면 만든 가게 페이지를 한곳에서 보고 고칠 수 있어요. 로그인 없이도 지금처럼 페이지를 만들 수 있어요.'),
-        links.length
-          ? h('div', { class: 'field' }, links.map((l) => h('a', { class: `account-provider account-provider-${l.provider}${l.imageSrc ? '' : ' account-provider-text'}`, href: l.href, 'data-provider': l.provider },
-            l.imageSrc ? h('img', { class: 'account-provider-image', src: l.imageSrc, alt: l.imageAlt }) : [l.iconSrc ? h('img', { class: 'account-provider-icon', src: l.iconSrc, alt: '', width: 20, height: 20, 'aria-hidden': 'true' }) : null, h('span', { class: 'account-provider-label' }, l.label)])))
-          : h('p', { class: 'card note', role: 'status' }, '계정 로그인은 아직 준비 중이에요. 지금은 로그인할 수 없어요.'),
-        btn('로그인 없이 시작하기', toHome, links.length === 0)),
-      resumeBlock());
+    const available = status.local === true;
+    const my = seq, hash0 = hashNow();
+    let mode = 'login', busy = false, generation = 0;
+    let pw = null, email = null, form = null, submit = null;
+    let retryAt = 0;
+    const switches = [];
+    const msg = h('p', { class: 'local-login-message', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true', id: 'local-login-message' });
+    const body = h('div', { class: 'local-login-body' });
+    const clearPassword = () => { if (pw) pw.value = ''; };
+    const goHome = () => { clearPassword(); generation++; toHome(); };
+    const inform = (text) => { msg.textContent = text; };
+    const current = (g) => !stale(my, hash0) && generation === g;
+    function switchMode(next) {
+      if (busy || stale(my, hash0)) return;
+      clearPassword();
+      mode = next; generation++;
+      inform('');
+      drawForm(true);
+    }
+    const action = (text, fn) => {
+      const b = h('button', { type: 'button', class: 'local-login-text-button', onclick: fn }, text);
+      switches.push(b);
+      return b;
+    };
+    function drawForm(focusHeading = false) {
+      const title = mode === 'signup' ? '이메일로 회원가입' : mode === 'reset' ? '비밀번호 재설정' : '로그인';
+      const heading = h('h1', { id: 'local-login-title', tabindex: '-1' }, title);
+      email = h('input', { id: 'local-login-email', name: 'email', type: 'email', autocomplete: 'username', inputmode: 'email', autocapitalize: 'none', spellcheck: 'false', required: true, disabled: !available, placeholder: 'name@example.com' });
+      pw = mode === 'reset' ? null : h('input', { id: 'local-login-password', name: 'password', type: 'password', autocomplete: mode === 'signup' ? 'new-password' : 'current-password', required: true, disabled: !available, placeholder: '비밀번호 입력' });
+      submit = h('button', { type: 'submit', class: 'local-login-submit', disabled: !available }, available ? (mode === 'reset' ? '재설정 요청' : mode === 'signup' ? '회원가입' : '로그인') : '이메일 로그인 · 준비 중');
+      form = h('form', { class: 'local-login-form', 'aria-labelledby': 'local-login-title', 'aria-describedby': 'local-login-message', onsubmit: submitLocal },
+        h('label', { for: 'local-login-email' }, '이메일 (아이디)'), email,
+        pw ? h('label', { for: 'local-login-password' }, '비밀번호') : null, pw,
+        mode === 'signup' ? h('p', { class: 'local-login-hint' }, '이메일과 비밀번호만 입력해 주세요. 가입 후 이메일 인증이 필요해요.') : null,
+        mode === 'reset' ? h('p', { class: 'local-login-hint' }, '이메일 계정의 비밀번호 재설정을 요청해요. 가입 여부는 알려드리지 않아요. 소셜 계정은 해당 서비스에서 비밀번호를 변경해 주세요.') : null,
+        !available ? h('p', { class: 'local-login-unavailable' }, '이메일 로그인·회원가입·비밀번호 재설정은 준비 중이에요. 입력 내용은 전송되지 않아요.') : null,
+        submit);
+      body.replaceChildren(heading, h('p', { class: 'local-login-subtitle' }, '내 가게 페이지를 한곳에서 관리하세요.'), form);
+      // Never focus inputs on initial load: no surprise mobile keyboard/autofill.
+      // User-requested mode changes focus the heading, not a sensitive field.
+      if (focusHeading) heading.focus?.();
+    }
+    async function submitLocal(event) {
+      event?.preventDefault?.();
+      if (busy || stale(my, hash0)) return;
+      if (!available) { clearPassword(); inform('이메일 계정 기능은 준비 중이에요. 요청을 전송하지 않았어요.'); return; }
+      if (Date.now() < retryAt) { clearPassword(); inform('요청이 많아요. 잠시 기다린 뒤 다시 시도해 주세요.'); return; }
+      const address = str(email.value).trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) || (pw && !pw.value)) {
+        clearPassword(); inform('이메일 형식과 비밀번호 입력을 확인해 주세요.'); return;
+      }
+      if (form.reportValidity && !form.reportValidity()) { clearPassword(); return; }
+      const op = mode, g = generation;
+      let payload = op === 'reset' ? { email: address } : { email: address, password: pw.value };
+      clearPassword();
+      busy = true; submit.disabled = true; email.disabled = true; if (pw) pw.disabled = true;
+      switches.forEach((b) => { b.disabled = true; });
+      form.setAttribute('aria-busy', 'true');
+      inform('요청을 처리하고 있어요…');
+      try {
+        const pending = fetcher('/api/local-auth?op=' + op, {
+          method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload),
+        });
+        payload = null;
+        const response = await pending;
+        if (!current(g)) return;
+        if (response?.status === 429) {
+          const raw = response.headers?.get?.('Retry-After');
+          const seconds = raw && /^\d+$/.test(raw) ? Number(raw) : (raw ? (Date.parse(raw) - Date.now()) / 1000 : 60);
+          retryAt = Date.now() + Math.min(86400, Math.max(1, Number.isFinite(seconds) ? seconds : 60)) * 1000;
+          inform('요청이 많아요. 잠시 기다린 뒤 다시 시도해 주세요.'); return;
+        }
+        if (!response?.ok || typeof response.json !== 'function') {
+          inform(op === 'login' ? '로그인하지 못했어요. 이메일과 비밀번호를 확인하거나 잠시 후 다시 시도해 주세요.' : '요청을 완료하지 못했어요. 입력 내용을 확인하거나 잠시 후 다시 시도해 주세요.'); return;
+        }
+        const result = await response.json();
+        if (!current(g)) return;
+        if (result?.ok !== true) { inform('처리 결과를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
+        if (op === 'login') {
+          if (result.authenticated !== true) { inform('로그인 완료를 확인하지 못했어요. 이메일 인증 여부를 확인해 주세요.'); return; }
+          await renderDashboard();
+        } else if (op === 'signup') {
+          if (result.verificationRequired !== true) { inform('가입 처리 결과를 확인하지 못했어요. 인증 메일 발송 여부도 확인되지 않았어요.'); return; }
+          inform(result.verificationEmailSent === true
+            ? '이메일 인증이 필요해요. 인증 안내 메일을 발송했어요. 메일의 안내를 확인해 주세요.'
+            : '이메일 인증이 필요해요. 인증 메일 발송 여부는 확인되지 않았어요.');
+        } else {
+          inform('요청을 접수했어요. 해당 이메일로 재설정 가능한 계정이 있는 경우 안내를 받을 수 있어요. 메일 도착을 보장하지 않아요.');
+        }
+      } catch {
+        if (current(g)) inform('요청 결과를 확인하지 못했어요. 연결 상태를 확인해 주세요. 자동으로 다시 요청하지 않아요.');
+      } finally {
+        payload = null; clearPassword(); busy = false;
+        if (current(g)) {
+          submit.disabled = !available; email.disabled = !available; if (pw) pw.disabled = !available;
+          switches.forEach((b) => { b.disabled = false; });
+          form.setAttribute('aria-busy', 'false');
+        }
+      }
+    }
+    const helpers = h('nav', { class: 'local-login-helpers', 'aria-label': '계정 도움말' },
+      action('로그인', () => switchMode('login')),
+      action('회원가입', () => switchMode('signup')),
+      action('아이디 안내', () => { clearPassword(); inform('아이디는 가입에 사용한 이메일 주소예요. 별도 아이디 찾기는 제공하지 않아요. 소셜 계정은 해당 서비스의 계정 찾기를 이용해 주세요.'); }),
+      action('비밀번호 재설정', () => switchMode('reset')));
+    const social = h('div', { class: 'local-login-social', 'aria-label': '소셜 로그인' }, PROVIDERS.map(([provider, label]) => {
+      const link = links.find((l) => l.provider === provider);
+      if (!link) return h('button', { type: 'button', class: 'local-login-social-disabled', disabled: true, 'data-provider': provider }, (provider === 'google' ? 'Google' : provider === 'naver' ? '네이버' : '카카오') + ' · 준비 중');
+      return h('a', { class: 'account-provider account-provider-' + provider + (link.imageSrc ? '' : ' account-provider-text'), href: link.href, 'data-provider': provider, onclick: clearPassword },
+        link.imageSrc ? h('img', { class: 'account-provider-image', src: link.imageSrc, alt: link.imageAlt }) : [link.iconSrc ? h('img', { class: 'account-provider-icon', src: link.iconSrc, alt: '', width: 20, height: 20, 'aria-hidden': 'true' }) : null, h('span', { class: 'account-provider-label' }, link.label)]);
+    }));
+    // Scope every style to this panel. Load CSS without modifying the application shell.
+    if (globalThis.document?.head && !document.getElementById('local-login-styles')) {
+      document.head.append(h('link', { id: 'local-login-styles', rel: 'stylesheet', href: '/local-login.css' }));
+    }
+    drawForm();
+    setNavbar(btn('처음으로', goHome));
+    show(h('section', { class: 'local-login', 'aria-labelledby': 'local-login-title' },
+      h('p', { class: 'local-login-eyebrow' }, '내 가게 계정'), body, msg, helpers,
+      h('div', { class: 'local-login-divider' }, '또는 소셜 계정으로'), social,
+      h('p', { class: 'local-login-hint' }, '이메일 계정과 각 소셜 계정은 별개이며 자동으로 합쳐지지 않아요. 기존에 사용한 로그인 방법을 선택해 주세요.'),
+      h('div', { class: 'local-login-guest' }, btn('로그인 없이 시작하기', goHome), h('p', { class: 'local-login-hint' }, '로그인 없이도 가게 페이지를 만들 수 있어요.'))), resumeBlock());
   }
 
   function renderLoggedIn(status, stores) {
