@@ -29,7 +29,7 @@
 
 ## 운영 전 확인 사항 (2026-11-12 시험 결과)
 
-- Production 코드는 아직 배포하지 않았고 실제 운영 Log Drain도 연결하지 않았습니다. 합성 서명 요청은 Preview API에서 정상 집계됐지만, Preview에 생성한 합성 가게의 봇 방문은 Vercel 실제 Drain으로 전달·집계되는 것을 확인하지 못했습니다. 엔드포인트 자체의 Vercel Test는 2xx였으므로 이것만으로 실제 로그 전달이 된다고 판단하지 않습니다. 시험용 Drain은 삭제했습니다.
+- Production 코드는 아직 배포하지 않았고 실제 운영 Log Drain도 연결하지 않았습니다. 당시 합성 서명 요청은 Preview API에서 정상 집계됐지만, Preview에 생성한 합성 가게의 봇 방문은 Vercel 실제 Drain으로 전달·집계되는 것을 확인하지 못했습니다. 이후 2026-11-13에 제한된 합성 요청으로 실제 전달·집계를 확인한 결과는 아래 추가 시험을 참고합니다. 엔드포인트 자체의 Vercel Test는 2xx였으므로 이것만으로 실제 로그 전달이 된다고 판단하지 않습니다. 시험용 Drain은 삭제했습니다.
 - 무료 Layerbase Redis `yeogibwa-ai-reads-production`을 빈 상태에서 Production 라벨의 분기로 만들었습니다. Preview는 원본 `yeogibwa-ai-reads-preview`를 사용합니다. 두 DB의 REST 자격을 다르게 회전한 뒤 상대 DB 접근이 각각 401임을 확인했고, 운영 후보는 자동 삭제 보호를 켰습니다. 아직 Vercel Production 환경변수에 연결하지 않았습니다.
 - 이 운영 후보는 Preview 원본에서 갈라진 독립 분기입니다. **Reset from parent를 누르면 운영 분기 데이터가 버려지고 Preview 데이터로 대체되므로 사용하면 안 됩니다.** Preview 또는 운영을 재설정·복제할 때는 데이터와 자격 분리를 다시 점검합니다.
 - Layerbase 무료 REST 한도는 계정의 모든 DB가 합쳐 하루 2,000회이며 UTC 자정에 초기화됩니다. DB당 초당 5회(순간 최대 20회) 제한도 있습니다. 한도 초과는 429가 되므로 Preview 사용도 운영의 남은 한도에 영향을 줄 수 있고, 수집 누락이나 지연이 생길 수 있습니다. 자동 유료 전환이나 유료 업그레이드는 설정하지 않았습니다. 수면·암호화·백업은 아래 확인한 조건을 참고하고 운영 전 계정에 적용되는 정책을 다시 확인합니다.
@@ -49,4 +49,19 @@
 - [Layerbase Redis 안내](https://layerbase.com/db/redis)는 Free Redis가 15분 유휴 후 잠들고 다음 연결에서 통상 1~5초 내에 깨어난다고 설명합니다. [생명주기 문서](https://layerbase.com/docs/database-lifecycle)는 자원 부족 등으로 자동 깨우기가 거절될 수도 있다고 명시합니다. 실제 응답 시간이나 무중단 수집을 보장하지 않습니다. Free 플랜에는 사용자가 직접 실행하는 백업 슬롯 1개가 있으며 자동 백업은 확인된 Free 제공 항목이 아닙니다.
 - [Layerbase 보안 정책](https://layerbase.com/security)에 따르면 전송은 TLS이고 백업 객체는 Cloudflare R2에서 저장 시 암호화됩니다. 실행 중 DB 볼륨은 인프라 제공자의 디스크 계층에 의존하며 Layerbase 자체의 애플리케이션 계층 암호화나 고객별 키를 제공한다고 주장하지 않습니다. 별도 보관·삭제 정책을 운영 전 점검합니다.
 - [Vercel Runtime Logs](https://vercel.com/docs/logs/runtime)에 따르면 기본 Pro 로그 보관은 1일이며 Observability Plus 적용 시 30일입니다. 이 기간은 Vercel Runtime Logs 기준이며 보안 로그와 다른 제공자의 백업까지 같은 기간에 사라진다는 뜻이 아닙니다. 실제 계정의 적용 상품을 별도 확인해야 합니다.
-- 무료 대안 후보로 [Cloudflare Durable Objects SQLite](https://developers.cloudflare.com/durable-objects/platform/pricing/)의 무료 한도와 서버리스 동작을 조사했습니다. 기존 Redis 방식과 별도 구현·격리 계정·호출량·보안 및 수신 검증이 필요하며, 아직 계정 연결이나 운영 배포는 하지 않았습니다.
+- 무료 대안 후보로 [Cloudflare Durable Objects SQLite](https://developers.cloudflare.com/durable-objects/platform/pricing/)의 무료 한도와 서버리스 동작을 조사했습니다. 기존 Redis 방식과 별도 구현·격리 계정·호출량·보안 및 수신 검증이 필요하며, 별도 Cloudflare 무료 계정에서 합성 시험만 수행했으며 운영 서비스에는 연결하지 않았습니다.
+
+
+## 실제 전달과 무료 저장소 추가 시험 (2026-11-13 한국시간)
+
+- Preview에만 합성 가게를 생성하고 합성 봇 이름 하나에 정확히 일치하는 OData 필터와 해당 프로젝트, Preview 100% 샘플링만 적용한 임시 Drain을 사용했습니다. 다른 실제 방문자 로그를 시험에 사용하지 않았습니다. 운영 Drain과 Production 변수는 설정하지 않았습니다.
+- 00:10:13의 합성 GET은 200/MISS였고 00:10:18 외부 Cloudflare 시험 Worker에 서명 검증을 통과한 실제 로그 1건이 도착했습니다. 환경·프로젝트·호스트·경로·메서드·상태·봇 이름이 시험값과 일치했고 timestamp와 요청 식별자가 있었습니다. 원문과 IP, 원본 User-Agent를 저장·출력하지 않고 일치 여부만 기록했습니다. 이는 한 건의 결과이지 전달 시간이나 누락이 없다는 보장은 아닙니다.
+- 이후 원래 Preview 수집 함수가 받는 설정을 시험했습니다. 00:23:26 합성 방문이 200/MISS였고 00:23:30 해당 수집 함수에 POST 200이 기록됐습니다. 다른 수동 POST나 외부 중계를 거치지 않은 이 시험 후 사이트 집계가 not_started에서 활성화되어 OpenAI 검색 미확인 1건, 확인 0건으로 바뀌었습니다. 사이트 조회의 CDN 캐시 때문에 표시 확인에는 추가 시간이 걸릴 수 있습니다. 합성 봇 주장은 실제 봇의 신원, 추천 또는 인용을 뜻하지 않습니다.
+- 수신처 설정 변경이 성공 응답으로 표시된 직후 두 번 모두 새 수신처가 아니라 직전 수신처로 전달되는 사례를 관찰했습니다. 설정 전파 지연이나 이미 처리 중인 배치 가능성은 있지만 원인·최대 반영 시간은 확인하지 못했습니다. 이전 실패 원인도 확정하지 않았습니다. 운영 전 필터, 설정 전파, 배치·재전송·중복 및 장애 복구를 별도로 검증해야 합니다.
+- 합성 가게는 삭제 후 404를 확인했고 임시 Drain, Cloudflare 수신 Worker와 우회 키를 제거했습니다. 다만 이 한 건의 합성 집계는 Preview 통계 DB에 남아 있으며 가게 삭제로 통계가 즉시 삭제되지 않습니다. Preview 예시 데이터를 실제 접근으로 해석하지 않습니다. 삭제된 시스템 우회 값은 이전 Preview 배포에 남을 수 있어 배포별 정리가 필요합니다.
+
+## Cloudflare Durable Objects 합성 프로토타입 (운영 미연결)
+
+- 별도 무료 계정에 SQLite Durable Object를 임시 배포해 합성 데이터만 시험했습니다. 인증 없음·틀린 인증은 403, IP처럼 허용하지 않은 추가 필드는 400이었습니다. 같은 합성 ID 동시 요청 20회는 모두 응답하고 1건만 반영됐고, 서로 다른 25건은 모두 반영됐습니다. 재배포 후에도 총 26건이 유지됐습니다. SQLite가 보고한 크기는 24,576바이트였으며 한 번의 소규모 시험입니다.
+- 시험 코드는 [experiments/cloudflare-do-synthetic.mjs](experiments/cloudflare-do-synthetic.mjs)에 비운영 프로토타입으로만 보관합니다. 별도 인증·수신·보관 설계, 원본 수신 제한, 만료/삭제, 일일 상한, 가게 소유권, 사용량·비용 통제 및 장애·복구 검증이 빠져 있어 운영에 배포하거나 기존 Redis 집계를 대체할 수 없습니다. 본문 크기는 읽은 뒤 검사하므로 운영용 입력 제한으로 쓰면 안 됩니다. 임시 Worker와 네임스페이스는 삭제했고 사용자 서비스와 연결하지 않았습니다.
+- [Cloudflare 공식 무료 한도](https://developers.cloudflare.com/durable-objects/platform/pricing/)는 Durable Objects 요청 10만 회/일, 실행 시간 13,000 GB-s/일, SQLite 읽기 500만 행/일, 쓰기 10만 행/일, 총 저장 5 GB입니다. 13,000 GB-s는 CPU 초가 아닙니다. 인덱스 갱신과 삭제도 쓰기 사용량에 영향을 주므로 10만 행/일이 10만 방문/일을 보장하지 않습니다. 초과한 유형의 작업은 오류로 실패하며 호출 Worker와 Vercel Drain 비용은 별도입니다. 한도 소진·장애·PITR/외부 백업 복구·실제 트래픽 부하·보안 심사는 시험하지 않았습니다.
