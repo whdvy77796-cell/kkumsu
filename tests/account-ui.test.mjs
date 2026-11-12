@@ -12,6 +12,9 @@ function makeEnv({ post, fetcher }) {
   const h = (tag, attrs, ...kids) => {
     const el = { tag, attrs: attrs || {}, children: kids.flat(Infinity).filter((x) => x != null && x !== false), value: attrs?.value ?? '', checked: false, handlers: {}, textContent: undefined };
     el.addEventListener = (n, f) => { el.handlers[n] = f; };
+    el.append = (...nodes) => { el.children.push(...nodes); };
+    el.replaceChildren = (...nodes) => { el.children = [...nodes]; };
+    el.setAttribute = (key, value) => { el.attrs[key] = String(value); };
     return el;
   };
   const btn = (label, onclick) => h('button', { onclick }, label);
