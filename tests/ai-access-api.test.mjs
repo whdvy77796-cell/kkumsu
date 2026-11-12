@@ -56,6 +56,8 @@ test('rejects invalid methods, duplicate query fields, extra parameters, host sp
 test('no fallback to the operational store and failures are not reported as zero', async () => {
   const x=setup({statsStore:null,env:{...ENV,YB_AI_ACCESS_REDIS_URL:'https://same.invalid',YB_AI_ACCESS_REDIS_TOKEN:'synthetic',KV_REST_API_URL:'https://same.invalid/'},readSummary:async()=>{throw Error('not called');}});
   const r=await invoke(x.h,'/api/ai-access?view=site'); assert.equal(r.statusCode,200);assert.equal(r.json().state,'unavailable');assert.equal(r.json().lifetime,null);
+  const alias=setup({statsStore:null,env:{...ENV,YB_AI_ACCESS_REDIS_URL:'https://same.invalid',YB_AI_ACCESS_REDIS_TOKEN:'synthetic',KV_REST_API_URL:'https://SAME.invalid:443/'}});
+  assert.equal((await invoke(alias.h,'/api/ai-access?view=site')).json().state,'unavailable');
   const fail=setup({readSummary:async()=>{throw Error('synthetic internal secret');}}); const f=await invoke(fail.h,'/api/ai-access?view=site');assert.equal(f.json().state,'unavailable');assert.doesNotMatch(f.body,/secret/);
 });
 test('summary rejects malformed counts, unknown providers and unexpected state', () => {

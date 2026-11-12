@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {MemoryStore} from '../lib/guard.mjs';
-import {recordAiBatch,readAiSummary,aiAccessPrefix,AI_ACCESS_LUA,DAILY_CAP,STORE_TTL,MAX_BATCH,REDIS_BATCH_SIZE} from '../lib/ai-access-core.mjs';
+import {recordAiBatch,readAiSummary,aiAccessPrefix,AI_ACCESS_LUA,AI_ACCESS_READ_LUA,DAILY_CAP,STORE_TTL,MAX_BATCH,REDIS_BATCH_SIZE} from '../lib/ai-access-core.mjs';
 import {publicSummary} from '../api/ai-access.js';
 const now=Date.parse('2026-11-08T03:00:00Z'),scope={namespace:'synthetic:preview:one'};
 const hash=x=>createHash('sha256').update(String(x)).digest('hex');
@@ -55,9 +55,15 @@ test('late events extend counted since but never backdate seven-day receipt cove
 // Protocol double executes the decoded plan against the synchronous MemoryStore
 // semantics. This tests EVAL wiring/retry boundaries, NOT a real Lua interpreter.
 function redisDouble(){
- const backing=new MemoryStore(),calls=[];
- return {backing,calls,failBefore:0,loseAfter:0,async cmd(args){
-  if(args[0]==='HGETALL'){const h=backing.kv.get(args[1])||{};return Object.entries(h).flatMap(([k,v])=>[k,String(v)]);}
+ const backing=new MemoryStore(),calls=[],readCalls=[];
+ return {backing,calls,readCalls,corrupt:null,failBefore:0,loseAfter:0,async cmd(args){
+  if(args[0]==='EVAL'&&args[1]===AI_ACCESS_READ_LUA){
+   const n=Number(args[2]),keys=args.slice(3);readCalls.push(args);
+   assert.equal(args.length,3+n);assert.equal(keys.length,n);assert.ok(n>=1&&n<=9);assert.equal(keys.length,new Set(keys).size);assert.ok(keys.every(k=>k.startsWith(aiAccessPrefix(scope)+':')));
+   if(this.corrupt)return this.corrupt(keys);
+   const out=keys.map(k=>{const exp=backing.aiAccessExpiry?.get(k);const h=exp!==undefined&&exp<=Date.now()?{}:backing.kv.get(k)||{};return Object.entries(h).flatMap(([a,v])=>[a,String(v)]);});
+   return JSON.stringify(out.map(x=>x.length?x:{}));
+  }
   assert.equal(args[0],'EVAL');assert.equal(args[1],AI_ACCESS_LUA);
   const n=Number(args[2]),keys=args.slice(3,3+n),p=JSON.parse(args[3+n]);
   calls.push({keys,p});assert.equal(keys.length,new Set(keys).size);assert.ok(p.events.length<=REDIS_BATCH_SIZE);
@@ -115,4 +121,50 @@ test('dedupe and store expiry remain equivalent through the Redis batch protocol
  assert.equal(redis.backing.aiAccessExpiry.get(aiAccessPrefix(scope)+':seen:'+hash('ttl')),now+8*86400000);
  assert.equal(redis.backing.aiAccessExpiry.get(aiAccessPrefix(scope)+':store:'+id),now+STORE_TTL*1000);
  const later=now+9*86400000;const r=await recordAiBatch({store:redis,scope,events:[event('ttl',{storeId:id})],now:later});assert.equal(r.limited,true);assert.equal((await read(redis,{now:later})).lifetime.verified,1);
+});
+
+test('Redis summary uses exactly one read-only EVAL, bounded to 9 unique owner-scoped keys, with parity',async()=>{
+ const redis=redisDouble(),memory=new MemoryStore(),id='A'.repeat(22),other='O'.repeat(22);
+ const early=now-2*86400000,events=[event(1,{at:early,storeId:id}),event(2,{storeId:id,verification:'unverified',provider:'google',purpose:'user'}),event(3,{storeId:other})];
+ for(const st of [redis,memory])await recordAiBatch({store:st,scope,events,now});
+ // Make coverage old enough for last7Days on both.
+ for(const st of [redis.backing,memory])for(const [k,v] of st.kv)if(v&&typeof v==='object'&&k.includes(':site')||k.includes(':store:'+id)&&!k.includes(':day:')&&!k.includes(':seen:'))v.coverageSince=Date.parse('2026-01-01T00:00:00Z');
+ for(const storeId of [null,id]){
+  redis.readCalls.length=0;const a=await read(redis,{storeId}),b=await read(memory,{storeId});
+  assert.deepEqual(a,b);assert.equal(redis.readCalls.length,1);assert.equal(redis.readCalls[0][2],String(storeId?9:8));
+  assert.notEqual(a.last7Days,null);assert.equal(a.state,'active');
+  assert.ok(!redis.readCalls[0].some(x=>typeof x==='string'&&x.includes(':store:'+other)));
+ }
+ redis.readCalls.length=0;const nodays=await read(redis,{since:'2026-11-08T00:00:00Z'});assert.equal(nodays.last7Days,null);assert.equal(redis.readCalls.length,1);assert.equal(redis.readCalls[0][2],'1');
+ redis.readCalls.length=0;assert.equal((await read(redis,{storeId:'Z'.repeat(22)})).state,'not_started');assert.equal(redis.readCalls.length,1);
+});
+test('Redis summary preserves limited and not_started semantics in one EVAL',async()=>{
+ const redis=redisDouble();await recordAiBatch({store:redis,scope,events:[event(3,{at:now-8*86400000,storeId:'C'.repeat(22)})],now});redis.readCalls.length=0;
+ for(const storeId of [null,'C'.repeat(22),'Z'.repeat(22)]){const a=await read(redis,{storeId});assert.equal(a.state,'limited');assert.deepEqual(a.lifetime,{verified:0,unverified:0});assert.equal(a.last7Days,null);}
+ assert.equal(redis.readCalls.length,3);
+ assert.equal((await read(redisDouble())).state,'not_started');
+});
+test('malformed or corrupt Redis read replies are unavailable, never zero or partial',async()=>{
+ const good=['verified','1','since',String(now),'coverageSince',String(now),'updatedAt',String(now)];
+ const cases={
+  notArray:()=>JSON.stringify({status:'unavailable'}),
+  null:()=>null,
+  badJson:()=>'{',
+  wrongLength:keys=>JSON.stringify([good,...keys.slice(2).map(()=>[])]),
+  oddFlat:()=>JSON.stringify([['verified']]),
+  nonString:()=>JSON.stringify([['verified',1]]),
+  duplicateField:()=>JSON.stringify([['verified','1','verified','2']]),
+  negative:()=>JSON.stringify([['verified','-1']]),
+  nan:()=>JSON.stringify([['verified','abc','since',String(now)]]),
+  leadingZero:()=>JSON.stringify([['verified','01','since',String(now)]]),
+  badLimited:()=>JSON.stringify([['verified','1','since',String(now),'updatedAt',String(now),'limited','x']]),
+  badDay:keys=>JSON.stringify(keys.map((k,i)=>i===0?['verified','1','since','0','coverageSince','0','updatedAt',String(now)]:i===1?['verified','x']:[])),
+ };
+ for(const [name,corrupt] of Object.entries(cases)){
+  const redis=redisDouble();redis.corrupt=corrupt;const a=await read(redis);
+  assert.deepEqual(a,{state:'unavailable',since:null,updatedAt:null,lifetime:null,last7Days:null,breakdown:[]},name);
+  assert.equal(redis.readCalls.length,1,name);
+ }
+ const throwing={cmd:async()=>{throw new Error('WRONGTYPE');}};assert.equal((await read(throwing)).state,'unavailable');
+ assert.match(AI_ACCESS_READ_LUA,/HGETALL/);assert.doesNotMatch(AI_ACCESS_READ_LUA,/HSET|HINCRBY|EXPIRE|\bSET\b|DEL|redis\.call\('(?!HGETALL)/);
 });

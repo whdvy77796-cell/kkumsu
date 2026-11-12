@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeAiAccessPanel, parseAiAccess } from '../public/ai-access-ui.js';
+import { makeAiAccessPanel, parseAiAccess, AI_ACCESS_REFRESH_MS } from '../public/ai-access-ui.js';
 
 const ID = 'abcdefghijklmnopqrstuv';
 const SECRET_ID = 'SECRETsecretSECRET_-12';
@@ -195,6 +195,54 @@ test('active with real zero shows 0; hostile date string is rejected, not render
   await tick();
   assert.doesNotMatch(text(q), /<img/);
   assert.match(text(q), /확인할 수 없어요/);
+});
+
+test('automatic refresh runs only while visible, stops on detach, and keeps unchanged data intact', async () => {
+  const originalWindow = globalThis.window, originalDocument = globalThis.document;
+  let callback, period, cleared = false, calls = 0;
+  let payload = active();
+  try {
+    globalThis.window = { setInterval: (cb, ms) => { callback = cb; period = ms; return 81; }, clearInterval: (id) => { assert.equal(id, 81); cleared = true; } };
+    globalThis.document = { visibilityState: 'visible' };
+    const panel = makeAiAccessPanel({ h, fetcher: async () => { calls++; return { ok: true, json: async () => payload }; }, kind: 'site' });
+    panel.isConnected = true;
+    await tick();
+    assert.equal(calls, 1);
+    assert.equal(period, AI_ACCESS_REFRESH_MS);
+    const body = find(panel, (x) => x.attrs.class === 'ai-access-body')[0];
+    const firstChild = body.children[0];
+    callback(); await tick();
+    assert.equal(calls, 2);
+    assert.equal(body.children[0], firstChild); // 수치가 같으면 다시 그리지 않는다.
+    payload = active({ lifetime: { verified: 1235, unverified: 5 } });
+    callback(); await tick();
+    assert.equal(calls, 3);
+    assert.match(text(panel), /1,235/);
+    globalThis.document.visibilityState = 'hidden'; callback(); await tick();
+    assert.equal(calls, 3);
+    panel.isConnected = false; callback();
+    assert.equal(cleared, true);
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window; else globalThis.window = originalWindow;
+    if (originalDocument === undefined) delete globalThis.document; else globalThis.document = originalDocument;
+  }
+});
+
+test('store automatic refresh cannot start before user requests the private statistics', async () => {
+  const originalWindow = globalThis.window, originalDocument = globalThis.document;
+  let callback, calls = 0;
+  try {
+    globalThis.window = { setInterval: (cb) => { callback = cb; return 1; }, clearInterval: () => {} };
+    globalThis.document = { visibilityState: 'visible' };
+    const p = makeAiAccessPanel({ h, fetcher: async () => { calls++; return { ok: true, json: async () => active() }; }, kind: 'store', storeId: ID });
+    p.isConnected = true;
+    callback(); await tick(); assert.equal(calls, 0);
+    buttons(p)[0].handlers.click(); await tick(); assert.equal(calls, 1);
+    callback(); await tick(); assert.equal(calls, 2);
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window; else globalThis.window = originalWindow;
+    if (originalDocument === undefined) delete globalThis.document; else globalThis.document = originalDocument;
+  }
 });
 
 test('accessibility hooks: labelled region, live status, table headers', async () => {

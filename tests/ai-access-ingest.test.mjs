@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {createHmac} from 'node:crypto';
-import {createHandler,config,RAW_LIMIT,MAX_ROWS,validDedicatedRedis} from '../api/ai-access-ingest.js';
+import {createHandler,config,RAW_LIMIT,MAX_ROWS,MAX_PROCESSING_MS,validDedicatedRedis} from '../api/ai-access-ingest.js';
 import {MemoryStore} from '../lib/guard.mjs';
-import {readAiSummary} from '../lib/ai-access-core.mjs';
+import {readAiSummary,recordAiBatch} from '../lib/ai-access-core.mjs';
 import {requestScope} from '../lib/stores.mjs';
 const now=Date.parse('2026-11-08T03:00:00Z'),host='synthetic.vercel.app';
 const env={YB_AI_ACCESS_ENABLED:'true',YB_AI_ACCESS_DRAIN_SECRET:'synthetic-secret-012345678901234567890123',YB_AI_ACCESS_PROJECT_ID:'prj_synthetic',YB_AI_ACCESS_STARTED_AT:'2026-11-01T00:00:00Z',VERCEL_ENV:'preview'};
@@ -80,7 +80,18 @@ test('dedicated Redis rejects main endpoints and unsafe URL components',()=>{
  for(const key of ['KV_REST_API_URL','UPSTASH_REDIS_REST_URL'])assert.equal(validDedicatedRedis({...dedicated,[key]:'https://TELEMETRY.example:443/'}),false);
 });
 
+test('processing deadline fails closed and partial chunks can be retried without double-counting',async()=>{
+ const rows=Array.from({length:201},(_,i)=>row({id:'deadline-'+i},{vercelId:'synthetic::deadline-'+i}));
+ let clock=0,writes=0;const store=new MemoryStore();
+ const first=await run(rows,{store,deps:{clock:()=>clock,recordBatch:async args=>{const result=await recordAiBatch(args);writes++;clock=MAX_PROCESSING_MS+1;return result;}}});
+ assert.equal(first.res.statusCode,503);assert.equal(writes,1);assert.equal((await summary(store)).lifetime.unverified,100);
+ const retry=await run(rows,{store});assert.equal(retry.res.statusCode,200);assert.equal((await summary(store)).lifetime.unverified,201);
+ let classifyClock=0;const x=await run([row(),row({}, {vercelId:'synthetic::deadline-two'})],{deps:{clock:()=>classifyClock,identifyBot:async()=>{classifyClock=MAX_PROCESSING_MS+1;return bot;}}});
+ assert.equal(x.res.statusCode,503);assert.equal(x.store.kv.size,0);
+});
+
 test('optional UTF-8 JSON charset preserves raw signature checks and rejects other media types',async()=>{
+ assert.equal((await run('[]',{headers:{'content-encoding':'gzip'}})).res.statusCode,415);
  for(const contentType of ['application/json; charset=utf-8','Application/JSON; Charset="UTF-8"']){
   assert.equal((await run(' [ ] ',{headers:{'content-type':contentType}})).res.statusCode,200);
   assert.equal((await run(' [ ] ',{signedRaw:Buffer.from('[]'),headers:{'content-type':contentType}})).res.statusCode,403);

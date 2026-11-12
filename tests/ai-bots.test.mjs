@@ -103,13 +103,14 @@ test('exact six-hour TTL, failed refresh never uses stale data, retry',async()=>
   assert.equal((await identify(fetcher)).verification,'verified');
   assert.equal((await identify(fetcher,{now:NOW+LIMITS.cacheMs-1})).verification,'verified');assert.equal(calls,1);
   assert.equal((await identify(fetcher,{now:NOW+LIMITS.cacheMs})).verification,'unverified');assert.equal(calls,2);
-  assert.equal((await identify(fetcher,{now:NOW+LIMITS.cacheMs+1})).verification,'verified');assert.equal(calls,3);
+  assert.equal((await identify(fetcher,{now:NOW+LIMITS.cacheMs+1})).verification,'unverified');assert.equal(calls,2);
+  assert.equal((await identify(fetcher,{now:NOW+LIMITS.cacheMs+LIMITS.failureBackoffMs})).verification,'verified');assert.equal(calls,3);
 });
 test('invalid refresh cannot partially poison or retain cache',async()=>{
   let calls=0;const fetcher=async()=>reply(++calls===1?feed:{prefixes:[{ipv4Prefix:'0.0.0.0/0'},{}]});
   await identify(fetcher);
   assert.equal((await identify(fetcher,{now:NOW+LIMITS.cacheMs})).verification,'unverified');
-  assert.equal((await identify(fetcher,{clientIp:'203.0.113.1',now:NOW+LIMITS.cacheMs+1})).verification,'unverified');assert.equal(calls,3);
+  assert.equal((await identify(fetcher,{clientIp:'203.0.113.1',now:NOW+LIMITS.cacheMs+1})).verification,'unverified');assert.equal(calls,2);
 });
 test('inflight deduplication and shared Anthropic cache',async()=>{
   let release,calls=0;const gate=new Promise(r=>{release=r;});const fetcher=async()=>{calls++;await gate;return reply(feed);};
@@ -148,5 +149,77 @@ test('timeout covers noncooperative fetch and stalled body, aborts and clears in
   const stalledBody=async(_url,options)=>{signal2=options.signal;return new Response(new ReadableStream({pull(){return new Promise(()=>{});}}));};
   const results=await Promise.all([identify(stalledFetch),identify(stalledBody)]);
   assert.ok(results.every(x=>x.verification==='unverified'));assert.ok(signal1.aborted);assert.ok(signal2.aborted);
-  assert.equal((await identify(stalledFetch)).verification,'verified');assert.equal(calls,2);
+  assert.equal((await identify(stalledFetch)).verification,'unverified');assert.equal(calls,1);
+  assert.equal((await identify(stalledFetch,{now:NOW+LIMITS.timeoutMs+LIMITS.failureBackoffMs+50})).verification,'verified');assert.equal(calls,2);
+});
+
+const failing = () => { const s = { calls: 0 }; s.fetcher = async () => { s.calls++; throw new Error('down'); }; return s; };
+const afterBackoff = { now: NOW + LIMITS.failureBackoffMs };
+test('many sequential classify calls after failed feed hit fetcher once, all unverified',async()=>{
+  const f=failing();
+  for(let i=0;i<200;i++){const r=await identify(f.fetcher,{now:NOW+i});assert.equal(r.verification,'unverified');assert.equal(r.bot,'GPTBot');}
+  assert.equal(f.calls,1);
+});
+test('stalled feed costs one timeout, later rows return immediately',async()=>{
+  let calls=0;const fetcher=async()=>{calls++;return new Promise(()=>{});};
+  const t0=performance.now();
+  assert.equal((await identify(fetcher)).verification,'unverified');
+  const first=performance.now()-t0;assert.ok(first>=LIMITS.timeoutMs-100,String(first));
+  const t1=performance.now();
+  for(let i=0;i<50;i++)assert.equal((await identify(fetcher,{now:NOW+LIMITS.timeoutMs+i})).verification,'unverified');
+  assert.ok(performance.now()-t1<500);assert.equal(calls,1);
+});
+test('backoff expiry and recovery; still failing re-arms backoff',async()=>{
+  let up=false,calls=0;const fetcher=async()=>{calls++;if(!up)throw Error('x');return reply(feed);};
+  await identify(fetcher);
+  assert.equal((await identify(fetcher,{now:NOW+LIMITS.failureBackoffMs-1})).verification,'unverified');assert.equal(calls,1);
+  assert.equal((await identify(fetcher,{now:NOW+LIMITS.failureBackoffMs})).verification,'unverified');assert.equal(calls,2);
+  assert.equal((await identify(fetcher,{now:NOW+LIMITS.failureBackoffMs+5})).verification,'unverified');assert.equal(calls,2);
+  up=true;
+  assert.equal((await identify(fetcher,{now:NOW+2*LIMITS.failureBackoffMs})).verification,'verified');assert.equal(calls,3);
+  assert.equal((await identify(fetcher,{now:NOW+2*LIMITS.failureBackoffMs+1})).verification,'verified');assert.equal(calls,3);
+});
+test('backoff also expires on monotonic clock; rewound caller clock cannot shorten it',async()=>{
+  const f=failing();await identify(f.fetcher);
+  assert.equal((await identify(f.fetcher,{now:NOW-10*LIMITS.failureBackoffMs})).verification,'unverified');assert.equal(f.calls,1);
+  const real=performance.now.bind(performance);
+  try{performance.now=()=>real()+LIMITS.failureBackoffMs;
+    assert.equal((await identify(f.fetcher,{now:NOW+1})).verification,'unverified');assert.equal(f.calls,2);
+  }finally{performance.now=real;}
+});
+test('failure is isolated per fetcher and per feed, and never poisons a success',async()=>{
+  const bad=failing(),good=fixture();
+  assert.equal((await identify(bad.fetcher)).verification,'unverified');
+  assert.equal((await identify(good.fetcher)).verification,'verified');
+  assert.equal((await identify(good.fetcher)).verification,'verified');assert.equal(good.calls.length,1);
+  // one feed failing does not block another feed on the same fetcher
+  let n=0;const mixed=async(url)=>{n++;if(url===FEED_URLS.training)throw Error('x');return reply(feed);};
+  assert.equal((await identify(mixed,{userAgent:'GPTBot'})).verification,'unverified');
+  assert.equal((await identify(mixed,{userAgent:'ChatGPT-User'})).verification,'verified');
+  assert.equal((await identify(mixed,{userAgent:'GPTBot'})).verification,'unverified');assert.equal(n,2);
+  // a failure after a cached success window does not erase other-fetcher success
+  assert.equal((await identify(good.fetcher)).verification,'verified');assert.equal(good.calls.length,1);
+});
+test('success cached 6h is unaffected by earlier failure; failed refresh never reuses stale ranges',async()=>{
+  let mode='down';const fetcher=async()=>{if(mode==='down')throw Error('x');return reply(feed);};
+  await identify(fetcher);mode='up';
+  assert.equal((await identify(fetcher,afterBackoff)).verification,'verified');
+  const at=NOW+LIMITS.failureBackoffMs;
+  assert.equal((await identify(fetcher,{now:at+LIMITS.cacheMs-1})).verification,'verified');
+  mode='down';
+  assert.equal((await identify(fetcher,{now:at+LIMITS.cacheMs})).verification,'unverified');
+  assert.equal((await identify(fetcher,{now:at+LIMITS.cacheMs+1})).verification,'unverified');
+});
+test('concurrent rows during a failing fetch share one request, then back off',async()=>{
+  let release,calls=0;const gate=new Promise(r=>{release=r;});
+  const fetcher=async()=>{calls++;await gate;throw Error('x');};
+  const jobs=Array.from({length:30},()=>identify(fetcher));release();
+  assert.ok((await Promise.all(jobs)).every(x=>x.verification==='unverified'));assert.equal(calls,1);
+  await identify(fetcher);assert.equal(calls,1);
+});
+test('legitimate bot classified and verified after unrelated feed failures; non-member stays unverified',async()=>{
+  const fetcher=async(url)=>url===FEED_URLS.google?reply(feed):Promise.reject(new Error('x'));
+  assert.equal((await identify(fetcher,{userAgent:'GPTBot'})).verification,'unverified');
+  assert.equal((await identify(fetcher,{userAgent:'Googlebot'})).verification,'verified');
+  assert.equal((await identify(fetcher,{userAgent:'Googlebot',clientIp:'203.0.113.9'})).verification,'unverified');
 });
