@@ -13,7 +13,7 @@ const row=(over={},proxy={})=>({id:'log-not-request',source:'static',host,projec
 async function run(rows=[row()],opts={}){
  const raw=Buffer.isBuffer(rows)?rows:Buffer.from(typeof rows==='string'?rows:JSON.stringify(rows));
  const headers={host,'content-type':'application/json','x-vercel-signature':createHmac('sha1',env.YB_AI_ACCESS_DRAIN_SECRET).update(opts.signedRaw??raw).digest('hex'),...opts.headers};
- const req=Readable.from([raw]);req.method=opts.method||'POST';req.headers=headers;if(opts.parsed)req.body=JSON.parse(raw);
+ const req=Readable.from([raw]);req.method=opts.method||'POST';req.headers=headers;if(opts.parsed)req.body=JSON.parse(raw);if(opts.lazyGetter)Object.defineProperty(req,'body',{get(){throw new Error('must not read parsed body');}});
  const res={headers:{},setHeader(k,v){this.headers[k]=v;},end(x){this.body=x;}};
  const store=opts.store||new MemoryStore();let classified=0;
  await createHandler({env:{...env,...opts.env},store:opts.noStore?undefined:store,now,identifyBot:async()=>{classified++;return opts.unknown?null:bot;},...opts.deps})(req,res);
@@ -22,6 +22,8 @@ async function run(rows=[row()],opts={}){
 const summary=s=>readAiSummary({store:s,scope:requestScope({headers:{host}},env),now,since:env.YB_AI_ACCESS_STARTED_AT});
 test('parser disabled; exact HMAC including whitespace and no pre-parsed body',async()=>{
  assert.equal(config.api.bodyParser,false);assert.equal((await run(' [ ] ')).res.statusCode,200);
+ assert.equal((await run(' [ ] ',{lazyGetter:true})).res.statusCode,200);
+ assert.equal((await run(' [ ] ',{lazyGetter:true,headers:{'x-vercel-signature':'0'.repeat(40)}})).res.statusCode,403);
  assert.equal((await run(' [ ] ',{signedRaw:Buffer.from('[]')})).res.statusCode,403);assert.equal((await run([row()],{parsed:true})).res.statusCode,503);
  for(const signature of [undefined,'bad','0'.repeat(40)])assert.equal((await run([row()],{headers:{'x-vercel-signature':signature}})).res.statusCode,403);
 });
