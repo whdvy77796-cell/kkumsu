@@ -6,7 +6,7 @@ Production base copied from `ai-access-production-port/kkumsu-yeogibwa-logo-953e
 
 - Reused `withdrawal-per-account/lib/withdrawal-redis.mjs` verbatim, rather than repeating its earlier withdrawal experiments. Reviewed its WIP and the older `lifecycle-copy/kkumsu-yeogibwa-lifecycle-module-20261112/WITHDRAWAL-WIP.md`.
 - Added `lib/legacy-lifecycle-adoption.mjs`: isolated, unintegrated Google-session migration building block. A single Redis EVAL checks existing persistent per-account authority, active state, incarnation/fence, tuple, session TTL, exact raw CAS, and a one-use independently reconciled session-specific grant. Missing authority or grant fails closed. It keeps the existing accountId, session key, binding, timestamps, unknown JSON fields, exact numeric lexemes and Redis TTL; only adds incarnation/fence. It does not write account/store/index records. Grant consumption is after the session write, so a failed consumption cannot authorize a second adoption because the session raw CAS and already-versioned checks reject it.
-- Added `tests/legacy-lifecycle-adoption.test.mjs` (7 Node test cases, not executed with Node runner here).
+- Added `tests/legacy-lifecycle-adoption.test.mjs` (7 Node test cases; later rerun independently with Node 24.22.3, all passed).
 - Added `lifecycle-validation.json`: actual validation scope/results.
 
 The preparer rejects duplicate JSON names, escaped duplicate names, already-versioned sessions, incompatible tuples/providers, deleting/deleted authority, invalid epochs and oversized input. It intentionally does not export an enrollment/grant issuer, deletion endpoint, callback adapter or runtime switch. The copied primitive's experimental PROVISION is NOT wired into the service.
@@ -28,7 +28,7 @@ No safe online bootstrap without a reviewed migration/cutover source of truth ha
 ## Validation actually performed
 
 - Exact exported preparer function source executed in the REPL sandbox: **24 assertions passed**, including field/raw retention, large numbers, duplicate keys, invalid input, missing/deleting/deleted authority, tuple mismatch and social legacy refusal. This is pure JavaScript contract validation, NOT Lua/Redis integration or HTTP verification.
-- Node 26.5.0 detected. Standard Node test/regression execution was **blocked** by shell filesystem isolation denying access to the QA directory. No passing Node suite is claimed.
+- The first Node run was blocked by shell isolation. A later independent rerun in a mapped temporary copy using Node 24.22.3 passed all 7 focused tests; the checks cover JS behavior and Lua source contract only, not Redis execution.
 - TCP checks of loopback 127.0.0.1:6379 and :16379 both returned ECONNREFUSED. No real Redis Lua execution occurred, and no production Redis fallback was attempted.
 - An attempted shell test command created two output files in the account root after Set-Location failed. Both were immediately removed; no such files remain. All intended deliverables are in this QA directory.
 
