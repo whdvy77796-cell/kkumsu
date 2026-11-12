@@ -113,7 +113,7 @@ test('CAS conflicts return CONFLICT without overwriting data',async()=>{
 test('delete race blocks late update and claim, deleted and expired records cannot be claimed',async()=>{
  for(const action of ['update','claim']){
   const st=new MemoryStore();await seed(st,{ownerAccountId:action==='update'?ACCOUNT:undefined});const base=st.ownerTransaction.bind(st);let deleted=false;
-  st.ownerTransaction=async(op,keys,p)=>{if(op===action&&!deleted){deleted=true;const old=await st.getJson(keys[0]);await st.publicTransaction('delete',storeKeys(scope,ID),{now:p.now,expected:old.revision,revision:'deleted',tombstoneTtl:0});}return base(op,keys,p);};
+  st.ownerTransaction=async(op,keys,p)=>{if(op===action&&!deleted){deleted=true;const old=await st.getJson(keys[0]);await st.publicTransaction('delete',storeKeys(scope,ID),{now:p.now,expected:old.revision,expectedRaw:st.kv.get(keys[0]),revision:'d'.repeat(32),tombstoneTtl:0});}return base(op,keys,p);};
   const r=await call(handler(st),action==='claim'?claim():update());assert.equal(r.statusCode,action==='claim'?403:404,r.body);assert.equal((await st.getJson(storeKeys(scope,ID)[0])).deleted,true);assert.equal(st.kv.has(ownerKeys(scope,ACCOUNT)[0]),false);
  }
  for(const extra of [{deleted:true},{expiresAt:Date.now()-1}]){const st=new MemoryStore();await seed(st,extra);assert.equal((await call(handler(st),claim())).statusCode,403);}
