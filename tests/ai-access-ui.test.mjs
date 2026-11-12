@@ -54,6 +54,25 @@ test('site: fetches immediately, same-origin GET, shows loading first', async ()
   assert.equal(find(p, (x) => x.tag === 'table').length, 1);
 });
 
+test('compact headline shows only verified count, freshness honestly, and expandable details', async () => {
+  const m = mk(active({ collectionStartedAt: '2026-10-31T23:21:00Z' }));
+  const p = makeAiAccessPanel({ h, fetcher: m.fetcher, kind: 'site' });
+  await tick();
+  const hero = find(p, (x) => x.attrs.class === 'ai-access-hero')[0];
+  assert.ok(hero);
+  assert.match(text(hero), /1,234\s+회/);
+  assert.doesNotMatch(text(hero), /1,239/); // 미확인 주장 5회는 확인된 봇에 합산하지 않는다.
+  assert.match(text(hero), /미확인 봇 주장\s+5회/);
+  assert.match(text(hero), /마지막 집계: 2026년 11월 8일 12:00 \(한국시간\)/);
+  assert.doesNotMatch(text(hero), /최근 1분|실시간|지금 1분/);
+  const details = find(p, (x) => x.tag === 'details')[0];
+  assert.ok(details);
+  assert.equal(Object.hasOwn(details.attrs, 'open'), false);
+  assert.equal(find(details, (x) => x.tag === 'summary').length, 1);
+  assert.match(text(find(details, (x) => x.tag === 'summary')[0]), /추천·인용 횟수가 아니에요/);
+  assert.match(text(details), /수집 설정 기준: 2026년 11월 1일 08:21/);
+});
+
 test('preview data is explicitly labeled, but production aliases are not', async () => {
   const original=globalThis.location;
   try {
@@ -159,6 +178,7 @@ test('limited: lower-bound wording on counts', async () => {
   await tick();
   const t = text(p);
   assert.match(t, /최소치/);
+  assert.match(text(find(p, (x) => x.attrs.class === 'ai-access-hero')[0]), /최소\s+7\s+회/);
   assert.match(t, /최소 7회/);
   assert.match(t, /최소 3회/);
   assert.match(t, /7일 전체를 확인할 기록이 아직 충분하지 않아요\. 0회라는 뜻이 아니에요/);
