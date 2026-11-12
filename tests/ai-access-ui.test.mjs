@@ -63,6 +63,7 @@ test('compact headline shows only verified count, freshness honestly, and expand
   assert.match(text(hero), /1,234\s+회/);
   assert.doesNotMatch(text(hero), /1,239/); // 미확인 주장 5회는 확인된 봇에 합산하지 않는다.
   assert.match(text(hero), /미확인 봇 주장\s+5회/);
+  assert.match(text(hero), /첫 집계 2026년 11월 1일부터 누적/);
   assert.match(text(hero), /마지막 집계: 2026년 11월 8일 12:00 \(한국시간\)/);
   assert.doesNotMatch(text(hero), /최근 1분|실시간|지금 1분/);
   const details = find(p, (x) => x.tag === 'details')[0];
