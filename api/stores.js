@@ -19,6 +19,7 @@ export function createHandler(deps={}) {
       const url=new URL(req.url || '/api/stores','https://'+scope.host);
       const query=name=>{const value=req.query?.[name] ?? url.searchParams.get(name);if (Array.isArray(value)) throw new HttpError(400,'QUERY','요청 주소를 확인해 주세요.');return value;};
       const view=query('view');
+      if (env.VERCEL_ENV==='preview' && scope.host==='kkumsu-git-yeogibwa-account-login-20261111-kkkkkum.vercel.app' && view==='page' && query('id')==='8a845ea65c523a8d348961' && req.headers['user-agent']==='OAI-SearchBot/1.0') console.info('yb_synthetic_drain_probe');
       if (view==='directory' || view==='page') {
         let html;
         try { html=view==='directory'?await renderDirectory(store,scope,query('page') || '1'):renderStore(scope,await publicStore(store,scope,query('id'))); }
