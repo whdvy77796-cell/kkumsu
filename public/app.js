@@ -1987,7 +1987,7 @@ function renderPolicy(kind) {
       ['6. 개인정보 문의', `담당: 여기봐 AI 개인정보 담당 · 이메일: ${biz('privacyEmail')}`],
       ['7. 방침 변경', '이 방침을 바꾸면 시행일과 함께 이 화면에 알려드려요.'],
       ['운영자 정보', operatorLine()],
-    ], '2026년 11월 12일'),
+    ], '2026년 11월 13일'),
   };
   show(h('div', { class: 'policy-page' }, docs[kind]()));
   setNavbar(btn('처음으로', () => { location.hash = '#/'; }, true));
