@@ -1,0 +1,6 @@
+{
+  "pureFunctionAssertionsPassed": 24,
+  "execution": "exact exported function source executed via sandbox Function; NOT standard node test runner",
+  "redis": "not executed; loopback 6379/16379 refused",
+  "nodeSuite": "not executed: shell filesystem isolation denied directory access"
+}

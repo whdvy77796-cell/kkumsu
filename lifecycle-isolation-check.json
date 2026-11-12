@@ -1,0 +1,10 @@
+{
+  "baseFilesChanged": [],
+  "additions": [
+    "lib\\legacy-lifecycle-adoption.mjs",
+    "lib\\withdrawal-redis.mjs",
+    "lifecycle-validation.json",
+    "SOCIAL-LIFECYCLE-QA.md",
+    "tests\\legacy-lifecycle-adoption.test.mjs"
+  ]
+}
