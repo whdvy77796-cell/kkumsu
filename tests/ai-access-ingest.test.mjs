@@ -12,7 +12,7 @@ const bot={bot:'synthetic',provider:'openai',purpose:'search',verification:'unve
 const row=(over={},proxy={})=>({id:'log-not-request',source:'static',host,projectId:env.YB_AI_ACCESS_PROJECT_ID,environment:'preview',...over,proxy:{host,timestamp:now,method:'GET',statusCode:200,path:'/',vercelId:'synthetic::request-00001',userAgent:['synthetic-bot'],clientIp:'192.0.2.1',...proxy}});
 async function run(rows=[row()],opts={}){
  const raw=Buffer.isBuffer(rows)?rows:Buffer.from(typeof rows==='string'?rows:JSON.stringify(rows));
- const headers={host,'content-type':'application/json','x-vercel-signature':createHmac('sha1',env.YB_AI_ACCESS_DRAIN_SECRET).update(opts.signedRaw??raw).digest('hex'),...opts.headers};
+ const headers={host:opts.host||host,'content-type':'application/json','x-vercel-signature':createHmac('sha1',env.YB_AI_ACCESS_DRAIN_SECRET).update(opts.signedRaw??raw).digest('hex'),...opts.headers};
  const req=Readable.from([raw]);req.method=opts.method||'POST';req.headers=headers;if(opts.parsed)req.body=JSON.parse(raw);if(opts.lazyGetter)Object.defineProperty(req,'body',{get(){throw new Error('must not read parsed body');}});
  const res={headers:{},setHeader(k,v){this.headers[k]=v;},end(x){this.body=x;}};
  const store=opts.store||new MemoryStore();let classified=0;
@@ -39,7 +39,7 @@ test('no session or browser header can spoof intake; signed requests need no ses
  const bad=await run([row()],{headers:{cookie:'owner-session=synthetic','origin':'https://'+host,'x-vercel-signature':undefined}});assert.equal(bad.res.statusCode,403);assert.equal(bad.store.kv.size,0);
 });
 test('wrong project/host/environment, private paths, failure statuses, WAF and missing request IDs excluded',async()=>{
- const invalid=[row({projectId:'wrong'}),row({host:'other.example'}),row({environment:'production'}),row({}, {host:'other.example'}),row({}, {method:'POST'}),row({}, {statusCode:404}),row({}, {statusCode:299.1}),...['deny','challenge','rate_limit'].map(wafAction=>row({}, {wafAction})),...['/api/private','/stores/abc','//stores','/stores/../api/private','/%73tores','/stores/','/stores#private'].map(path=>row({}, {path})),row({}, {vercelId:undefined}),row({}, {vercelId:'a'}),row({}, {timestamp:now+300001}),row({}, {timestamp:Date.parse(env.YB_AI_ACCESS_STARTED_AT)-1})];
+ const invalid=[row({projectId:'wrong'}),row({environment:'production'}),row({}, {host:'other.example'}),row({}, {method:'POST'}),row({}, {statusCode:404}),row({}, {statusCode:299.1}),...['deny','challenge','rate_limit'].map(wafAction=>row({}, {wafAction})),...['/api/private','/stores/abc','//stores','/stores/../api/private','/%73tores','/stores/','/stores#private'].map(path=>row({}, {path})),row({}, {vercelId:undefined}),row({}, {vercelId:'a'}),row({}, {timestamp:now+300001}),row({}, {timestamp:Date.parse(env.YB_AI_ACCESS_STARTED_AT)-1})];
  const r=await run(invalid);assert.equal(r.res.statusCode,200);assert.equal(r.classified,0);assert.equal((await summary(r.store)).state,'not_started');
 });
 test('duplicates use request ID not per-log ID, query ignored, public directory/store accepted',async()=>{
@@ -48,6 +48,16 @@ test('duplicates use request ID not per-log ID, query ignored, public directory/
  const persisted=JSON.stringify([...r.store.kv]);for(const raw of ['192.0.2.1','synthetic-bot','not-saved','different-log-id','synthetic::request','private=query'])assert.ok(!persisted.includes(raw));
  const unknown=await run([row()],{unknown:true});assert.equal(unknown.store.kv.size,0);
 });
+test('signed proxy host accepts documented deployment host discrepancy and only confirmed production aliases',async()=>{
+ const deploy='kkumsu-example-deployment.vercel.app';
+ const preview=await run([row({host:deploy},{vercelId:'synthetic::preview-host'})]);assert.equal((await summary(preview.store)).lifetime.unverified,1);
+ const aliases=['www.kkumsu.com','www.kkumsu.net','kkumsu-rho.vercel.app','evil.example'];
+ const rows=aliases.map((h,i)=>row({host:deploy,environment:'production'},{host:h,vercelId:'synthetic::prod-'+i}));
+ const prod=await run(rows,{host:'www.kkumsu.com',env:{VERCEL_ENV:'production'}});
+ const scope=requestScope({headers:{host:'www.kkumsu.com'}},{...env,VERCEL_ENV:'production'});
+ assert.equal(prod.res.statusCode,200);assert.equal((await readAiSummary({store:prod.store,scope,now,since:env.YB_AI_ACCESS_STARTED_AT})).lifetime.unverified,3);
+});
+
 test('storage/classification failure is generic with no payload disclosure, signed malformed JSON not accepted',async()=>{
  const r=await run([row()],{deps:{recordBatch:async()=>{throw new Error('secret 192.0.2.1');}}});assert.equal(r.res.statusCode,503);assert.equal(r.res.body,'{"error":"Unavailable"}');
  assert.equal((await run('{')).res.statusCode,503);
