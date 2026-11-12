@@ -10,7 +10,7 @@ export const BUSINESS = {
   phone: '', // 고객센터 전화번호
   email: '', // 고객센터 이메일
   privacyEmail: 'whdvy77796@gmail.com', // 사용자가 공개를 승인한 개인정보 문의 이메일
-  privacyOfficer: '', // 개인정보 보호책임자 (비우면 대표자)
+  privacyOfficer: '여기봐 AI 개인정보 담당', // 사용자가 승인한 개인정보 문의 담당 부서
   hosting: 'Vercel Inc.', // 호스팅 서비스 제공자
 };
 
