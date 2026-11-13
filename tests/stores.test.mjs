@@ -116,7 +116,7 @@ test('body byte limit includes Vercel pre-parsed JSON and no storage fallback in
 
 test('SSR escapes every field, has canonical/disclosure/accessibility and no scripts',()=>{
  const dangerous={...DATA,name:'<img src=x onerror=bad()>',headline:'"quoted"',intro:'&lt;script&gt;',sections:[{heading:'<b>',body:'<svg/onload=bad>'}],faqs:[{question:'<iframe>',answer:'</title>'}]};
- const html=renderStore(scope,{id:ID,data:dangerous});assert.ok(!/<script|<img\s+src=x|<svg|<iframe|style=|onclick=/i.test(html));assert.ok(html.includes('&lt;img'));assert.ok(html.includes(DISCLOSURE));assert.ok(html.includes('https://www.kkumsu.com/stores/'+ID));assert.ok(html.includes('/#/manage/'+ID));assert.ok(html.includes('/#/report-store/'+ID));assert.ok(html.includes('href="/styles.css"'));
+ const html=renderStore(scope,{id:ID,data:dangerous});assert.ok(!/<script|<img\s+src=x|<svg|<iframe|style=|onclick=/i.test(html));assert.ok(html.includes('&lt;img'));assert.ok(html.includes(DISCLOSURE));assert.ok(html.includes('<link rel="canonical" href="https://www.lookhereai.com/stores/'+ID+'">'));assert.ok(html.includes('<meta property="og:url" content="https://www.lookhereai.com/stores/'+ID+'">'));assert.ok(html.includes('/#/manage/'+ID));assert.ok(html.includes('/#/report-store/'+ID));assert.ok(html.includes('href="/styles.css"'));
  const preview=renderStore({...scope,production:false},{id:ID,data:DATA});assert.ok(preview.includes('noindex,nofollow'));assert.ok(!preview.includes('rel="canonical"'));
 });
 
