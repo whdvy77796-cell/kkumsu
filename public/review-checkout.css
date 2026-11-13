@@ -1,0 +1,26 @@
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: #f6f7f9; color: #1b1d21; line-height: 1.6; }
+.rc-wrap { max-width: 520px; margin: 0 auto; padding: 20px 18px 48px; }
+.rc-badge { display: inline-block; margin: 0 0 12px; padding: 4px 10px; border-radius: 999px; background: #fff3cd; color: #6b4e00; font-size: 13px; font-weight: 700; border: 1px solid #e8cf7a; }
+h1 { font-size: 24px; margin: 8px 0; }
+.rc-price { font-size: 20px; font-weight: 700; margin: 4px 0 16px; }
+.rc-price span { font-size: 13px; font-weight: 400; color: #5b616b; }
+.rc-notice { margin: 0 0 20px; padding: 14px 16px 14px 32px; background: #fff; border: 1px solid #d9dde3; border-radius: 12px; font-size: 15px; }
+.rc-notice li + li { margin-top: 6px; }
+.rc-btn { display: block; width: 100%; min-height: 52px; padding: 14px 16px; border: 0; border-radius: 12px; background: #3182f6; color: #fff; font-size: 16px; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; }
+.rc-btn:disabled { background: #a8b3c2; cursor: not-allowed; }
+.rc-btn-sub { margin-top: 16px; background: #e8ebef; color: #1b1d21; }
+.rc-status { min-height: 1.6em; margin: 12px 0 0; font-size: 14px; color: #8a1c1c; }
+.rc-detail { margin: 12px 0; padding: 12px 14px; background: #fff; border: 1px solid #d9dde3; border-radius: 12px; font-size: 14px; word-break: break-all; }
+.rc-detail dt { font-weight: 700; margin-top: 6px; }
+.rc-detail dd { margin: 0; }
+.rc-notice-line { font-size: 14px; color: #3a3f47; }
+[hidden] { display: none !important; }
+
+.rc-product { margin: 20px 0; padding: 16px; border: 1px solid #dce5f4; border-radius: 14px; background: #f7faff; color: #253754; font-size: .95rem; line-height: 1.65; }
+.rc-product p { margin: 10px 0; }
+.rc-product a { color: #194ab3; text-decoration: underline; }
+.rc-preview { display: flex; flex-direction: column; gap: 4px; padding: 18px; border-radius: 12px; background: white; border: 1px solid #d6e1f1; }
+.rc-preview span, .rc-preview small { color: #647795; }
+.rc-preview strong { color: #132b54; font-size: 1.15rem; }

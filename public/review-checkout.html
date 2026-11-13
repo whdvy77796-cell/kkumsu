@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="referrer" content="no-referrer">
+  <title>[테스트 전용] 결제창 검토 - 여기봐 AI</title>
+  <link rel="stylesheet" href="review-checkout.css">
+  <!-- 토스페이먼츠 결제창(구버전) SDK v2. 공식 샘플(tosspayments/tosspayments-sample)과 같은 주소입니다. -->
+  <script src="https://js.tosspayments.com/v2/standard"></script>
+</head>
+<body>
+  <main class="rc-wrap" id="rc-root" data-view="start">
+    <p class="rc-badge" role="note">테스트 · 검토 전용 화면</p>
+
+    <section id="rc-start">
+      <h1>우리 가게 공개하기</h1>
+      <p class="rc-price">제안 가격 3,900원 <span>(아직 확정된 판매 가격이 아닙니다)</span></p>
+      <div class="rc-product" aria-label="예정된 가게 공개 서비스 안내">
+        <div class="rc-preview" role="img" aria-label="가게 소개 페이지 구성 예시">
+          <span>가게 소개 화면 예시</span><strong>우리 가게 이야기</strong><small>소개 · 자주 묻는 질문 · 공유 링크</small>
+        </div>
+        <p>가게 1곳의 소개 페이지와 공유 주소·QR을 제공하고, 관리 비밀번호로 수정·삭제할 수 있도록 준비 중입니다.</p>
+        <p>유료 출시 시 1회 결제로 공개 시작일부터 1년 제공 예정이며 자동 갱신은 없습니다. 결제일과 공개일 중 더 늦은 날부터 7일 이내에는 전액, 이후에는 남은 기간을 일할 계산해 위약금 없이 환불할 계획입니다.</p>
+        <p><a href="/#/terms">예정 이용약관</a> · <a href="/#/refund">예정 환불정책</a> · <a href="/#/privacy">개인정보처리방침</a></p>
+      </div>
+
+      <ul class="rc-notice">
+        <li><strong>이 화면은 결제창 연동을 검토하기 위한 테스트 전용입니다.</strong></li>
+        <li>토스페이먼츠 <strong>테스트 환경</strong>의 결제창만 열립니다. <strong>실제 결제(청구)는 일어나지 않습니다.</strong></li>
+        <li>주문이 만들어지지 않고, 가게가 실제로 공개되지도 않습니다.</li>
+        <li>현재 공개된 베타 서비스의 가게 공개는 <strong>계속 무료</strong>입니다.</li>
+        <li><strong>실제 결제는 아직 활성화되지 않았습니다.</strong> 실제 카드 정보는 입력하지 마세요.</li>
+      </ul>
+
+      <button type="button" id="rc-pay" class="rc-btn">테스트 결제창 열기 (3,900원, 실제 청구 없음)</button>
+      <p id="rc-status" class="rc-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="rc-result" hidden>
+      <h1 id="rc-result-title"></h1>
+      <p id="rc-result-body"></p>
+      <dl id="rc-result-detail" class="rc-detail"></dl>
+      <p class="rc-notice-line">이 화면은 승인(결제 확정) 요청을 보내지 않습니다. 주문 생성, 가게 공개, 청구는 모두 일어나지 않았습니다. 현재 베타의 가게 공개는 계속 무료입니다.</p>
+      <a class="rc-btn rc-btn-sub" href="review-checkout.html">처음 화면으로</a>
+    </section>
+  </main>
+  <script type="module" src="review-checkout.js"></script>
+</body>
+</html>

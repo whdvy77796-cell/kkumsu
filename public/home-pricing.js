@@ -49,7 +49,8 @@ export function makeHomePricing(h, focusStart) {
           feature('인스타·SNS에 쓸 공유 문구'),
           feature('관리 비밀번호로 내용 수정·삭제'),
           feature('내 가게 AI 검색 봇 접근 현황 (준비중)', true)),
-        h('p', { class: 'pricing-plan-note' }, '공개 유지 기간과 이용 조건은 유료 출시 전에 안내할 예정이에요.'))),
+        h('p', { class: 'pricing-plan-note' }, '유료 출시 계획: 결제와 공개 동의가 완료되면 공개를 시작하고 1년간 유지해요. 자동 갱신이나 정기결제는 없어요.'),
+        h('p', { class: 'pricing-plan-note' }, '결제일과 공개 시작일 중 더 늦은 날부터 7일 안에는 이용 여부와 관계없이 전액 환불해요. 이후에는 남은 기간을 일할 계산해 위약금 없이 환불할 계획이에요. ', h('a', { href: '#/refund' }, '환불 안내 자세히 보기')))),
     h('section', { class: 'pricing-progress', 'aria-labelledby': 'pricing-progress-title' },
       h('div', { class: 'pricing-progress-heading' },
         h('div', null, h('p', { class: 'pricing-progress-kicker' }, '단계별 공개 가격'),
@@ -64,7 +65,7 @@ export function makeHomePricing(h, focusStart) {
         HOME_PRICE_STEPS.map(() => h('span', { class: 'pricing-meter-segment', 'aria-hidden': 'true' }))),
       h('p', { class: 'pricing-meter-note' }, '구매자 수와 단계별 진행률은 결제·집계가 연결된 뒤 표시할 예정이에요.'),
       h('ol', { class: 'pricing-levels' }, levels),
-      h('p', { class: 'pricing-progress-note' }, '각 가격은 1회 공개 기준 제안이에요. 구매 인원 산정, 취소·환불 처리와 상세 조건은 유료 출시 전에 안내해요.')),
+      h('p', { class: 'pricing-progress-note' }, '각 가격은 유료 출시 후 가게 1곳의 1년 공개를 위한 1회 결제 예정가예요. 구매자 집계와 취소 반영 기준은 유료 출시 전에 확정해 안내해요.')),
     h('p', { class: 'pricing-disclaimer' }, 'AI·검색 봇의 접근은 AI 답변의 추천·인용이나 실제 손님 방문을 뜻하지 않아요. 검색 노출과 AI 추천은 보장하지 않아요.'),
     h('button', { class: 'btn primary go pricing-start', type: 'button', onclick: focusStart }, '지금 무료로 페이지 만들기'));
 }
