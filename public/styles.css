@@ -874,3 +874,116 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
   .faq-question { gap: 10px; padding: 17px 16px; font-size: 15px; }
   .faq-answer { padding: 0 16px 18px 42px; }
 }
+
+/* 첫 화면의 AI 가게정보 준비도: 가상의 세 단계 예시 */
+.home-readiness { min-width: 0; margin: 34px 0 36px; padding: clamp(25px, 4vw, 48px); border: 1px solid #dfe8fa; border-radius: 24px; background: #f5f8ff; }
+.home-readiness-heading { max-width: 760px; margin: 0 auto 27px; text-align: center; }
+.home-readiness-kicker { display: inline-block; margin-bottom: 10px; padding: 5px 12px; border-radius: 99px; background: #e4edff; color: #3155b3; font-size: 12px; line-height: 1.4; font-weight: 800; }
+.home-readiness-heading h2 { margin: 0 0 11px; color: #102040; font-size: clamp(25px, 3.5vw, 36px); line-height: 1.3; letter-spacing: -.04em; word-break: keep-all; }
+.home-readiness-heading p { max-width: 650px; margin: 0 auto; color: #536783; font-size: 15px; line-height: 1.65; word-break: keep-all; }
+.home-readiness-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.home-readiness-step { min-width: 0; padding: 20px 18px; border: 1px solid #dfE7f6; border-radius: 19px; background: #fff; }
+.home-readiness-step-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.home-readiness-number { color: #8a9bb5; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.home-readiness-step-tag { color: #60728d; font-size: 12px; font-weight: 700; }
+.home-readiness-dial { display: grid; place-items: center; width: 100px; height: 100px; margin: 18px auto 16px; border-radius: 50%; }
+.home-readiness-dial-inner { display: flex; align-items: baseline; justify-content: center; gap: 2px; width: 82px; height: 82px; padding-top: 25px; border-radius: 50%; color: #214bc0; background: #fff; line-height: 1; font-variant-numeric: tabular-nums; }
+.home-readiness-dial-inner strong { font-size: 32px; font-weight: 800; letter-spacing: -.04em; }
+.home-readiness-dial-inner span { font-size: 13px; font-weight: 700; }
+.home-readiness-step h3 { margin: 0 0 5px; color: #172541; font-size: 17px; line-height: 1.4; }
+.home-readiness-step p { min-height: 48px; margin: 0; color: #5d6e85; font-size: 13.5px; line-height: 1.65; word-break: keep-all; }
+.home-readiness-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.home-readiness-chips span { display: inline-block; padding: 4px 8px; border-radius: 7px; background: #f0f5ff; color: #3a5eae; font-size: 12px; line-height: 1.4; font-weight: 700; }
+.home-readiness-review { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 17px; padding: 15px 18px; border-radius: 14px; color: #28406a; background: #e7efff; }
+.home-readiness-plus { flex: 0 0 auto; padding: 6px 10px; border-radius: 9px; color: #fff; background: #315fe8; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+.home-readiness-review p { margin: 0; font-size: 13px; line-height: 1.5; }
+.home-readiness-disclaimer { margin: 15px 0 0; color: #687a92; font-size: 12px; line-height: 1.65; text-align: center; word-break: keep-all; }
+@media (min-width: 1024px) {
+  body[data-page="home"] #view > .hero { grid-column: 1 / -1; grid-row: 1; justify-self: center; max-width: 850px; text-align: center; }
+  body[data-page="home"] #view > .home-readiness { grid-column: 1 / -1; grid-row: auto; }
+  body[data-page="home"] #view > .home-sample { grid-column: 1 / -1; grid-row: auto; justify-self: center; margin: 0 auto 24px; }
+}
+@media (max-width: 700px) {
+  .home-readiness { margin: 25px 0 30px; padding: 25px 18px; border-radius: 20px; }
+  .home-readiness-heading { margin-bottom: 20px; text-align: left; }
+  .home-readiness-heading p { font-size: 14px; }
+  .home-readiness-steps { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .home-readiness-step { display: grid; grid-template-columns: 75px minmax(0, 1fr); column-gap: 14px; align-items: center; padding: 16px; }
+  .home-readiness-step-head { grid-column: 1 / -1; }
+  .home-readiness-dial { grid-column: 1; grid-row: 2 / span 3; width: 72px; height: 72px; margin: 10px 0 0; }
+  .home-readiness-dial-inner { width: 58px; height: 58px; padding-top: 17px; }
+  .home-readiness-dial-inner strong { font-size: 24px; }
+  .home-readiness-step h3 { margin: 12px 0 3px; font-size: 16px; }
+  .home-readiness-step p { min-height: 0; font-size: 13px; }
+  .home-readiness-chips { margin-top: 8px; }
+  .home-readiness-review { justify-content: flex-start; }
+  .home-readiness-disclaimer { text-align: left; }
+}
+
+/* 질문 화면의 혜택과 실제 입력 기준 준비도 */
+.page-questions-layout { display: grid; gap: 22px; align-items: start; }
+.page-questions-layout[hidden] { display: none; }
+.page-questions-form, .readiness-aside { min-width: 0; }
+.readiness-aside { display: grid; gap: 12px; }
+.readiness-benefits, .readiness-current { min-width: 0; padding: 20px; border: 1px solid #dce6fa; border-radius: 18px; background: #f8faff; }
+.readiness-benefits-kicker, .readiness-current-label { margin: 0 0 5px; color: #315fe0; font-size: 12px; line-height: 1.4; font-weight: 800; }
+.readiness-benefits h3, .readiness-current h3 { margin: 0; color: #172541; font-size: 18px; line-height: 1.4; letter-spacing: -.025em; }
+.readiness-benefits ul { display: grid; gap: 13px; padding: 0; margin: 18px 0 14px; list-style: none; }
+.readiness-benefits li { display: flex; align-items: flex-start; gap: 10px; color: #253957; font-size: 13px; line-height: 1.5; }
+.readiness-benefits li div { min-width: 0; }
+.readiness-benefits li strong { display: block; word-break: keep-all; }
+.readiness-benefits li p { margin: 3px 0 0; color: #60718a; font-size: 12px; line-height: 1.55; word-break: keep-all; }
+.readiness-benefit-mark { flex: 0 0 20px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 7px; background: #e5edff; color: #315fe0; font-size: 12px; font-weight: 800; }
+.readiness-benefits-note { margin: 0; color: #667990; font-size: 11.5px; line-height: 1.55; }
+.readiness-current { background: #fff; }
+.readiness-current-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.readiness-current-badge { display: inline-block; padding: 4px 7px; border-radius: 7px; color: #5b6d88; background: #f1f4f9; font-size: 11px; line-height: 1.4; font-weight: 700; }
+.readiness-current-score { margin: 13px 0 8px; color: #687992; font-size: 13px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.readiness-current-number { color: #2858dc; font-size: 35px; font-weight: 800; letter-spacing: -.04em; }
+.readiness-meter { height: 8px; overflow: hidden; border-radius: 99px; background: #e6edf8; }
+.readiness-meter-fill { display: block; height: 100%; border-radius: inherit; background: #315fe8; }
+.readiness-next { margin: 12px 0; color: #314663; font-size: 13px; line-height: 1.6; word-break: keep-all; }
+.readiness-details { border-top: 1px solid #e8edf6; padding-top: 10px; }
+.readiness-details summary { color: #3155b3; cursor: pointer; font-size: 12.5px; font-weight: 700; }
+.readiness-details summary:focus-visible, .readiness-na input:focus-visible, .readiness-review-label input:focus-visible { outline: 3px solid #315fe8; outline-offset: 3px; }
+.readiness-criteria { display: grid; gap: 6px; padding: 0; margin: 12px 0; list-style: none; }
+.readiness-criterion { display: flex; justify-content: space-between; gap: 12px; color: #536780; font-size: 12px; }
+.readiness-criterion span:last-child { flex: none; color: #60718a; font-weight: 700; }
+.readiness-completed span:last-child { color: #2457c9; }
+.readiness-fineprint, .readiness-caveat { margin: 10px 0 0; color: #687a92; font-size: 11.5px; line-height: 1.6; word-break: keep-all; }
+.readiness-na { display: flex; align-items: flex-start; gap: 8px; margin: -12px 0 23px; color: #435975; font-size: 13px; line-height: 1.5; cursor: pointer; }
+.readiness-na input, .readiness-review-label input { flex: 0 0 auto; width: 18px; height: 18px; margin: 1px 0 0; accent-color: #315fe8; }
+.readiness-na small { color: #738197; font-size: 11.5px; }
+.readiness-review-check { margin: 16px 0 12px; padding: 20px; border: 1px solid #dce6fa; border-radius: 16px; background: #f8faff; }
+.readiness-review-check h3 { margin: 0 0 6px; font-size: 17px; }
+.readiness-review-check p { color: #536780; font-size: 13px; line-height: 1.6; }
+.readiness-review-label { display: flex; align-items: flex-start; gap: 9px; color: #213a65; font-size: 14px; font-weight: 700; cursor: pointer; }
+.readiness-review-help { margin: 10px 0 0 !important; font-size: 12px !important; }
+.page-preview > .readiness-current { margin: 12px 0 20px; }
+@media (min-width: 1024px) {
+  body:has(#view > .page-questions) #view { max-width: var(--wrap-wide); }
+  .page-questions-layout { grid-template-columns: minmax(0, 1fr) 350px; gap: 28px; }
+  .readiness-aside { position: sticky; top: 86px; grid-column: 2; grid-row: 1; max-height: calc(100vh - 160px); overflow-y: auto; }
+  .page-questions-form { grid-column: 1; grid-row: 1; }
+}
+@media (max-width: 1023px) {
+  .readiness-benefits li:not(:first-child) p { display: none; }
+  .readiness-benefits ul { gap: 9px; margin: 13px 0 11px; }
+  .readiness-aside { gap: 10px; }
+}
+@media (max-width: 600px) {
+  .page-questions-layout { gap: 18px; }
+  .readiness-benefits, .readiness-current { padding: 17px; border-radius: 15px; }
+  .readiness-benefits h3, .readiness-current h3 { font-size: 17px; }
+  .readiness-current-number { font-size: 30px; }
+}
+
+/* 작은 화면에서도 축약한 혜택 설명을 펼쳐 볼 수 있다. */
+.readiness-benefits-more { display: none; }
+.readiness-aside:focus-visible { outline: 3px solid #315fe8; outline-offset: 3px; border-radius: 18px; }
+@media (max-width: 1023px) {
+  .readiness-benefits-more { display: block; margin: 2px 0 10px; }
+  .readiness-benefits-more summary { color: #3155b3; cursor: pointer; font-size: 12px; font-weight: 700; }
+  .readiness-benefits-more summary:focus-visible { outline: 3px solid #315fe8; outline-offset: 3px; }
+  .readiness-benefits-more p { margin: 7px 0 0; color: #60718a; font-size: 12px; line-height: 1.55; }
+}

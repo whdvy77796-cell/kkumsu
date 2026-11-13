@@ -15,6 +15,7 @@ import { makeHomeExample } from './home-example.js';
 import { makeHomeExplainer } from './home-explainer.js';
 import { makeHomePricing } from './home-pricing.js';
 import { makeHomeFaq } from './home-faq.js';
+import { makeHomeReadiness } from './home-readiness.js';
 import { setupHomeLogo } from './logo-home.js';
 import { makeAccountUI } from './account-ui.js';
 import { allowOwnerHashChange } from './account-navigation.js';
@@ -287,6 +288,7 @@ function renderHome() {
       h('p', { class: 'ai-access-intro-text' }, h('span', { class: 'ai-access-intro-emphasis' }, 'AI 회사 검색 엔진 로봇'), '이 날마다 등록된 ', h('span', { class: 'ai-access-intro-emphasis' }, '여기봐 AI 업체 페이지 정보'), '를 가져갑니다.'),
       h('p', { class: 'ai-access-intro-caveat' }, '실제 접근 여부와 주기는 다를 수 있으며, AI 추천·인용은 보장하지 않아요.')),
     makeAiAccessPanel({ h, fetcher: (url, options) => fetch(url, options), kind: 'site' }),
+    makeHomeReadiness(h),
     makeHomeExample(h),
     makeHomeExplainer(h, focusStart),
     pageSearchWarning, pendingDiagnosis,
