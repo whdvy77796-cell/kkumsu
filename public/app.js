@@ -14,6 +14,7 @@ import { makeDiagnosisStart } from './diagnosis-start.js';
 import { makeHomeExample } from './home-example.js';
 import { makeHomeExplainer } from './home-explainer.js';
 import { makeHomePricing } from './home-pricing.js';
+import { makeHomeFaq } from './home-faq.js';
 import { setupHomeLogo } from './logo-home.js';
 import { makeAccountUI } from './account-ui.js';
 import { allowOwnerHashChange } from './account-navigation.js';
@@ -307,6 +308,7 @@ function renderHome() {
       h('p', null, '동의하신 상호명과 주소로 공개 정보를 찾아요. 질문 답변과 확인한 정보를 AI에 보내 초안을 만들 때는 별도로 동의받아요. 초안은 비공개이며 AI가 정리한 내용은 사장님이 직접 확인해 주세요.'),
       h('p', { style: { margin: '8px 0 0' } }, h('a', { href: '#/privacy' }, '개인정보처리방침 자세히 보기'))),
     makeHomePricing(h, focusStart),
+    makeHomeFaq(h),
   );
   setNavbar(btn('무료로 페이지 만들기', focusStart, true));
   if (wantStart) { wantStart = false; setTimeout(focusStart, 60); }
