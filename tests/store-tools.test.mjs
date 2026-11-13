@@ -69,8 +69,8 @@ test('manage: auth, update needs confirmation, password only in requests', async
   makeStoreTools(env).renderManage(ID);
   const pw = find(st, (x) => x.tag === 'input' && x.attrs.type === 'password');
   assert.ok(pw);
-  const legacyLink = find(st, x => x.tag === 'a' && x.attrs.href === '/#/my-stores');
-  assert.ok(legacyLink && labelOf(legacyLink) === '기존 계정으로 관리하기');
+  const legacyLink = find(st, x => x.tag === 'a' && x.attrs.href === 'https://www.kkumsu.com/#/my-stores');
+  assert.ok(legacyLink && labelOf(legacyLink) === '기존 계정으로 관리하기 (기존 주소)');
   assert.match(text(st), /이전에 이 가게를 계정에 연결해 두셨다면/);
   pw.value = 'secret-pass';
   click(st, '관리 시작'); await tick(); await tick();
