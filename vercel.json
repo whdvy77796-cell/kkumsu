@@ -1,6 +1,6 @@
 {
   "framework": null,
-  "buildCommand": "npm run build",
+  "buildCommand": "env -i PATH=\"$PATH\" HOME=\"$HOME\" CI=1 npm test && npm run build",
   "outputDirectory": "dist",
   "regions": [
     "icn1"
