@@ -27,5 +27,8 @@ export function makeHomeReadiness(h) {
     h('div', { class: 'home-readiness-review' },
       h('span', { class: 'home-readiness-plus' }, '+15점'),
       h('p', null, h('strong', null, '예상 질문과 답변까지 직접 확인하면'), h('br'), '입력 정보와 확인 여부에 따라 준비도가 달라져요.')),
+    h('section', { class: 'home-readiness-aeo', 'aria-label': 'AI 검색 최적화 안내' },
+      h('p', null, h('strong', null, 'AI 검색 최적화(AEO·GEO)'), '는 손님이 ChatGPT·클로드·구글 AI 개요·네이버 AI 브리핑에 업체를 물을 때 ', h('strong', null, 'AI가 우리 업체를 바르게 소개하도록'), ' 정보를 정리해 두는 일입니다.'),
+      h('p', null, '국내 주요 지도·블로그 서비스 중에는 ', h('strong', null, '해외 AI 검색 로봇의 수집을 제한하는 곳'), '도 있어, ', h('strong', null, 'AI가 읽을 수 있는 업체 정보가 제한될 수 있습니다.'))),
     h('p', { class: 'home-readiness-disclaimer' }, '위 점수는 가상의 예시예요. 준비도는 여기봐 AI의 자체 입력 기준이며, 정보의 진위나 공개 내용 반영을 자동 검증하지 않아요. AI의 실제 수집·검색 노출·추천은 보장하지 않아요.'));
 }
