@@ -80,7 +80,9 @@
 /* 홈 화면: 봇 접근현황 앞의 소개 문구 */
 .ai-access-intro { min-width: 0; padding: 28px 16px 8px; text-align: center; }
 .ai-access-intro-title { margin: 0 0 16px; color: #101824; font-size: clamp(27px, 4vw, 44px); font-weight: 800; line-height: 1.24; letter-spacing: -.045em; word-break: keep-all; overflow-wrap: anywhere; }
+.ai-access-intro-emphasis { color: var(--brand); font-weight: 800; }
 .ai-access-intro-text { margin: 0; color: #58677b; font-size: clamp(15px, 1.6vw, 18px); font-weight: 500; line-height: 1.7; word-break: keep-all; }
+.ai-access-intro-text .ai-access-intro-emphasis { font-weight: 700; }
 .ai-access-intro-caveat { margin: 12px 0 0; color: #697789; font-size: 12.5px; line-height: 1.55; word-break: keep-all; }
 @media (min-width: 1024px) {
   body[data-page="home"] #view > .ai-access-intro { grid-column: 1 / -1; grid-row: 2; }
