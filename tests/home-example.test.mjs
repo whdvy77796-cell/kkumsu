@@ -72,12 +72,12 @@ test('WHY and four-step guide are accessible, use the existing start action and 
   assert.equal(why.attrs['aria-labelledby'], 'home-why-title');
   assert.equal(how.attrs['aria-labelledby'], 'home-how-title');
   assert.match(whyText, /WHY\?/); assert.match(whyText, /외부 AI가 그 내용을 자유롭게 읽을 수 있는 건 아니에요/);
-  assert.match(whyText, /99,000원\s+\(적용 예정\)/); assert.match(whyText, /현재 베타 기간에는 공개와 QR·소개글도 무료/);
+  assert.match(whyText, /첫 100명 공개 1회 3,900원\s+\(유료 전환 후 적용 예정\)/); assert.match(whyText, /현재 베타 기간에는 공개와 QR·소개글도 무료/);
   assert.match(whyText, /결제는 운영하지 않아요/); assert.match(whyText, /검색 노출·AI 추천·인용은 보장하지 않아요/);
   const button = find(why, n => n.tag === 'button'); assert.equal(button.attrs.type, 'button');
   assert.equal(button.attrs.onclick, start); button.attrs.onclick(); assert.equal(called, 1);
   const list = find(how, n => n.tag === 'ol'); assert.equal(list.children.filter(n => n.tag === 'li').length, 4);
   assert.match(howText, /동의 후/); assert.match(howText, /5개 항목/); assert.match(howText, /대표 메뉴·서비스만 필수/);
-  assert.match(howText, /실제 고객의 질문 기록은 아니에요/); assert.match(howText, /99,000원은 적용 예정/);
+  assert.match(howText, /실제 고객의 질문 기록은 아니에요/); assert.match(howText, /3,900원은 유료 전환 후 적용 예정/);
   assert.match(howText, /현재 베타 기간에는 무료/); assert.match(howText, /QR코드/);
 });
