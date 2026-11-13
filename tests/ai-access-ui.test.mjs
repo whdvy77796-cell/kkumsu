@@ -255,3 +255,114 @@ test('accessibility hooks: labelled region, live status, table headers', async (
   assert.equal(find(p, (x) => x.attrs['aria-live'] === 'polite').length, 1);
   assert.equal(find(p, (x) => x.tag === 'th' && x.attrs.scope === 'col').length, 4);
 });
+
+const realLikeSite = (extra = {}) => active({
+  lifetime: { verified: 22, unverified: 0 },
+  breakdown: [
+    { provider: 'openai', purpose: 'training', verified: 6, unverified: 0 },
+    { provider: 'anthropic', purpose: 'training', verified: 12, unverified: 0 },
+    { provider: 'google', purpose: 'search_engine', verified: 4, unverified: 0 },
+  ],
+  ...extra,
+});
+const providerPanel = node => find(node, x => x.attrs.class === 'ai-access-providers')[0];
+const providerRows = node => find(providerPanel(node), x => x.attrs.class === 'ai-access-provider-row');
+
+test('site hero shows verified requests by provider with actual purpose labels', async () => {
+  const p = makeAiAccessPanel({ h, fetcher: mk(realLikeSite()).fetcher, kind: 'site' });
+  await tick();
+  const rows = providerRows(p);
+  assert.equal(rows.length, 3);
+  assert.match(text(rows[0]), /OpenAI\s+학습용\s+6회/);
+  assert.match(text(rows[1]), /Anthropic\s+학습용\s+12회/);
+  assert.match(text(rows[2]), /Google\s+검색엔진\s+4회/);
+  assert.ok(find(p, x => x.attrs.class === 'ai-access-hero')[0].children.includes(providerPanel(p)));
+  assert.equal(find(p, x => x.tag === 'details').length, 1); // 기존 상세 표 유지
+});
+
+test('provider totals combine purposes but never add unverified claims', async () => {
+  const p = makeAiAccessPanel({ h, kind: 'site', fetcher: mk(realLikeSite({
+    lifetime: { verified: 24, unverified: 10 },
+    breakdown: [
+      { provider: 'openai', purpose: 'training', verified: 6, unverified: 2 },
+      { provider: 'openai', purpose: 'search', verified: 2, unverified: 3 },
+      { provider: 'anthropic', purpose: 'training', verified: 12, unverified: 1 },
+      { provider: 'google', purpose: 'search_engine', verified: 4, unverified: 4 },
+    ],
+  })).fetcher });
+  await tick();
+  const rows = providerRows(p);
+  assert.match(text(rows[0]), /OpenAI\s+학습용 · 검색 답변용\s+8회/);
+  assert.doesNotMatch(text(rows[0]), /13회/);
+  assert.match(text(rows[1]), /Anthropic\s+학습용\s+12회/);
+  assert.match(text(rows[2]), /Google\s+검색엔진\s+4회/);
+  assert.match(text(find(p, x => x.attrs.class === 'ai-access-hero')[0]), /미확인 봇 주장\s+10회/);
+});
+
+test('absent provider means zero only for a present, reconciled breakdown', async () => {
+  const p = makeAiAccessPanel({ h, kind: 'site', fetcher: mk(realLikeSite({
+    lifetime: { verified: 3, unverified: 2 },
+    breakdown: [{ provider: 'openai', purpose: 'training', verified: 3, unverified: 2 }],
+  })).fetcher });
+  await tick();
+  const rows = providerRows(p);
+  assert.match(text(rows[0]), /OpenAI\s+학습용\s+3회/);
+  assert.match(text(rows[1]), /Anthropic\s+확인된 기록 없음\s+0회/);
+  assert.match(text(rows[2]), /Google\s+확인된 기록 없음\s+0회/);
+  for (const breakdown of [undefined, null, [], [
+    { provider: 'openai', purpose: 'training', verified: 3, unverified: 2 },
+    { provider: 'openai', purpose: 'training', verified: 0, unverified: 0 },
+  ]]) {
+    const q = makeAiAccessPanel({ h, kind: 'site', fetcher: mk(realLikeSite({
+      lifetime: { verified: 3, unverified: 2 }, breakdown,
+    })).fetcher });
+    await tick();
+    assert.match(text(providerPanel(q)), /운영사별 기록을 확인할 수 없어요/);
+    assert.equal(providerRows(q).length, 0);
+  }
+});
+
+test('no provider counts for not_started or unavailable; limited counts are lower bounds', async () => {
+  for (const state of ['not_started', 'unavailable']) {
+    const p = makeAiAccessPanel({ h, kind: 'site', fetcher: mk({ state }).fetcher });
+    await tick();
+    assert.equal(providerPanel(p), undefined);
+  }
+  const p = makeAiAccessPanel({ h, kind: 'site', fetcher: mk(realLikeSite({ state: 'limited' })).fetcher });
+  await tick();
+  assert.match(text(providerRows(p)[0]), /OpenAI\s+학습용\s+최소\s+6회/);
+  assert.match(text(providerRows(p)[1]), /Anthropic\s+학습용\s+최소\s+12회/);
+  assert.match(text(providerRows(p)[2]), /Google\s+검색엔진\s+최소\s+4회/);
+});
+
+test('provider totals refresh along with the site total, and stop while hidden', async () => {
+  const originalWindow = globalThis.window, originalDocument = globalThis.document;
+  let callback, calls = 0;
+  let payload = realLikeSite();
+  try {
+    globalThis.window = { setInterval: (cb, ms) => { callback = cb; assert.equal(ms, AI_ACCESS_REFRESH_MS); return 51; }, clearInterval: () => {} };
+    globalThis.document = { visibilityState: 'visible' };
+    const p = makeAiAccessPanel({ h, kind: 'site', fetcher: async () => { calls++; return { ok: true, json: async () => payload }; } });
+    p.isConnected = true;
+    await tick();
+    assert.match(text(providerRows(p)[0]), /6회/);
+    payload = realLikeSite({
+      lifetime: { verified: 23, unverified: 0 },
+      breakdown: [
+        { provider: 'openai', purpose: 'training', verified: 7, unverified: 0 },
+        { provider: 'anthropic', purpose: 'training', verified: 12, unverified: 0 },
+        { provider: 'google', purpose: 'search_engine', verified: 4, unverified: 0 },
+      ],
+    });
+    callback(); await tick();
+    assert.equal(calls, 2);
+    assert.match(text(find(p, x => x.attrs.class === 'ai-access-total')[0]), /23\s*회/);
+    assert.match(text(providerRows(p)[0]), /7회/);
+    assert.match(text(providerRows(p)[1]), /12회/);
+    globalThis.document.visibilityState = 'hidden'; callback(); await tick();
+    assert.equal(calls, 2);
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window; else globalThis.window = originalWindow;
+    if (originalDocument === undefined) delete globalThis.document; else globalThis.document = originalDocument;
+  }
+});
