@@ -76,3 +76,18 @@
   .ai-access-details > summary { align-items: flex-start; }
   .ai-access-expanded .ai-access-btn { width: auto; }
 }
+
+/* 홈 화면: 봇 접근현황 앞의 소개 문구 */
+.ai-access-intro { min-width: 0; padding: 28px 16px 8px; text-align: center; }
+.ai-access-intro-title { margin: 0 0 16px; color: #101824; font-size: clamp(27px, 4vw, 44px); font-weight: 800; line-height: 1.24; letter-spacing: -.045em; word-break: keep-all; overflow-wrap: anywhere; }
+.ai-access-intro-text { margin: 0; color: #58677b; font-size: clamp(15px, 1.6vw, 18px); font-weight: 500; line-height: 1.7; word-break: keep-all; }
+.ai-access-intro-caveat { margin: 12px 0 0; color: #697789; font-size: 12.5px; line-height: 1.55; word-break: keep-all; }
+@media (min-width: 1024px) {
+  body[data-page="home"] #view > .ai-access-intro { grid-column: 1 / -1; grid-row: 2; }
+  body[data-page="home"] #view > .ai-access-site { grid-row: 3; }
+}
+@media (max-width: 600px) {
+  .ai-access-intro { padding: 26px 4px 4px; }
+  .ai-access-intro-title { font-size: clamp(25px, 7vw, 32px); }
+  .ai-access-intro-text { font-size: 15px; }
+}
