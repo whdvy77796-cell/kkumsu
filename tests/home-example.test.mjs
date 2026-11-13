@@ -52,9 +52,11 @@ test('portrait asset exists and has dimensions matching the reserved image space
 
 test('homepage introduction uses the requested wording without removing the existing start controls', async () => {
   const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
-  assert.ok(app.includes("h('h2', { class: 'hero-sub' }, '손님이 AI에게 물을 때,', h('br', { class: 'hero-break-mobile' }), ' 우리 가게도 발견될 수 있도록.')"));
-  assert.ok(app.includes("h('p', { class: 'hero-intro' }, '손님이 물어볼 만한 질문과', h('br', { class: 'hero-break-mobile' }), ' 우리 가게가 그 답이 되는 이유를 담아,', h('br'), ' AI가 읽기 쉬운 가게 소개 페이지를 만들고 여기봐ai에 배포해 드려요.')"));
+  assert.ok(app.includes(`h('h1', null, 'AI 시대,', h('br'), '우리 가게가 ', h('span', { class: 'hero-highlight' }, "'추천'"), ' 되는 방법.')`));
+  assert.ok(app.includes("h('h2', { class: 'hero-sub' }, '손님이 AI에게 물을 때,', h('br', { class: 'hero-break-mobile' }), ' 우리 가게도 ', h('span', { class: 'hero-highlight' }, '발견될 수 있도록'), '.')"));
+  assert.ok(app.includes("h('p', { class: 'hero-intro' }, '손님이 물어볼 만한 질문과', h('br', { class: 'hero-break-mobile' }), ' 우리 가게가 그 답이 되는 이유를 담아,', h('br'), ' AI가 읽기 쉬운 ', h('span', { class: 'hero-highlight' }, '가게 소개 페이지'), '를 만들고 여기봐ai에 배포해 드려요.')"));
   const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.hero \.hero-highlight \{\s*color: var\(--brand\)/);
   assert.match(css, /\.hero \.hero-intro \{[^}]*line-height: 1\.6/);
   assert.match(css, /@media \(max-width: 600px\) \{ \.hero-break-mobile \{ display: inline; \} \}/);
   assert.ok(!app.includes("h('h2', { class: 'hero-sub' }, '가게 이름과 주소를 알려주세요.'"));
