@@ -783,3 +783,63 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
 .account-provider-text:hover { background: #f8f9fa; }
 .account-provider-icon { display: block; width: 20px; height: 20px; flex: none; }
 .account-provider-label { white-space: nowrap; }
+
+/* 여기봐AI 무료·유료 가격 안내: 유료 도입 전에는 실제 구매 진행률을 표시하지 않는다. */
+.home-pricing { min-width: 0; margin: 56px 0 32px; padding: 44px 0 0; border-top: 1px solid #e4ebf5; }
+.pricing-heading { text-align: center; margin: 0 auto 22px; max-width: 740px; }
+.pricing-eyebrow { margin: 0 0 6px; color: var(--brand); font-size: 13px; font-weight: 800; letter-spacing: -.01em; }
+.pricing-heading h2 { margin: 0 0 8px; color: #101824; font-size: clamp(26px, 3.6vw, 38px); line-height: 1.28; letter-spacing: -.04em; word-break: keep-all; }
+.pricing-lead { margin: 0; color: #596a82; font-size: 16px; line-height: 1.6; word-break: keep-all; }
+.pricing-beta { display: flex; align-items: flex-start; gap: 12px; max-width: 960px; margin: 0 auto 20px; padding: 14px 16px; border: 1px solid #cbdcff; border-radius: 14px; color: #314765; background: #f3f7ff; font-size: 13px; line-height: 1.6; word-break: keep-all; }
+.pricing-beta strong { flex: 0 0 auto; color: #1646c7; }
+.pricing-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; max-width: 960px; margin: 0 auto; }
+.pricing-plan { min-width: 0; padding: 28px; border: 1px solid #dfe7f3; border-radius: 20px; background: #fff; }
+.pricing-paid { position: relative; border: 2px solid #1f4fe0; background: #f8faff; }
+.pricing-plan-label { margin: 0 0 7px; color: #617087; font-size: 13px; font-weight: 800; }
+.pricing-paid .pricing-plan-label { color: #1f4fe0; }
+.pricing-plan h3 { margin: 0 0 13px; color: #152036; font-size: 21px; line-height: 1.3; letter-spacing: -.03em; }
+.pricing-amount { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin: 0; color: #101824; font-size: 32px; font-weight: 800; line-height: 1.2; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.pricing-paid .pricing-amount { color: #1f4fe0; }
+.pricing-amount span { color: #536981; font-size: 13px; font-weight: 700; letter-spacing: 0; }
+.pricing-plan-desc { margin: 7px 0 18px; color: #5f7088; font-size: 13px; }
+.pricing-features { display: grid; gap: 11px; margin: 0; padding: 18px 0 0; border-top: 1px solid #e5ebf4; list-style: none; }
+.pricing-feature { display: flex; gap: 9px; align-items: flex-start; color: #293a50; font-size: 14px; line-height: 1.55; word-break: keep-all; }
+.pricing-check { flex: 0 0 auto; color: #1f4fe0; font-weight: 800; }
+.pricing-feature-pending { color: #55677e; }
+.pricing-plan-note { margin: 18px 0 0; color: #6e7d90; font-size: 12px; line-height: 1.55; word-break: keep-all; }
+.pricing-progress { max-width: 960px; margin: 22px auto 0; padding: 28px; border: 1px solid #dfe7f3; border-radius: 20px; background: #f8faff; }
+.pricing-progress-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 18px; }
+.pricing-progress-kicker { margin: 0 0 4px; color: #1f4fe0; font-size: 12px; font-weight: 800; }
+.pricing-progress-heading h3 { margin: 0 0 5px; color: #152036; font-size: 21px; line-height: 1.35; letter-spacing: -.03em; word-break: keep-all; }
+.pricing-progress-heading p:not(.pricing-progress-kicker) { margin: 0; color: #607188; font-size: 13px; line-height: 1.6; word-break: keep-all; }
+.pricing-progress-total { display: grid; gap: 2px; min-width: 160px; padding: 12px 15px; border: 1px solid #dce6f6; border-radius: 12px; background: #fff; }
+.pricing-progress-total span, .pricing-progress-total small { color: #667990; font-size: 12px; }
+.pricing-progress-total strong { color: #1f4fe0; font-size: 18px; line-height: 1.4; }
+.pricing-offer { margin: 20px 0 0; color: #53667e; font-size: 13px; word-break: keep-all; }
+.pricing-offer strong { color: #1f4fe0; font-size: 15px; }
+.pricing-meter { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin: 12px 0 7px; }
+.pricing-meter-segment { display: block; height: 12px; border-radius: 999px; background: #dbe4f0; }
+.pricing-meter-note { margin: 0 0 18px; color: #667990; font-size: 12px; line-height: 1.5; word-break: keep-all; }
+.pricing-levels { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; padding: 0; margin: 0; list-style: none; }
+.pricing-level { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 12px 10px; border: 1px solid #e0e8f3; border-radius: 12px; background: #fff; }
+.pricing-level-first { border-color: #a9c1ff; background: #eef4ff; }
+.pricing-level-number { color: #748399; font-size: 11px; font-weight: 700; }
+.pricing-level-first .pricing-level-number { color: #1f4fe0; }
+.pricing-level-range { color: #53667e; font-size: 12px; line-height: 1.4; word-break: keep-all; }
+.pricing-level-price { color: #152036; font-size: 15px; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.pricing-level-first .pricing-level-price { color: #1f4fe0; }
+.pricing-progress-note, .pricing-disclaimer { color: #697b90; font-size: 12px; line-height: 1.6; word-break: keep-all; }
+.pricing-progress-note { margin: 16px 0 0; }
+.pricing-disclaimer { max-width: 960px; margin: 16px auto 0; }
+.pricing-start { display: block; width: min(100%, 360px); margin: 24px auto 0; }
+@media (min-width: 1024px) { body[data-page="home"] #view > .home-pricing { grid-column: 1 / -1; grid-row: auto; } }
+@media (max-width: 900px) { .pricing-levels { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .home-pricing { margin-top: 40px; padding-top: 34px; }
+  .pricing-heading { text-align: left; }
+  .pricing-beta { flex-direction: column; gap: 3px; }
+  .pricing-plans { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .pricing-plan, .pricing-progress { padding: 22px 18px; }
+  .pricing-progress-total { width: 100%; }
+  .pricing-levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
