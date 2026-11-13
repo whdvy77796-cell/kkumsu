@@ -1,0 +1,9 @@
+.sim-card { margin: 18px 0; padding: 16px; border: 1px solid #dce5f4; border-radius: 14px; background: #fff; }
+.sim-card h2 { font-size: 19px; margin: 0 0 8px; }
+.sim-card .rc-btn { margin-top: 10px; }
+.sim-small { color: #4f5c6e; font-size: 14px; }
+.sim-details { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 14px; }
+.sim-details dt { font-weight: 700; }
+.sim-details dd { margin: 0; overflow-wrap: anywhere; }
+#sim-refund-date { display: block; width: 100%; min-height: 46px; padding: 8px; margin-top: 6px; border: 1px solid #aeb8c6; border-radius: 8px; font-size: 16px; }
+a { color: #194ab3; }

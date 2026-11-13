@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>[가상 실습] 주문과 공개 - 여기봐 AI</title>
+  <link rel="stylesheet" href="/review-checkout.css">
+  <link rel="stylesheet" href="/review-order-simulation.css">
+</head>
+<body>
+<main class="rc-wrap" id="sim-root">
+  <p class="rc-badge">미리보기 전용 · 가상 실습</p>
+  <h1>가상 주문과 가게 공개</h1>
+  <p>가상의 가게와 가상의 주문으로 단계와 환불 계산을 살펴보는 실습입니다.</p>
+  <ul class="rc-notice">
+    <li><strong>토스 결제나 결제 승인과 연결되지 않습니다.</strong> 실제 주문·가게 공개·청구는 발생하지 않습니다.</li>
+    <li>예시 정보만 이 브라우저 화면에서 사용하며, 새로고침하면 사라집니다. 실제 가게 정보나 개인정보를 입력하지 마세요.</li>
+    <li>현재 무료 베타 가게와 데이터는 변경하지 않습니다.</li>
+  </ul>
+  <p id="sim-status" class="rc-status" role="status">테스트 환경을 확인하고 있어요.</p>
+  <section class="sim-card" aria-label="가상 상품">
+    <h2>우리 가게 공개하기</h2>
+    <p>첫 100명 출시 예정가 <strong>3,900원</strong> · 가게 1곳 · 공개일부터 1년 · 자동 갱신 없음</p>
+    <p class="sim-small">7일 이내 전액 환불, 이후 남은 일수에 따른 환불을 가상으로 계산합니다.</p>
+  </section>
+  <section class="sim-card" aria-label="가상 실습 단계">
+    <h2>실습 단계</h2>
+    <button class="rc-btn" id="sim-order" type="button" disabled>1. 가상 주문 만들기</button>
+    <button class="rc-btn rc-btn-sub" id="sim-pay" type="button" disabled>2. 가상 결제 가정하기</button>
+    <button class="rc-btn rc-btn-sub" id="sim-publish" type="button" disabled>3. 가상 게시 가정하기</button>
+    <p id="sim-progress" class="sim-small" aria-live="polite">테스트 환경 확인 전에는 실행되지 않습니다.</p>
+  </section>
+  <section class="sim-card" id="sim-result" hidden aria-label="가상 게시 결과">
+    <p class="rc-badge">실제로 공개되지 않은 예시</p>
+    <h2>가상의 카페</h2>
+    <p>예시 소개 페이지입니다. 공개 URL과 QR은 생성하지 않습니다.</p>
+    <dl class="sim-details">
+      <dt>가상 주문</dt><dd id="sim-order-id"></dd>
+      <dt>가상 공개 시작일</dt><dd id="sim-start"></dd>
+      <dt>가상 공개 종료일</dt><dd id="sim-end"></dd>
+    </dl>
+    <label for="sim-refund-date">가상 환불 요청일</label>
+    <input type="date" id="sim-refund-date">
+    <button class="rc-btn rc-btn-sub" id="sim-refund" type="button">4. 환불액 예시 계산</button>
+    <p id="sim-refund-result" class="sim-small" aria-live="polite"></p>
+    <p class="sim-small">7일 이후에는 요청 접수 다음 날부터 남은 일수를 기준으로 계산하고, 1원 미만은 이용자에게 유리하게 올림한 예시입니다. 실제 환불은 처리하지 않습니다.</p>
+  </section>
+  <button class="rc-btn rc-btn-sub" type="button" id="sim-reset" disabled>실습 초기화</button>
+  <p><a href="/review-checkout.html">토스 테스트 결제창으로 돌아가기</a></p>
+</main>
+<script type="module" src="/review-order-simulation.js"></script>
+</body>
+</html>
