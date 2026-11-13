@@ -25,7 +25,8 @@ test('the real store preview links to the observed public page without claiming 
 test('home keeps its CTA and input while putting the example in a separate grid item', async () => {
   const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
-  assert.match(app, /makeHomeExample\(h\),\s*makeHomeExplainer\(h, focusStart\),\s*pageSearchWarning, pendingDiagnosis/);
+  assert.ok(app.indexOf('makeHomeExample(h)') < app.indexOf('makeHomeExplainer(h, focusStart)'));
+  assert.match(app, /makeHomeExplainer\(h, focusStart\),\s*pageSearchWarning, pendingDiagnosis/);
   assert.match(app, /onclick: focusStart \}, '무료로 페이지 만들기'/); assert.match(app, /id: 'startCard'/);
   assert.match(css, /#view > \.home-sample \{ grid-column: 2; grid-row: 1/);
   assert.match(css, /#view > #startCard \{ grid-column: 1 \/ -1; grid-row: auto/);

@@ -65,13 +65,15 @@ test('여기봐 AI에 공개한다는 핵심 설명과 +15 FAQ 확인이 있다'
   assert.equal(calculateReadiness({ name: '예시 가게', address: '서울 마포구 예시로', answers: {} }).score, 20);
 });
 
-test('renderHome은 AI 접근 패널, 준비도, 예시 순서로 배치한다', () => {
+test('첫 화면 소개와 가상 예시 다음에 봇 현황과 준비도가 순서대로 나온다', () => {
   const app = read('../public/app.js');
+  const hero = app.indexOf("h('section', { class: 'hero' }");
+  const e = app.indexOf('makeHomeExample(h)');
+  const intro = app.indexOf("h('section', { class: 'ai-access-intro'");
   const a = app.search(/makeAiAccessPanel\s*\(\s*\{[^}]*kind:\s*'site'/);
   const r = app.indexOf('makeHomeReadiness(h)');
-  const e = app.indexOf('makeHomeExample(h)');
-  assert.ok(a > 0 && r > 0 && e > 0, '세 호출이 모두 있어야 한다');
-  assert.ok(a < r && r < e, '순서: makeAiAccessPanel < makeHomeReadiness < makeHomeExample');
+  assert.ok(hero > 0 && e > 0 && intro > 0 && a > 0 && r > 0, '다섯 요소가 모두 있어야 한다');
+  assert.ok(hero < e && e < intro && intro < a && a < r, '순서: 소개, 가상 예시, 봇 소개, 봇 현황, 준비도');
   assert.match(app, /import\s*\{\s*makeHomeReadiness\s*\}\s*from\s*'\.\/home-readiness\.js'/);
   assert.match(app, /AI·검색 봇/);
   assert.match(app, /접근할 수 있도록 설정되어 있어요/);
@@ -81,6 +83,10 @@ test('renderHome은 AI 접근 패널, 준비도, 예시 순서로 배치한다',
 test('desktop/mobile 반응형 스타일이 있다', () => {
   const css = squash(read('../public/styles.css'));
   assert.match(css, /\.home-readiness-steps\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+  const heroRules = [...css.matchAll(/body\[data-page="home"\] #view > \.hero \{([^}]*)\}/g)];
+  const exampleRules = [...css.matchAll(/body\[data-page="home"\] #view > \.home-sample \{([^}]*)\}/g)];
+  assert.match(heroRules.at(-1)?.[1] || '', /grid-column:\s*1\s*;\s*grid-row:\s*1/);
+  assert.match(exampleRules.at(-1)?.[1] || '', /grid-column:\s*2\s*;\s*grid-row:\s*1/);
   assert.match(css, /@media \(min-width: 1024px\)\s*\{[^@]*\.home-readiness\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/);
   const mobile = css.match(/@media \(max-width: 700px\)\s*\{(.*)/);
   assert.ok(mobile, 'mobile 미디어쿼리');
