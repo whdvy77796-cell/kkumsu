@@ -9,6 +9,8 @@ export function isSafeTestClientKey(key) {
 
 // 순수 함수: env 객체를 받아 { configured, clientKey? } 만 반환.
 export function reviewCheckoutConfig(env) {
+  // 운영 배포에서는 테스트용 환경변수가 실수로 들어와도 검토 기능을 절대 켜지 않는다.
+  if (env && env.VERCEL_ENV === 'production') return { configured: false };
   const raw = env && typeof env === 'object' ? env[REVIEW_KEY_ENV] : undefined;
   return isSafeTestClientKey(raw) ? { configured: true, clientKey: raw } : { configured: false };
 }
