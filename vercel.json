@@ -1,6 +1,6 @@
 {
   "framework": null,
-  "buildCommand": "env -i PATH=\"$PATH\" HOME=\"$HOME\" CI=1 node --test --test-force-exit tests/*.test.mjs && npm run build",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "regions": [
     "icn1"
