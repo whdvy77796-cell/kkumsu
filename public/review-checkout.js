@@ -146,7 +146,7 @@ function init() {
       // 모바일은 같은 창이 이동(redirect)하고 PC는 결제창이 열립니다. 클릭 핸들러 안에서 바로 호출합니다.
       await payment.requestPayment(buildPaymentRequest(location.origin, makeOrderId()));
     } catch (e) {
-      status.textContent = '테스트 결제창을 열지 못했습니다' + (e && e.code ? ' (' + clip(e.code, 60) + ')' : '') + '. 청구된 금액은 없습니다.';
+      status.textContent = '테스트 결제창을 열지 못했습니다' + (e ? ' (' + clip(e.code, 60) + (e.message ? ': ' + clip(e.message, 120) : '') + ')' : '') + '. 청구된 금액은 없습니다.';
     } finally {
       btn.disabled = false;
     }
