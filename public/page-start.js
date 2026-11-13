@@ -1,4 +1,6 @@
 // 소개 페이지의 첫 단계. 기존 매출 진단 상태(maechul.v3)는 읽거나 수정하지 않는다.
+import { makeReadinessBenefits, makeReadinessCard, makeReadinessReview } from './readiness-ui.js';
+
 const PAGE_KEY = 'yeogibwa.page.start.v1';
 
 export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPublished }) {
@@ -347,6 +349,8 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     const available = factOptions();
     d.store.verifiedFacts = [...new Set((Array.isArray(d.store.verifiedFacts) ? d.store.verifiedFacts : []).filter(x => available.includes(x)))].slice(0, 8);
     for (const [key] of QUESTION_FIELDS) d.answers[key] = string(d.answers[key]);
+    if (!d.readinessNA || typeof d.readinessNA !== 'object' || Array.isArray(d.readinessNA)) d.readinessNA = {};
+    for (const key of ['difference', 'audience', 'visit']) if (d.answers[key].trim()) delete d.readinessNA[key];
     storeName.textContent = string(d.store.name);
     return d;
   }
@@ -434,7 +438,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     if (key === 'offer' && names.length) data.offer.unshift({ text: `대표 메뉴: ${names.join(', ')}.`, fromAi: true });
     return data[key] || [];
   }
-  function suggestionPanel(key, d, max) {
+  function suggestionPanel(key, d, max, onUpdated = () => {}) {
     const status = h('p', { class: 'page-suggestion-status', role: 'status', 'aria-live': 'polite' });
     const apply = (choice) => {
       if (busy || draftBusy) return;
@@ -447,7 +451,8 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
       } else if (choice.confirmFact) {
         if (!askBeforeDiscard('아래는 참고용 예시예요. 우리 가게와 실제로 맞는 내용인지 확인한 뒤 적용해 주세요.\n\n' + value + (replace ? '\n\n기존 답변은 바뀌어요.' : ''))) return;
       } else if (replace && !askBeforeDiscard('기존에 작성한 답변을 이 예시로 바꿀까요?')) return;
-      d.answers[key] = value; save();
+      if (d.answers[key] !== value) delete d.readinessReview;
+      d.answers[key] = value; onUpdated(key); save();
       const el = typeof document === 'undefined' ? null : document.getElementById('page-answer-' + key);
       if (el) {
         el.value = value; el.removeAttribute('aria-invalid'); el.focus();
@@ -475,26 +480,46 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     applyEdits(d);
     d.view = '#/page-questions'; save();
     let consent = false;
+    const benefits = makeReadinessBenefits(h, d);
+    const naInputs = {};
+    const updateReadiness = (changedKey) => {
+      if (changedKey && string(d.answers[changedKey]).trim()) delete d.readinessNA[changedKey];
+      for (const key of ['difference', 'audience', 'visit']) {
+        if (!naInputs[key]) continue;
+        const hasAnswer = !!string(d.answers[key]).trim();
+        naInputs[key].disabled = draftBusy || hasAnswer;
+        naInputs[key].checked = !hasAnswer && d.readinessNA[key] === true;
+      }
+      benefits.update();
+    };
     const error = h('p', { id: 'page-draft-error', class: 'page-error', role: 'alert', 'aria-live': 'polite' });
     const existing = !!d.draft && !d.regenerate;
     const submit = h('button', { type: 'submit', class: 'btn primary block', disabled: draftBusy },
       draftBusy ? '초안 만드는 중…' : ['error', 'pending'].includes(d.status) ? '동의하고 다시 요청' : '동의하고 AI 초안 만들기');
     const form = h('form', { class: 'page-form', novalidate: true, onsubmit: e => { e.preventDefault(); return generateDraft(consent, error); } },
       h('h3', null, '가게 기본 정보'),
-      field('page-store-name', '가게명', d.store.name, 60, value => { d.store.name = value; save(); }, { required: true, disabled: draftBusy }),
-      field('page-store-address', '주소', d.store.address, 120, value => { d.store.address = value; save(); }, { required: true, disabled: draftBusy }),
+      field('page-store-name', '가게명', d.store.name, 60, value => { if (d.store.name !== value) delete d.readinessReview; d.store.name = value; updateReadiness(); save(); }, { required: true, disabled: draftBusy }),
+      field('page-store-address', '주소', d.store.address, 120, value => { if (d.store.address !== value) delete d.readinessReview; d.store.address = value; updateReadiness(); save(); }, { required: true, disabled: draftBusy }),
       h('fieldset', { class: 'page-facts', disabled: draftBusy },
         h('legend', null, '사장님이 직접 확인한 특징만 선택 (최대 8개)'),
         h('p', { class: 'small muted' }, '아래 내용은 AI가 찾은 미확인 정보예요. 기본 선택은 없으며, 맞다고 직접 체크한 항목만 ‘확인한 특징’으로 전송해요. 체크하지 않은 검색 특징은 검증되지 않은 참고 정보로 따로 함께 전송돼요. 가게 선택은 특징 확인과 다릅니다.'),
         factOptions().map((fact, i) => h('label', { class: 'page-fact', for: 'page-fact-' + i },
           h('input', { id: 'page-fact-' + i, type: 'checkbox', checked: d.store.verifiedFacts.includes(fact), disabled: draftBusy,
-            onchange: e => { d.store.verifiedFacts = e.target.checked ? [...new Set([...d.store.verifiedFacts, fact])].slice(0, 8) : d.store.verifiedFacts.filter(x => x !== fact); save(); } }), fact)),
+            onchange: e => { delete d.readinessReview; d.store.verifiedFacts = e.target.checked ? [...new Set([...d.store.verifiedFacts, fact])].slice(0, 8) : d.store.verifiedFacts.filter(x => x !== fact); updateReadiness(); save(); } }), fact)),
         !factOptions().length ? h('p', { class: 'small muted' }, '선택할 특징이 없어요. 아래 질문에 직접 적어 주세요.') : null),
       h('h3', null, '질문 5개'),
-      QUESTION_FIELDS.map(([key, label, help, max, required], i) => h('div', { class: 'page-question' },
-        field('page-answer-' + key, (i + 1) + '. ' + label, d.answers[key], max,
-          value => { d.answers[key] = value; save(); }, { required, help: questionHelp(key, help), multiline: true, disabled: draftBusy }),
-        suggestionPanel(key, d, max))),
+      QUESTION_FIELDS.map(([key, label, help, max, required], i) => {
+        const canExclude = ['difference', 'audience', 'visit'].includes(key);
+        const na = canExclude ? h('input', { type: 'checkbox', id: 'readiness-na-' + key,
+          checked: d.readinessNA[key] === true && !d.answers[key].trim(), disabled: draftBusy || !!d.answers[key].trim(),
+          onchange: e => { delete d.readinessReview; d.readinessNA[key] = !!e.target.checked; save(); updateReadiness(); } }) : null;
+        if (na) naInputs[key] = na;
+        return h('div', { class: 'page-question' },
+          field('page-answer-' + key, (i + 1) + '. ' + label, d.answers[key], max,
+            value => { if (d.answers[key] !== value && key !== 'keywords') delete d.readinessReview; d.answers[key] = value; updateReadiness(key); save(); }, { required, help: questionHelp(key, help), multiline: true, disabled: draftBusy }),
+          suggestionPanel(key, d, max, updateReadiness),
+          na ? h('label', { class: 'readiness-na', for: 'readiness-na-' + key }, na, h('span', null, '우리 가게에 해당하지 않아요 ', h('small', null, '(답변을 비운 뒤 선택하면 점수에서 제외)'))) : null);
+      }),
       existing ? h('p', { class: 'card note' }, '이미 초안을 만들었어요. 답변 변경은 AI에 다시 전송하지 않아요. 초안의 문장은 내용 수정에서 직접 고쳐 주세요.') :
         h('div', { class: 'card note page-disclosure' },
           h('h3', null, 'AI 초안 생성을 위한 별도 전송 동의'),
@@ -507,13 +532,14 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
             '위 전송 내용과 보관 안내를 확인했고 AI 초안 생성을 위한 전송에 동의합니다.')),
       error,
       existing ? h('div', { class: 'page-actions' }, h('button', { class: 'btn primary block', type: 'button', onclick: () => { location.hash = '#/page-preview'; } }, '작성한 비공개 미리보기 보기'), h('button', { class: 'btn block', type: 'button', onclick: () => { d.regenerate = true; save(); renderQuestions(); } }, '답변으로 새 초안 만들기')) : [submit, d.draft && !draftBusy ? h('button', { class: 'btn block', type: 'button', onclick: () => { delete d.regenerate; d.status = 'ready'; d.view = '#/page-preview'; save(); location.hash = '#/page-preview'; } }, '기존 미리보기 보기') : null]);
+    updateReadiness();
     stopDraftTips();
     const progress = draftBusy ? draftProgress(d) : null;
     show(h('div', { class: 'page-questions' },
       draftBusy ? progress : [privateNote(), h('h2', null, '우리 가게를 알려 주세요'),
         h('p', { class: 'small muted' }, '대표 메뉴·서비스만 필수예요. 나머지는 모르면 비워 두세요. 희망 검색어는 사실 근거로 사용하지 않아요.'),
         draftMessage(d) ? h('p', { class: 'card warn page-draft-status', role: 'status', 'aria-live': 'polite' }, draftMessage(d)) : null],
-      h('div', { hidden: draftBusy }, form)));
+      h('div', { class: 'page-questions-layout', hidden: draftBusy }, benefits.element, h('div', { class: 'page-questions-form' }, form))));
     setNavbar(btn('가게 확인으로', () => { location.hash = '#/page-confirmed'; }), btn('처음으로', home));
   }
   async function generateDraft(consent, error) {
@@ -545,6 +571,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
       if (!result?.draft || typeof result.draft !== 'object' || Array.isArray(result.draft)) throw new Error('초안 응답을 확인하지 못했어요.');
       // 새 초안은 예상 질문도 faqs 하나로 받는다. 혹시 온 situations는 자동 공개하지 않도록 버린다.
       d.draft = cleanDraft({ ...result.draft, situations: [] });
+      delete d.readinessReview;
       d.researchedCount = researchedFacts.length;
       d.createdAt = string(result.createdAt); d.cached = result.cached === true; d.mock = result.mock === true;
       d.status = 'ready'; d.view = '#/page-preview'; delete d.edit; delete d.editStore; delete d.regenerate; save();
@@ -598,6 +625,8 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     const draft = cleanDraft(d.draft);
     // 이전 비공개 초안에서 선택했던 항목은 FAQ로 한 번만 이관한다.
     d.draft = draft; save();
+    const readiness = makeReadinessCard(h, d);
+    const readinessReview = makeReadinessReview(h, d, save, readiness.update);
     show(h('div', { class: 'page-preview' }, privateNote(), h('h2', null, '완성본 비공개 미리보기'),
       h('p', { class: 'small muted' }, d.mock ? '테스트용 모의 초안이에요. 실제 AI 생성 결과가 아니에요.' : 'AI가 작성하고 사장님이 확인·수정하는 초안이에요.'),
       h('p', { class: 'small muted' }, '편집·저장은 이 탭에만 반영돼요. 서버 전송이나 AI 재호출은 하지 않아요.'),
@@ -608,6 +637,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
         draft.intro?.text ? h('p', { class: 'page-intro' }, draft.intro.text) : null,
         draft.sections.filter(x => x.heading || x.body).map(x => h('section', { class: 'page-preview-section' }, x.heading ? h('h2', null, x.heading) : null, x.body ? h('p', null, x.body) : null)),
         draft.faqs.some(x => x.question && x.answer) ? h('section', { class: 'page-preview-faq' }, h('h2', null, '고객 질문과 답변 (예상)'), h('p', { class: 'small muted' }, '실제 고객 질문 기록이 아니라 가게 정보를 바탕으로 만든 예상 질문과 답변이에요. 가게에 맞는지 확인한 뒤 ‘내용 수정’에서 고치거나 삭제할 수 있어요. 검색·AI 추천을 보장하지 않아요.'), draft.faqs.filter(x => x.question && x.answer).map(x => h('div', null, h('h3', null, x.question), h('p', null, x.answer)))) : null),
+      readinessReview, readiness.element,
       ['partial', 'missing', 'invalid', 'empty'].includes(draft.situationsStatus) && draft.situationsNotice ? h('p', { class: 'card note small', role: 'status' }, draft.situationsNotice) : null,
       d.researchedCount > 0 ? h('p', { class: 'card note small page-researched-note', role: 'status' }, '초안 작성에 직접 확인하지 않은 AI 검색 특징 ' + d.researchedCount + '개가 검증되지 않은 참고 정보로 함께 쓰였을 수 있어요. 초안의 모든 사실을 직접 검토하고 맞지 않으면 ‘내용 수정’에서 고치거나 지워 주세요.') : null,
       draft.keywords.some(x => x.text) ? h('aside', { class: 'card note page-keywords' }, h('h3', null, '확인할 키워드 제안'), h('p', { class: 'small muted' }, '희망 검색어는 사실 근거가 아니에요. 실제 가게와 맞는지 확인해 주세요. 소개 본문이나 공개 페이지의 확정 키워드·메타데이터로 반영되지 않았으며 검색 노출을 보장하지 않아요.'), draft.keywords.filter(x => x.text).map(x => h('span', null, x.text))) : null,
@@ -624,9 +654,9 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     const draft = d.edit;
     if (!draft.headline) draft.headline = { text: '', evidence: [] };
     if (!draft.intro) draft.intro = { text: '', evidence: [] };
-    const editField = (id, label, item, key, max, multiline = false) => field(id, label, item[key], max, value => { item[key] = value; save(); }, { multiline });
-    const add = (list, item, max) => { if (list.length < max) { list.push(item); save(); renderEdit(); } };
-    const remove = (list, index) => { list.splice(index, 1); save(); renderEdit(); };
+    const editField = (id, label, item, key, max, multiline = false) => field(id, label, item[key], max, value => { if (item[key] !== value) delete d.readinessReview; item[key] = value; save(); }, { multiline });
+    const add = (list, item, max) => { if (list.length < max) { delete d.readinessReview; list.push(item); save(); renderEdit(); } };
+    const remove = (list, index) => { delete d.readinessReview; list.splice(index, 1); save(); renderEdit(); };
     show(h('div', { class: 'page-edit' }, privateNote(), h('h2', null, '소개 내용 수정'),
       h('p', { class: 'small muted' }, '입력 중 내용은 이 탭에 임시저장되며, 미리보기나 질문 화면으로 이동하면 자동 반영돼요. 서버 전송·AI 재호출은 없어요. 필요하면 질문에서 별도 동의 후 새 초안을 만들 수 있어요. 근거 표시는 최초 AI 작성 기준이며 수정 내용을 검증해 주지 않아요.'),
       omittedNote(draft),

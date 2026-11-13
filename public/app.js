@@ -15,6 +15,7 @@ import { makeHomeExample } from './home-example.js';
 import { makeHomeExplainer } from './home-explainer.js';
 import { makeHomePricing } from './home-pricing.js';
 import { makeHomeFaq } from './home-faq.js';
+import { makeHomeReadiness } from './home-readiness.js';
 import { setupHomeLogo } from './logo-home.js';
 import { makeAccountUI } from './account-ui.js';
 import { allowOwnerHashChange } from './account-navigation.js';
@@ -284,9 +285,10 @@ function renderHome() {
       h('p', { class: 'small muted page-stage-note' }, '베타 기간에는 공개와 QR·소개글을 무료로 이용할 수 있어요. 검색 노출과 AI 추천은 보장하지 않아요.')),
     h('section', { class: 'ai-access-intro', 'aria-label': 'AI와 검색엔진의 가게 정보 접근' },
       h('h2', { class: 'ai-access-intro-title' }, '손님은 ', h('span', { class: 'ai-access-intro-emphasis' }, '간판'), '을 보고,', h('br'), 'AI는 ', h('span', { class: 'ai-access-intro-emphasis' }, '여기봐AI'), '를 읽습니다'),
-      h('p', { class: 'ai-access-intro-text' }, h('span', { class: 'ai-access-intro-emphasis' }, 'AI 회사 검색 엔진 로봇'), '이 날마다 등록된 ', h('span', { class: 'ai-access-intro-emphasis' }, '여기봐 AI 업체 페이지 정보'), '를 가져갑니다.'),
+      h('p', { class: 'ai-access-intro-text' }, h('span', { class: 'ai-access-intro-emphasis' }, 'AI·검색 봇'), '이 등록된 ', h('span', { class: 'ai-access-intro-emphasis' }, '여기봐 AI 가게 페이지'), '에 접근할 수 있도록 설정되어 있어요.'),
       h('p', { class: 'ai-access-intro-caveat' }, '실제 접근 여부와 주기는 다를 수 있으며, AI 추천·인용은 보장하지 않아요.')),
     makeAiAccessPanel({ h, fetcher: (url, options) => fetch(url, options), kind: 'site' }),
+    makeHomeReadiness(h),
     makeHomeExample(h),
     makeHomeExplainer(h, focusStart),
     pageSearchWarning, pendingDiagnosis,
