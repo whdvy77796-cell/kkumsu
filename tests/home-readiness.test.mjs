@@ -65,6 +65,26 @@ test('여기봐 AI에 공개한다는 핵심 설명과 +15 FAQ 확인이 있다'
   assert.equal(calculateReadiness({ name: '예시 가게', address: '서울 마포구 예시로', answers: {} }).score, 20);
 });
 
+test('요청한 AI 검색 최적화 설명은 그래픽 아래에 중요 문구를 강조해 표시한다', () => {
+  const explanation = byClass(tree, 'home-readiness-aeo')[0];
+  assert.equal(explanation.tag, 'section');
+  assert.equal(explanation.props['aria-label'], 'AI 검색 최적화 안내');
+  assert.equal(explanation.children.filter(n => n.tag === 'p').length, 2);
+  const copy = squash(textOf(explanation));
+  assert.match(copy, /AI 검색 최적화\(AEO·GEO\)는 손님이 ChatGPT·클로드·구글 AI 개요·네이버 AI 브리핑에 업체를 물을 때 AI가 우리 업체를 바르게 소개하도록 정보를 정리해 두는 일입니다\./);
+  assert.match(copy, /국내 주요 지도·블로그 서비스 중에는 해외 AI 검색 로봇의 수집을 제한하는 곳도 있어, AI가 읽을 수 있는 업체 정보가 제한될 수 있습니다\./);
+  assert.doesNotMatch(copy, /상당수|생각보다 적습니다|보장합니다/);
+  const emphasized = find(explanation, n => n.tag === 'strong').map(textOf);
+  assert.ok(emphasized.includes('AI 검색 최적화(AEO·GEO)'));
+  assert.ok(emphasized.includes('AI가 우리 업체를 바르게 소개하도록'));
+  assert.ok(emphasized.includes('해외 AI 검색 로봇의 수집을 제한하는 곳'));
+  assert.ok(emphasized.includes('AI가 읽을 수 있는 업체 정보가 제한될 수 있습니다.'));
+  const classes = tree.children.map(n => n?.props?.class);
+  assert.ok(classes.indexOf('home-readiness-steps') < classes.indexOf('home-readiness-review'));
+  assert.ok(classes.indexOf('home-readiness-review') < classes.indexOf('home-readiness-aeo'));
+  assert.ok(classes.indexOf('home-readiness-aeo') < classes.indexOf('home-readiness-disclaimer'));
+});
+
 test('첫 화면 소개와 가상 예시 다음에 봇 현황과 준비도가 순서대로 나온다', () => {
   const app = read('../public/app.js');
   const hero = app.indexOf("h('section', { class: 'hero' }");
