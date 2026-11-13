@@ -11,3 +11,9 @@ test('home metadata, robots and sitemap point to the verified new canonical host
  assert.ok(sitemap.includes('<loc>https://www.lookhereai.com/stores</loc>'));
  assert.ok(!sitemap.includes('www.kkumsu.com'));
 });
+
+test('home browser and newly saved bookmark title uses the requested wording',async()=>{
+ const home=await read('public/index.html');
+ assert.ok(home.includes('<title>여기봐 AI · AI가 우리 가게를 학습하는 곳</title>'));
+ assert.ok(!home.includes('<title>여기봐 AI · 우리 가게 정보 확인</title>'));
+});
