@@ -11,7 +11,7 @@ const EXAMPLES = Object.freeze([
 export function makeHomeReadiness(h) {
   return h('section', { class: 'home-readiness', 'aria-labelledby': 'home-readiness-title' },
     h('div', { class: 'home-readiness-heading' },
-      h('span', { class: 'home-readiness-kicker' }, '가상의 예시'),
+      h('span', { class: 'home-readiness-kicker' }, '가게정보 준비도 · 가상의 예시'),
       h('h2', { id: 'home-readiness-title' }, '가게 정보를 더할수록,', h('br'), '우리 가게의 이야기가 선명해져요'),
       h('p', null, 'AI·검색 봇이 접근할 수 있도록 설정된 여기봐 AI에 가게 소개 페이지를 공개해요. 아래는 가상의 입력 예시예요.')),
     h('div', { class: 'home-readiness-steps' }, EXAMPLES.map((step, index) => {
