@@ -1900,6 +1900,8 @@ async function renderSample() {
     }
     if (seq !== navSeq) return;
   }
+  const betaFreeSample = PAY.mode === 'off';
+  if (betaFreeSample) sampleView = 'paid'; // 현재 베타는 잠금 없이 전체 보고서를 무료로 제공
   const data = sampleView === 'free' ? redactReport(sampleData) : sampleData;
   const tab = (v, label) => h('button', { class: sampleView === v ? 'on' : '', type: 'button', 'aria-pressed': String(sampleView === v), onclick: () => { sampleView = v; renderSample(); } }, label);
   const pdfBtn = h('button', { class: 'btn small', type: 'button' }, '샘플 PDF 저장');
@@ -1908,10 +1910,12 @@ async function renderSample() {
     h('div', { class: 'card sample-bar' },
       h('div', { class: 'sample-badge' }, '샘플 보고서 · 예시 데이터'),
       h('p', { class: 'small', style: { margin: '8px 0 12px' } }, '실제 가게(대구 동성로 연어로) 사장님 동의를 받아 공개한 예시예요. 숫자와 내용은 이 가게 기준이라 우리 가게와 달라요. 개인 연락처는 일부 가렸어요.'),
-      h('div', { class: 'seg no-print', role: 'group', 'aria-label': '보기 방식' }, tab('free', '무료 진단 화면'), tab('paid', '결제 후 전체 화면')),
-      h('p', { class: 'tiny muted no-print', style: { margin: '10px 0 0' } }, sampleView === 'free'
-        ? '무료 진단에서는 이렇게 1순위 개선안까지 보이고, 나머지 실행 자료는 흐리게 가려져요.'
-        : '맞춤 실행 패키지를 결제하면 이렇게 모든 개선안의 실행 방법과 실행 계획이 열리고 PDF로 저장할 수 있어요.'),
+      betaFreeSample ? null : h('div', { class: 'seg no-print', role: 'group', 'aria-label': '보기 방식' }, tab('free', '무료 진단 화면'), tab('paid', '결제 후 전체 화면')),
+      h('p', { class: 'tiny muted no-print', style: { margin: '10px 0 0' } }, betaFreeSample
+        ? '전체 보고서 예시예요. 현재 베타에서는 실제 결제 없이 전체 보고서와 PDF 저장을 무료로 이용할 수 있어요.'
+        : sampleView === 'free'
+          ? '무료 진단에서는 이렇게 1순위 개선안까지 보이고, 나머지 실행 자료는 흐리게 가려져요.'
+          : '맞춤 실행 패키지를 결제하면 이렇게 모든 개선안의 실행 방법과 실행 계획이 열리고 PDF로 저장할 수 있어요.'),
       sampleView === 'paid' ? h('div', { class: 'no-print', style: { marginTop: '10px' } }, pdfBtn) : null),
     ...reportBody(data, { sample: true }),
   );
