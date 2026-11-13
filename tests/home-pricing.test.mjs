@@ -57,3 +57,8 @@ test('home section is after the privacy card, full-width and does not replace th
   assert.match(css, /\.pricing-meter-segment \{[^}]*background: #dbe4f0/);
   assert.match(css, /@media \(max-width: 600px\)/);
 });
+
+test('planned one-year offer is clearly future only with seven-day refund and no automatic renewal', () => {
+  const text = textOf(makeHomePricing(h, () => {}));
+  for (const value of ['유료 출시 계획', '1년간 유지', '자동 갱신이나 정기결제는 없어요', '결제일과 공개 시작일 중 더 늦은 날부터 7일 안에는 이용 여부와 관계없이 전액 환불', '현재 실제 결제는 운영하지 않아요']) assert.ok(text.includes(value), value);
+});

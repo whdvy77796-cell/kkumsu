@@ -49,3 +49,11 @@ test('홈페이지 바닥글과 개인정보처리방침이 동일한 사업자 
   assert.ok(app.includes("biz('privacyEmail')"));
   assert.ok(app.includes("biz('privacyEmail', biz('email'))"));
 });
+
+test('공정위 통신판매 사업자정보 확인 링크가 푸터에 표시된다', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes('https://www.ftc.go.kr/bizCommPop.do?wrkr_no='));
+  assert.ok(app.includes("B.bizNo.replace(/\\D/g, '')"));
+  assert.ok(app.includes('사업자정보 확인 (새 창)'));
+  assert.ok(app.includes("rel: 'noopener noreferrer'"));
+});
