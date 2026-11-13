@@ -73,6 +73,9 @@ test('renderHome은 AI 접근 패널, 준비도, 예시 순서로 배치한다',
   assert.ok(a > 0 && r > 0 && e > 0, '세 호출이 모두 있어야 한다');
   assert.ok(a < r && r < e, '순서: makeAiAccessPanel < makeHomeReadiness < makeHomeExample');
   assert.match(app, /import\s*\{\s*makeHomeReadiness\s*\}\s*from\s*'\.\/home-readiness\.js'/);
+  assert.match(app, /AI·검색 봇/);
+  assert.match(app, /접근할 수 있도록 설정되어 있어요/);
+  assert.doesNotMatch(app, /날마다 등록된/); // 봇의 방문 빈도를 보장하지 않는다.
 });
 
 test('desktop/mobile 반응형 스타일이 있다', () => {
