@@ -28,14 +28,14 @@
 
       <ul class="rc-notice">
         <li><strong>이 화면은 결제창 연동을 검토하기 위한 테스트 전용입니다.</strong></li>
-        <li>토스페이먼츠 <strong>테스트 환경</strong>의 결제창만 열립니다. <strong>실제 결제(청구)는 일어나지 않습니다.</strong></li>
+        <li>테스트 키가 연결된 경우에만 토스페이먼츠 <strong>테스트 환경</strong>의 결제창이 열립니다. <strong>실제 결제(청구)는 일어나지 않습니다.</strong></li>
         <li>주문이 만들어지지 않고, 가게가 실제로 공개되지도 않습니다.</li>
         <li>현재 공개된 베타 서비스의 가게 공개는 <strong>계속 무료</strong>입니다.</li>
         <li><strong>실제 결제는 아직 활성화되지 않았습니다.</strong> 실제 카드 정보는 입력하지 마세요.</li>
       </ul>
 
-      <button type="button" id="rc-pay" class="rc-btn">테스트 결제창 열기 (3,900원, 실제 청구 없음)</button>
-      <p id="rc-status" class="rc-status" role="status" aria-live="polite"></p>
+      <button type="button" id="rc-pay" class="rc-btn" disabled>테스트 결제창 열기 (3,900원, 실제 청구 없음)</button>
+      <p id="rc-status" class="rc-status" role="status" aria-live="polite">테스트 키를 확인하는 중이에요. 확인되기 전에는 테스트창을 열 수 없어요. 실제 결제는 꺼져 있어요.</p>
     </section>
 
     <section id="rc-result" hidden>

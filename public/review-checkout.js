@@ -1,5 +1,5 @@
 // 테스트 전용 결제창 검토 화면. 직접 URL로만 접근합니다(사이트 어디에도 링크하지 않음).
-// 이 파일은 서버로 어떤 요청도 보내지 않습니다. 승인 API 호출도 없습니다.
+// 서버 요청은 같은 출처의 읽기 전용 설정 API(GET) 한 가지뿐입니다. 주문 생성/승인 API 호출은 없습니다.
 // 시크릿 키와 라이브 키는 사용하지 않습니다.
 
 export const PRODUCT_NAME = '우리 가게 공개하기';
@@ -7,29 +7,31 @@ export const ORDER_NAME = '우리 가게 공개하기 (테스트 전용)';
 export const PRICE_KRW = 3900;
 export const ORDER_ID_PREFIX = 'review-test-';
 
-// 출처: 토스페이먼츠 공식 샘플 저장소 tosspayments/tosspayments-sample 의
-// express-javascript/public/payment/checkout.html (결제창(구버전) SDK v2, API 개별 연동 키 test_ck_*).
-// 클라이언트 키는 브라우저에 공개되는 값이며, 테스트 키라 실제 결제가 일어나지 않습니다.
-export const DOCS_TEST_CLIENT_KEY = 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq';
+// 키는 코드에 넣지 않고, 같은 출처의 읽기 전용 설정 API 에서만 받습니다.
+export const CONFIG_ENDPOINT = '/api/review-checkout-config';
+export const NOT_READY_MESSAGE = '토스 테스트 키를 연결하면 심사용 테스트창을 사용할 수 있어요. 실제 결제는 꺼져 있어요.';
 
 // 결제창(구버전) payment() 는 test_ck_ 키만 허용.
 // test_gck_(결제위젯용), live_*, 시크릿 키(*_sk_, *_gsk_)는 모두 거부합니다.
-const TEST_CK = /^test_ck_[A-Za-z0-9_-]{10,100}$/;
+const TEST_CK = /^test_ck_[A-Za-z0-9_-]{10,100}(?![\s\S])/;
 
 export function isTestClientKey(key) {
   return typeof key === 'string' && TEST_CK.test(key);
 }
 
-// <meta name="toss-test-client-key" content="test_ck_..."> 가 있으면 그 값을, 없으면 공식 문서 테스트 키를 사용.
-// test_ck_ 형식이 아니면 null (결제창 열기 차단, fail-closed).
-export function resolveClientKey(doc) {
-  let injected = null;
+// 설정 응답에서 안전한 test_ck_ 키만 꺼냅니다. 그 외는 null (fail-closed).
+export function keyFromConfig(data) {
+  if (!data || typeof data !== 'object' || data.configured !== true) return null;
+  return isTestClientKey(data.clientKey) ? data.clientKey : null;
+}
+
+// 같은 출처 GET 한 번. 실패/비정상 응답은 모두 null.
+export async function loadClientKey(fetchFn) {
   try {
-    const el = doc && doc.querySelector && doc.querySelector('meta[name="toss-test-client-key"]');
-    if (el) injected = el.getAttribute('content');
-  } catch { injected = null; }
-  const candidate = injected == null || injected === '' ? DOCS_TEST_CLIENT_KEY : injected;
-  return isTestClientKey(candidate) ? candidate : null;
+    const res = await fetchFn(CONFIG_ENDPOINT, { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
+    if (!res || !res.ok) return null;
+    return keyFromConfig(await res.json());
+  } catch { return null; }
 }
 
 export function isAllowedOrigin(loc) {
@@ -55,6 +57,8 @@ export function buildPaymentRequest(origin, orderId) {
     amount: { currency: 'KRW', value: PRICE_KRW },
     orderId,
     orderName: ORDER_NAME,
+    windowTarget: 'self',
+    card: { useEscrow: false, flowMode: 'DEFAULT', useCardPoint: false, useAppCardOnly: false },
     successUrl: page + '?r=success',
     failUrl: page + '?r=fail',
   };
@@ -118,7 +122,7 @@ function render(doc, res) {
   dl.hidden = d.rows.length === 0;
 }
 
-function init() {
+async function init() {
   const doc = document;
   const res = parseResult(location.search);
   if (res.kind !== 'start') {
@@ -129,21 +133,27 @@ function init() {
   }
   const btn = doc.getElementById('rc-pay');
   const status = doc.getElementById('rc-status');
-  const key = resolveClientKey(doc);
+  btn.disabled = true; // 키가 확인되기 전에는 항상 비활성
+  let key = null;
   let blocked = null;
-  if (!isAllowedOrigin(location)) blocked = '이 주소에서는 결제창을 열 수 없습니다(https 또는 localhost 필요).';
-  else if (!key) blocked = '테스트 클라이언트 키(test_ck_)가 확인되지 않아 결제창을 열지 않습니다.';
-  else if (typeof globalThis.TossPayments !== 'function') blocked = '토스페이먼츠 SDK를 불러오지 못해 결제창을 열 수 없습니다.';
-  if (blocked) { btn.disabled = true; status.textContent = blocked; }
+  if (!isAllowedOrigin(location)) blocked = '이 주소에서는 테스트창을 열 수 없어요(https 또는 localhost 필요). 실제 결제는 꺼져 있어요.';
+  else {
+    key = await loadClientKey(typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : null);
+    if (!key) blocked = NOT_READY_MESSAGE;
+    else if (typeof globalThis.TossPayments !== 'function') blocked = '토스페이먼츠 SDK를 불러오지 못해 테스트창을 열 수 없어요. 실제 결제는 꺼져 있어요.';
+  }
+  if (blocked) { status.textContent = blocked; return; }
+  status.textContent = '';
+  btn.disabled = false;
 
   btn.addEventListener('click', async () => {
-    if (blocked || btn.disabled) return;
+    if (btn.disabled) return;
     btn.disabled = true;
     status.textContent = '';
     try {
       const tp = globalThis.TossPayments(key);
       const payment = tp.payment({ customerKey: globalThis.TossPayments.ANONYMOUS });
-      // 모바일은 같은 창이 이동(redirect)하고 PC는 결제창이 열립니다. 클릭 핸들러 안에서 바로 호출합니다.
+      // 모바일·PC 모두 같은 창이 이동(redirect)합니다. 클릭 핸들러 안에서 바로 호출합니다.
       await payment.requestPayment(buildPaymentRequest(location.origin, makeOrderId()));
     } catch (e) {
       status.textContent = '테스트 결제창을 열지 못했습니다' + (e ? ' (' + clip(e.code, 60) + (e.message ? ': ' + clip(e.message, 120) : '') + ')' : '') + '. 청구된 금액은 없습니다.';
