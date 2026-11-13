@@ -142,7 +142,7 @@ export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpd
         h('p', { class: 'muted' }, '이 화면은 만든 사람만 쓰는 관리 화면이에요. 손님에게 보이는 공개 페이지와 달라요.'),
         h('label', { for: 'manage-pw' }, '관리 비밀번호'), pw,
         h('p', { class: 'muted' }, '비밀번호는 잃어버리면 복구할 수 없어요. 이 기기에 저장하지 않고, 화면에도 다시 보여주지 않아요.'),
-        h('p', { class: 'small muted' }, '이전에 이 가게를 계정에 연결해 두셨다면 ', h('a', { href: '/#/my-stores' }, '기존 계정으로 관리하기'), '를 이용할 수 있어요.'),
+        h('p', { class: 'small muted' }, '이전에 이 가게를 계정에 연결해 두셨다면 ', h('a', { href: 'https://www.kkumsu.com/#/my-stores' }, '기존 계정으로 관리하기 (기존 주소)'), '를 이용할 수 있어요.'),
         status, go, viewLink()));
       pw.addEventListener?.('keydown', (e) => { if (e.key === 'Enter') submit(); });
     }
