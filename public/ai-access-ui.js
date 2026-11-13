@@ -4,6 +4,7 @@ const ID_RE = /^[A-Za-z0-9_-]{22}$/;
 const STATES = ['not_started', 'active', 'limited', 'unavailable'];
 const PROVIDERS = { openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google' };
 const PURPOSES = { search: '검색 답변용', training: '학습용', user: '사용자 요청 대행', search_engine: '검색엔진' };
+const PROVIDER_ORDER = ['openai', 'anthropic', 'google'];
 const nf = new Intl.NumberFormat('ko-KR');
 // 화면을 연 동안만 약 1분 간격으로 재조회한다. 실제 전달 지연은 따로 생길 수 있다.
 export const AI_ACCESS_REFRESH_MS = 60_000;
@@ -16,7 +17,7 @@ const isDateStr = (s) => typeof s === 'string' && s.length <= 40 && !Number.isNa
 export function parseAiAccess(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
   if (!STATES.includes(data.state)) return null;
-  const out = { state: data.state, since: null, collectionStartedAt: null, updatedAt: null, lifetime: null, last7Days: null, breakdown: [] };
+  const out = { state: data.state, since: null, collectionStartedAt: null, updatedAt: null, lifetime: null, last7Days: null, breakdown: [], hasBreakdown: false };
   for (const k of ['since', 'collectionStartedAt', 'updatedAt']) {
     const v = data[k];
     if (v == null) continue;
@@ -32,6 +33,7 @@ export function parseAiAccess(data) {
   }
   if (data.breakdown != null) {
     if (!Array.isArray(data.breakdown) || data.breakdown.length > 50) return null;
+    out.hasBreakdown = true;
     for (const r of data.breakdown) {
       if (!r || typeof r !== 'object' || !Object.hasOwn(PROVIDERS, r.provider) || !Object.hasOwn(PURPOSES, r.purpose) || !isCount(r.verified) || !isCount(r.unverified)) return null;
       out.breakdown.push({ provider: r.provider, purpose: r.purpose, verified: r.verified, unverified: r.unverified });
@@ -120,6 +122,34 @@ export function makeAiAccessPanel({ h, fetcher, kind, storeId } = {}) {
           h('td', { class: 'ai-access-r' }, nf.format(r.verified)), h('td', { class: 'ai-access-r' }, nf.format(r.unverified)))))));
   }
 
+  // 누적 합계와 세부 항목이 일치할 때만 운영사별 숫자를 보여준다.
+  // 미확인 봇 주장은 별도로 합산하여 확인된 접근에 섞지 않는다.
+  function providerSummary(d, limited) {
+    const counts = Object.fromEntries(PROVIDER_ORDER.map(provider => [provider, { verified: 0, purposes: [] }]));
+    let verified = 0, unverified = 0, valid = d.hasBreakdown;
+    const seen = new Set();
+    if (valid) for (const row of d.breakdown) {
+      const key = `${row.provider}:${row.purpose}`;
+      if (seen.has(key)) { valid = false; break; }
+      seen.add(key);
+      verified += row.verified;
+      unverified += row.unverified;
+      counts[row.provider].verified += row.verified;
+      if (![verified, unverified, counts[row.provider].verified].every(Number.isSafeInteger)) { valid = false; break; }
+      if (row.verified > 0) counts[row.provider].purposes.push(PURPOSES[row.purpose]);
+    }
+    valid = valid && verified === d.lifetime.verified && unverified === d.lifetime.unverified;
+    return h('div', { class: 'ai-access-providers', 'aria-label': '운영사별 확인된 봇 접근' },
+      h('p', { class: 'ai-access-providers-title' }, '운영사별 확인된 봇 접근'),
+      valid ? h('dl', { class: 'ai-access-provider-list' }, PROVIDER_ORDER.map(provider => {
+        const item = counts[provider];
+        const purpose = item.purposes.length ? item.purposes.join(' · ') : '확인된 기록 없음';
+        return h('div', { class: 'ai-access-provider-row' },
+          h('dt', null, h('strong', { class: 'ai-access-provider-name' }, PROVIDERS[provider]), h('span', { class: 'ai-access-provider-purpose' }, purpose)),
+          h('dd', { class: 'ai-access-provider-count' }, limited ? '최소 ' : '', `${nf.format(item.verified)}회`));
+      })) : h('p', { class: 'ai-access-providers-unavailable' }, '운영사별 기록을 확인할 수 없어요.'));
+  }
+
   const beginLoad = () => { started = true; void load(); };
   const retryButton = () => h('button', { type: 'button', class: 'ai-access-btn', onclick: beginLoad }, '다시 시도');
   const refreshButton = () => h('button', { type: 'button', class: 'ai-access-btn ai-access-btn-quiet', onclick: beginLoad }, '새로고침');
@@ -160,7 +190,8 @@ export function makeAiAccessPanel({ h, fetcher, kind, storeId } = {}) {
           h('p', { class: 'ai-access-meta' }, `${first} 누적 · 미확인 봇 주장 `, h('b', null, unverified)),
           h('p', { class: 'ai-access-meta' }, recent),
           h('p', { class: 'ai-access-meta' }, '화면을 열어두면 약 1분마다 다시 확인해요. 수집 지연이나 누락이 있을 수 있어요.'),
-          limited ? h('p', { class: 'ai-access-limited', role: 'note' }, '일부 기록만 집계됨 · 최소치') : null)),
+          limited ? h('p', { class: 'ai-access-limited', role: 'note' }, '일부 기록만 집계됨 · 최소치') : null),
+        isStore ? null : providerSummary(d, limited)),
       h('details', { class: 'ai-access-details' },
         h('summary', null,
           h('span', { class: 'ai-access-footnote' }, '여기봐 집계에 IP 미저장 · 접근은 AI 추천·인용 횟수가 아니에요'),

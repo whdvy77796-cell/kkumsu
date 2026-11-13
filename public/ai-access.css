@@ -47,8 +47,18 @@
 .ai-access-total-number { font-size: clamp(2.75rem, 5vw, 4.35rem); font-weight: 800; letter-spacing: -.055em; overflow-wrap: anywhere; }
 .ai-access-total-unit { color: var(--ink-2); font-size: 1.15rem; font-weight: 700; }
 .ai-access-at-least { color: var(--brand-ink); font-size: 1rem; font-weight: 700; }
-.ai-access-overview { min-width: 0; }
+.ai-access-overview { flex: 1 1 auto; min-width: 0; }
 .ai-access-overview p { margin: 0; }
+/* 운영사별 확인된 접근은 같은 공개 집계의 세부 항목만 사용한다. */
+.ai-access-providers { flex: 0 0 clamp(235px, 23vw, 290px); min-width: 0; padding: 12px 14px; border: 1px solid #dce6fa; border-radius: 14px; background: rgba(255, 255, 255, .82); }
+.ai-access-providers-title { margin: 0 0 7px; color: #596b87; font-size: .76rem; font-weight: 700; line-height: 1.4; }
+.ai-access-provider-list { display: grid; gap: 5px; margin: 0; }
+.ai-access-provider-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
+.ai-access-provider-row dt { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 6px; min-width: 0; }
+.ai-access-provider-name { color: #263a60; font-size: .83rem; font-weight: 750; }
+.ai-access-provider-purpose { color: #76849a; font-size: .71rem; line-height: 1.35; word-break: keep-all; }
+.ai-access-provider-count { flex: none; margin: 0; color: #1f4fe0; font-size: .9rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ai-access-providers-unavailable { margin: 0; color: #687a92; font-size: .8rem; line-height: 1.5; word-break: keep-all; }
 .ai-access-lead { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 1rem; font-weight: 750; }
 .ai-access-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 4px #e2ebff; }
 .ai-access-meta { margin-top: 4px !important; color: var(--muted); font-size: .83rem; line-height: 1.5; }
@@ -69,9 +79,14 @@
 @media (min-width: 1024px) {
   body[data-page="home"] #view > .ai-access-site { grid-column: 1 / -1; grid-row: 2; margin: 28px 0 0; }
 }
+@media (min-width: 601px) and (max-width: 850px) {
+  .ai-access-site .ai-access-hero { flex-wrap: wrap; gap: 16px 24px; }
+  .ai-access-site .ai-access-providers { flex: 1 1 100%; }
+}
 @media (max-width: 600px) {
   .card.ai-access { padding: 19px 18px 13px; border-radius: 18px; }
   .ai-access-hero { flex-direction: column; align-items: flex-start; gap: 12px; padding: 3px 0 15px; }
+  .ai-access-providers { flex: none; width: 100%; box-sizing: border-box; }
   .ai-access-total-number { font-size: clamp(2.7rem, 12vw, 3.7rem); }
   .ai-access-details > summary { align-items: flex-start; }
   .ai-access-expanded .ai-access-btn { width: auto; }
