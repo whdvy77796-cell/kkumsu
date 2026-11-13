@@ -69,6 +69,9 @@ test('manage: auth, update needs confirmation, password only in requests', async
   makeStoreTools(env).renderManage(ID);
   const pw = find(st, (x) => x.tag === 'input' && x.attrs.type === 'password');
   assert.ok(pw);
+  const legacyLink = find(st, x => x.tag === 'a' && x.attrs.href === '/#/my-stores');
+  assert.ok(legacyLink && labelOf(legacyLink) === '기존 계정으로 관리하기');
+  assert.match(text(st), /이전에 이 가게를 계정에 연결해 두셨다면/);
   pw.value = 'secret-pass';
   click(st, '관리 시작'); await tick(); await tick();
   assert.deepEqual(calls[0], ['/api/stores', { action: 'auth', id: ID, password: 'secret-pass' }]);
@@ -207,6 +210,7 @@ test('published: renders link, share text, qr canvas without throwing', () => {
   const a = find(st, (x) => x.tag === 'a' && x.attrs.href === `/stores/${ID}`);
   assert.ok(a);
   assert.ok(find(st, (x) => x.tag === 'a' && x.attrs.href === `/#/manage/${ID}`));
+  assert.equal(find(st, (x) => x.tag === 'a' && x.attrs.href === '/#/my-stores'), null, 'new publication does not prompt account linking');
   const ta = find(st, (x) => x.tag === 'textarea');
   assert.ok(ta.value.includes(`https://example.test/stores/${ID}`));
   assert.ok(find(st, (x) => x.tag === 'canvas'));

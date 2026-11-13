@@ -60,5 +60,7 @@ test('homepage wiring keeps native logo link and existing route behavior', async
   assert.match(app, /import \{ setupHomeLogo \} from '\.\/logo-home\.js'/);
   assert.match(app, /setupHomeLogo\(document, window\)/);
   assert.match(html, /class="logo" href="#\/"/);
+  assert.doesNotMatch(html, /class="account-nav"|href="#\/my-stores"/);
+  assert.match(html, /href="\/stores" aria-label="믿을만한 가게 정보 모음"/);
   assert.match(app, /window\.addEventListener\('hashchange'/);
 });
