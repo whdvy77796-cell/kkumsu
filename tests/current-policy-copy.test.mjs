@@ -36,3 +36,11 @@ test('개인정보처리방침은 토스페이먼츠를 향후 계획으로만 �
 test('예정된 1년 상품에는 중도 해지와 일할 환불 및 처리 기준이 있다', () => {
   for (const v of ['7일이 지난 뒤에도', '해지 요청 접수 다음 날', '별도 위약금은 받지 않을 계획', '3영업일 이내', '법령상 더 유리한 기준']) assert.ok(policy.includes(v), v);
 });
+
+test('결제가 꺼진 현재 베타 샘플 보고서는 잠기지 않고 유료 판매로 오해시키지 않는다', () => {
+  const sample = app.slice(app.indexOf('async function renderSample('), app.indexOf('// ───────── 이용약관'));
+  assert.ok(sample.includes("PAY.mode === 'off'"));
+  assert.ok(sample.includes("if (betaFreeSample) sampleView = 'paid'"));
+  assert.ok(sample.includes('betaFreeSample ? null'));
+  assert.ok(sample.includes('현재 베타에서는 실제 결제 없이 전체 보고서와 PDF 저장을 무료로 이용'));
+});
