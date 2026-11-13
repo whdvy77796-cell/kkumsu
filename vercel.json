@@ -1,6 +1,6 @@
 {
   "framework": null,
-  "buildCommand": "npm test && npm run build",
+  "buildCommand": "node --test --test-force-exit tests/*.test.mjs && npm run build",
   "outputDirectory": "dist",
   "regions": [
     "icn1"
