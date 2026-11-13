@@ -1,6 +1,6 @@
 {
   "framework": null,
-  "buildCommand": "npm run build",
+  "buildCommand": "npm test && npm run build",
   "outputDirectory": "dist",
   "regions": [
     "icn1"
