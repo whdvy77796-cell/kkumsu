@@ -899,9 +899,7 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
 .home-readiness-review p { margin: 0; font-size: 13px; line-height: 1.5; }
 .home-readiness-disclaimer { margin: 15px 0 0; color: #687a92; font-size: 12px; line-height: 1.65; text-align: center; word-break: keep-all; }
 @media (min-width: 1024px) {
-  body[data-page="home"] #view > .hero { grid-column: 1 / -1; grid-row: 1; justify-self: center; max-width: 850px; text-align: center; }
   body[data-page="home"] #view > .home-readiness { grid-column: 1 / -1; grid-row: auto; }
-  body[data-page="home"] #view > .home-sample { grid-column: 1 / -1; grid-row: auto; justify-self: center; margin: 0 auto 24px; }
 }
 @media (max-width: 700px) {
   .home-readiness { margin: 25px 0 30px; padding: 25px 18px; border-radius: 20px; }
