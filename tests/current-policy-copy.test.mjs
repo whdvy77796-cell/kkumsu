@@ -13,7 +13,7 @@ test('정책 문서는 새 시행일과 서비스 식별 정보를 사용한다'
   assert.doesNotMatch(policy, /매출올려드림/);
 });
 
-test('유료 조건은 제안과 계획으로만 안내하고 실제 결제를 부인한다', () => {
+test('승인된 유료 조건은 출시 예정으로 안내하고 실제 결제를 부인한다', () => {
   for (const x of ['3,900원', '100명', '1년', '자동 갱신', '7일', '실제 결제는 진행하지 않습니다', '삭제되거나 유료로 바뀌거나 청구되지 않습니다', '보장하지 않습니다']) {
     assert.ok(policy.includes(x), x);
   }
@@ -43,4 +43,9 @@ test('결제가 꺼진 현재 베타 샘플 보고서는 잠기지 않고 유료
   assert.ok(sample.includes("if (betaFreeSample) sampleView = 'paid'"));
   assert.ok(sample.includes('betaFreeSample ? null'));
   assert.ok(sample.includes('현재 베타에서는 실제 결제 없이 전체 보고서와 PDF 저장을 무료로 이용'));
+});
+
+test('승인된 상품 조건은 출시 예정으로 표시하고 미확정 제안으로 남기지 않는다', () => {
+  for (const x of ['출시 예정 가격: 처음 유료로 구매하는 100명까지 3,900원', '출시 예정 서비스 기간: 유료 게시일부터 1년', '청약철회와 환불, 출시 예정 조건']) assert.ok(policy.includes(x), x);
+  assert.doesNotMatch(policy, /제안 조건|가격\(제안\)|서비스 기간\(제안\)/);
 });

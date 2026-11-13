@@ -57,3 +57,8 @@ test('GET only: other methods get 405 with no-store and no key', () => {
     assert.ok(!r.body.includes(VALID));
   }
 });
+
+test('production 배포는 안전한 테스트 키가 설정돼도 항상 비활성화', () => {
+  assert.deepEqual(reviewCheckoutConfig({ VERCEL_ENV: 'production', YB_TOSS_REVIEW_CLIENT_KEY: 'test_ck_ABCDEFGHIJKLMNOPQRSTUV' }), { configured: false });
+  assert.equal(reviewCheckoutConfig({ VERCEL_ENV: 'preview', YB_TOSS_REVIEW_CLIENT_KEY: 'test_ck_ABCDEFGHIJKLMNOPQRSTUV' }).configured, true);
+});

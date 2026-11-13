@@ -126,7 +126,7 @@ test('page copy states test-only, no charge, no order/publication, free beta, li
   // no other public page links to it (direct URL only)
   const dir = new URL('../public/', import.meta.url);
   for (const f of readdirSync(dir)) {
-    if (/^review-checkout\./.test(f) || !/\.(html|js)$/.test(f)) continue;
+    if (/^review-(checkout|order-simulation)\./.test(f) || !/\.(html|js)$/.test(f)) continue;
     assert.ok(!readFileSync(new URL(f, dir), 'utf8').includes('review-checkout'), f + ' must not reference the test page');
   }
 });
