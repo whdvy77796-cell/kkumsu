@@ -899,9 +899,10 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
 .home-readiness-review p { margin: 0; font-size: 13px; line-height: 1.5; }
 /* 사용자가 요청한 AI 검색 최적화 설명: 점수 예시 아래에서 핵심만 강조한다. */
 .home-readiness-aeo { margin-top: 17px; padding: 20px 24px; border: 1px solid #d8e4fa; border-radius: 16px; background: #fff; }
-.home-readiness-aeo p { margin: 0; color: #40536e; font-size: 15px; line-height: 1.75; word-break: keep-all; overflow-wrap: anywhere; }
-.home-readiness-aeo p + p { margin-top: 10px; }
+.home-readiness-aeo p { margin: 0; color: #40536e; font-size: 15px; line-height: 1.75; word-break: keep-all; overflow-wrap: anywhere; text-wrap: balance; }
+.home-readiness-aeo p + p { margin-top: 8px; }
 .home-readiness-aeo strong { color: #2858d8; font-weight: 800; }
+@media (min-width: 300px) { .home-readiness-aeo p:first-child strong:first-child { white-space: nowrap; } }
 .home-readiness-disclaimer { margin: 15px 0 0; color: #687a92; font-size: 12px; line-height: 1.65; text-align: center; word-break: keep-all; }
 @media (min-width: 1024px) {
   body[data-page="home"] #view > .home-readiness { grid-column: 1 / -1; grid-row: auto; }
