@@ -51,11 +51,15 @@ test('duplicates use request ID not per-log ID, query ignored, public directory/
 test('signed proxy host accepts documented deployment host discrepancy and only confirmed production aliases',async()=>{
  const deploy='kkumsu-example-deployment.vercel.app';
  const preview=await run([row({host:deploy},{vercelId:'synthetic::preview-host'})]);assert.equal((await summary(preview.store)).lifetime.unverified,1);
- const aliases=['www.kkumsu.com','www.kkumsu.net','kkumsu-rho.vercel.app','evil.example'];
+ const aliases=['www.kkumsu.com','www.kkumsu.net','kkumsu-rho.vercel.app','lookhereai.com','www.lookhereai.com','evil.example','www.lookhereai.com.evil.example'];
  const rows=aliases.map((h,i)=>row({host:deploy,environment:'production'},{host:h,vercelId:'synthetic::prod-'+i}));
  const prod=await run(rows,{host:'www.kkumsu.com',env:{VERCEL_ENV:'production'}});
  const scope=requestScope({headers:{host:'www.kkumsu.com'}},{...env,VERCEL_ENV:'production'});
- assert.equal(prod.res.statusCode,200);assert.equal((await readAiSummary({store:prod.store,scope,now,since:env.YB_AI_ACCESS_STARTED_AT})).lifetime.unverified,3);
+ assert.equal(prod.res.statusCode,200);assert.equal((await readAiSummary({store:prod.store,scope,now,since:env.YB_AI_ACCESS_STARTED_AT})).lifetime.unverified,5);
+ for(const h of aliases.slice(0,5)){
+  const aliasScope=requestScope({headers:{host:h}},{...env,VERCEL_ENV:'production'});
+  assert.deepEqual(await readAiSummary({store:prod.store,scope:aliasScope,now,since:env.YB_AI_ACCESS_STARTED_AT}),await readAiSummary({store:prod.store,scope,now,since:env.YB_AI_ACCESS_STARTED_AT}));
+ }
 });
 
 test('storage/classification failure is generic with no payload disclosure, signed malformed JSON not accepted',async()=>{

@@ -97,7 +97,7 @@ test('return whitelist, query pollution, absolute URL, unknown operations and me
 });
 test('unknown hosts, forwarded spoof, protocol downgrade, namespace changes, browser-session binding', async () => {
   const x = setup(), l = await login(x);
-  for (const headers of [{ host: 'evil.invalid' }, { 'x-forwarded-host': 'evil.invalid' }, { 'x-forwarded-proto': 'http' }, { host: 'www.kkumsu.net' }]) { assert.ok((await invoke(x.h, '/api/owner-auth?op=status', headers)).statusCode >= 400); await assert.rejects(session(x, l.cookie, { headers }), e => e instanceof HttpError && [400,403].includes(e.status)); }
+  for (const headers of [{ host: 'evil.invalid' }, { 'x-forwarded-host': 'evil.invalid' }, { 'x-forwarded-proto': 'http' }, { host: 'www.kkumsu.net' }, { host: 'lookhereai.com' }, { host: 'www.lookhereai.com' }]) { assert.ok((await invoke(x.h, '/api/owner-auth?op=status', headers)).statusCode >= 400); await assert.rejects(session(x, l.cookie, { headers }), e => e instanceof HttpError && [400,403].includes(e.status)); }
   await assert.rejects(session(x, l.cookie, { env: { ...ENV, VERCEL_ENV: 'preview' } }), { status: 401 });
   const s = await start(x, 'kakao', 'dashboard', l.cookie); assert.equal((await invoke(x.h, callbackUrl(s), { cookie: jar(s.r) })).statusCode, 400);
   assert.equal((await invoke(x.h, '/api/owner-auth?op=start&provider=kakao', { origin: 'https://evil.invalid' })).statusCode, 403);

@@ -67,7 +67,7 @@ test('strict origin, forwarded-host spoof protection and host namespace isolatio
  assert.equal((await invoke(preview,create(),previewOptions)).statusCode,201);
  assert.equal((await invoke(h,undefined,get())).statusCode,404);
  assert.notEqual(requestScope(request(),{...ENV,VERCEL_ENV:'preview'}).namespace,scope.namespace);
- for (const host of ['www.kkumsu.com','www.kkumsu.net','kkumsu-rho.vercel.app']) {
+ for (const host of ['www.kkumsu.com','www.kkumsu.net','kkumsu-rho.vercel.app','lookhereai.com','www.lookhereai.com']) {
    const aliasScope=requestScope(request(undefined,{headers:{host}}),ENV);
    assert.equal(aliasScope.namespace,scope.namespace,'all promoted aliases share durable production pages');
    assert.equal(aliasScope.ttl,0,'a production-alias page must not expire as a preview');
@@ -76,6 +76,34 @@ test('strict origin, forwarded-host spoof protection and host namespace isolatio
  assert.notEqual(deployScope.namespace,scope.namespace);assert.equal(deployScope.ttl,7200);
  assert.equal((await invoke(preview,undefined,{method:'GET',url:'/api/stores?view=page&id='+ID,...previewOptions})).headers['x-robots-tag'],'noindex, nofollow');
  assert.equal((await invoke(h,create())).statusCode,201,'prod does not collide with same preview id');
+});
+
+test('old and new domains share synthetic records while previews and cross-origin requests stay isolated',async()=>{
+ const st=new MemoryStore(),h=createHandler({store:st,env:ENV});
+ const aliases=['www.kkumsu.com','www.kkumsu.net','kkumsu-rho.vercel.app','lookhereai.com','www.lookhereai.com'];
+ const opt=host=>({headers:{host,origin:'https://'+host}});
+ assert.equal((await invoke(h,create(),opt(aliases[0]))).statusCode,201);
+ for(const host of aliases){
+   const read=await invoke(h,undefined,{...get(),...opt(host)});
+   assert.equal(read.statusCode,200);assert.equal(read.json().data.name,DATA.name);
+   const scoped=requestScope(request(undefined,opt(host)),ENV);
+   assert.equal(scoped.namespace,scope.namespace);assert.equal(scoped.ttl,0);
+ }
+ assert.equal((await invoke(h,owner('auth'),opt('www.kkumsu.com'))).statusCode,200);
+ assert.equal((await invoke(h,owner('auth'),opt('www.lookhereai.com'))).statusCode,200);
+ assert.equal((await invoke(h,owner('auth',{password:'wrong-password'}),opt('www.lookhereai.com'))).statusCode,403);
+ assert.equal((await invoke(h,create(ID,{...DATA,name:'attacker'}),opt('www.lookhereai.com'))).statusCode,409);
+ assert.equal((await invoke(h,owner('update',{data:{...DATA,intro:'cross domain update'},consent:true}),opt('www.lookhereai.com'))).statusCode,200);
+ assert.equal((await invoke(h,undefined,{...get(),...opt('www.kkumsu.com')})).json().data.intro,'cross domain update');
+ assert.equal((await invoke(h,owner('update',{data:DATA,consent:true}),{headers:{host:'www.lookhereai.com',origin:'https://evil.example'}})).statusCode,403);
+ assert.equal((await invoke(h,owner('auth'),{headers:{host:'www.lookhereai.com',origin:'https://www.lookhereai.com','x-forwarded-host':'evil.example'}})).statusCode,403);
+ assert.equal((await invoke(h,owner('auth'),{headers:{host:'www.lookhereai.com',origin:'https://www.lookhereai.com','x-forwarded-proto':'http'}})).statusCode,403);
+ assert.equal((await invoke(h,undefined,{...get(),...opt('evil.example')})).statusCode,404);
+ const preview=createHandler({store:st,env:{...ENV,VERCEL_ENV:'preview'}});
+ assert.equal((await invoke(preview,undefined,{...get(),...opt('www.lookhereai.com')})).statusCode,404);
+ assert.equal((await invoke(h,owner('delete'),opt('www.lookhereai.com'))).statusCode,200);
+ assert.equal((await invoke(h,undefined,{...get(),...opt('www.kkumsu.com')})).statusCode,404);
+ assert.equal((await invoke(h,create(),opt('www.kkumsu.com'))).statusCode,409);
 });
 
 test('body byte limit includes Vercel pre-parsed JSON and no storage fallback in deployment',async()=>{

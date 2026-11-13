@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { createStore } from '../lib/guard.mjs';
-import { requestScope } from '../lib/stores.mjs';
+import { requestScope, PRODUCTION_HOSTS } from '../lib/stores.mjs';
 import { recordAiBatch, REDIS_BATCH_SIZE } from '../lib/ai-access-core.mjs';
 import { strictStartedAt, validDedicatedRedis, validAiProjectId } from '../lib/ai-access-config.mjs';
 export { strictStartedAt, validDedicatedRedis } from '../lib/ai-access-config.mjs';
@@ -29,9 +29,8 @@ async function rawBytes(req){
   if(length!==undefined&&Number(length)!==size)throw new Error('BODY');
   return Buffer.concat(chunks);
 }
-// A production deployment has three confirmed public aliases sharing one
-// store namespace. Preview remains strictly bound to its own branch host.
-const productionHosts=new Set(['www.kkumsu.com','www.kkumsu.net','kkumsu-rho.vercel.app']);
+// The same verified aliases represent one site. Preview stays host-isolated.
+const productionHosts=new Set(PRODUCTION_HOSTS);
 function candidate(row,scope,project,started,now){
   if(!row||typeof row!=='object'||Array.isArray(row)||!['static','lambda'].includes(row.source)||row.projectId!==project||row.environment!==(scope.production?'production':'preview')||row.customEnvironment)return null;
   const p=row.proxy;
