@@ -171,7 +171,7 @@ const withSituations=(situations=SITUATIONS)=>({...DATA,situations});
 const pageOptions={method:'GET',url:'/api/stores?view=page&id='+ID};
 const noPrivate=r=>assert.ok(!/"(?:password|salt|hash|revision|createdAt|updatedAt|expiresAt|reporter)"\s*:/.test(r.body),r.body);
 
-test('legacy six-field records retain exact create/auth/public shapes and byte-identical SSR',async()=>{
+test('legacy six-field records retain exact shapes and SSR apart from canonical metadata',async()=>{
  const st=new MemoryStore(),h=createHandler({store:st,env:ENV});
  assert.deepEqual(normalizeData(DATA),DATA);assert.equal(Object.hasOwn(normalizeData(DATA),'situations'),false);
  const created=await invoke(h,create());assert.equal(created.statusCode,201);
@@ -179,7 +179,11 @@ test('legacy six-field records retain exact create/auth/public shapes and byte-i
  const auth=await invoke(h,owner('auth'));assert.deepEqual(auth.json(),created.json());noPrivate(auth);
  const publicJson=await invoke(h,undefined,get());assert.deepEqual(publicJson.json(),{id:ID,data:DATA});noPrivate(publicJson);
  const page=await invoke(h,undefined,pageOptions);assert.equal(page.statusCode,200);
- assert.equal(createHash('sha256').update(page.body).digest('hex'),'5a07efab4f2ac938c4d2c3f9b6a841e14c37feac44b656cf33a5c3b07224e011');
+ const meta='<link rel="canonical" href="https://www.lookhereai.com/stores/'+ID+'"><meta property="og:url" content="https://www.lookhereai.com/stores/'+ID+'">';
+ const previousMeta='<link rel="canonical" href="https://www.kkumsu.com/stores/'+ID+'">';
+ assert.ok(page.body.includes(meta),'new canonical and social URL are present');
+ const normalized=page.body.replace(meta,previousMeta);
+ assert.equal(createHash('sha256').update(normalized).digest('hex'),'5a07efab4f2ac938c4d2c3f9b6a841e14c37feac44b656cf33a5c3b07224e011','all other bytes remain identical');
  assert.ok(!page.body.includes('이럴 때 찾는 가게'));
  assert.equal(renderStore(scope,{id:ID,data:withSituations([])}),page.body,'explicit empty renders no new section');
 });
