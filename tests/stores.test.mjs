@@ -86,10 +86,11 @@ test('old and new domains share synthetic records while previews and cross-origi
  for(const host of aliases){
    const read=await invoke(h,undefined,{...get(),...opt(host)});
    assert.equal(read.statusCode,200);assert.equal(read.json().data.name,DATA.name);
-   assert.equal((await invoke(h,owner('auth'),opt(host))).statusCode,200);
    const scoped=requestScope(request(undefined,opt(host)),ENV);
    assert.equal(scoped.namespace,scope.namespace);assert.equal(scoped.ttl,0);
  }
+ assert.equal((await invoke(h,owner('auth'),opt('www.kkumsu.com'))).statusCode,200);
+ assert.equal((await invoke(h,owner('auth'),opt('www.lookhereai.com'))).statusCode,200);
  assert.equal((await invoke(h,owner('auth',{password:'wrong-password'}),opt('www.lookhereai.com'))).statusCode,403);
  assert.equal((await invoke(h,create(ID,{...DATA,name:'attacker'}),opt('www.lookhereai.com'))).statusCode,409);
  assert.equal((await invoke(h,owner('update',{data:{...DATA,intro:'cross domain update'},consent:true}),opt('www.lookhereai.com'))).statusCode,200);
