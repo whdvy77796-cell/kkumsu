@@ -75,6 +75,14 @@
   ],
   "rewrites": [
     {
+      "source": "/sitemap-stores.xml",
+      "destination": "/api/stores?view=sitemap-index"
+    },
+    {
+      "source": "/sitemaps/stores/:page",
+      "destination": "/api/stores?view=sitemap-page&page=:page"
+    },
+    {
       "source": "/stores",
       "destination": "/api/stores?view=directory"
     },

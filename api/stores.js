@@ -1,5 +1,6 @@
 import { HttpError, send, readJson, createStore } from '../lib/guard.mjs';
 import { BODY_LIMIT, requestScope, checkStoreOrigin, validateRequest, actOnStore, publicStore, renderStore, renderUnavailable, renderDirectory } from '../lib/stores.mjs';
+import { renderStoreSitemapIndex, renderStoreSitemapPage } from '../lib/sitemap.mjs';
 export function createHandler(deps={}) {
   return async function handler(req,res) {
     try {
@@ -19,6 +20,19 @@ export function createHandler(deps={}) {
       const url=new URL(req.url || '/api/stores','https://'+scope.host);
       const query=name=>{const value=req.query?.[name] ?? url.searchParams.get(name);if (Array.isArray(value)) throw new HttpError(400,'QUERY','요청 주소를 확인해 주세요.');return value;};
       const view=query('view');
+      if (view==='sitemap-index' || view==='sitemap-page') {
+        // Only production, isolated Vercel previews and local tests can serve a sitemap.
+        // The preview is marked noindex above and uses its own host and namespace.
+        if (!scope.production && !scope.local && env.VERCEL_ENV!=='preview') return send(res,404,{error:'사이트맵을 찾을 수 없어요.',code:'NOT_FOUND'});
+        const xml=view==='sitemap-index'
+          ? await renderStoreSitemapIndex(store,scope)
+          : await renderStoreSitemapPage(store,scope,query('page'));
+        res.statusCode=200;
+        res.setHeader('Content-Type','application/xml; charset=utf-8');
+        // Do not cache public links after a store is hidden or deleted.
+        res.setHeader('Cache-Control','no-store');
+        return res.end(xml);
+      }
       if (view==='directory' || view==='page') {
         let html;
         try { html=view==='directory'?await renderDirectory(store,scope,query('page') || '1'):renderStore(scope,await publicStore(store,scope,query('id'))); }
