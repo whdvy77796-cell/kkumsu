@@ -69,6 +69,7 @@ test('navigation is hidden on initial load and other routes with sticky-header o
   const home = app.slice(app.indexOf('function renderHome()'), app.indexOf('// ───────── 2.'));
   assert.match(home, /homeJumpNav\.show\(\)/);
   assert.match(css, /\.home-jump-nav\[hidden\] \{ display: none; \}/);
+  assert.match(css, /\.home-jump-nav button \{[^}]*min-width: 44px; min-height: 44px;/);
   assert.match(css, /\.home-pricing, \.home-faq \{ scroll-margin-top: 76px; \}/);
   assert.doesNotMatch(navCode, /location\.|history\.|localStorage|sessionStorage|fetch\(/);
 });
