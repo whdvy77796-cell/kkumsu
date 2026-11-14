@@ -997,7 +997,7 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
 /* 홈페이지 상단 가격·FAQ 바로가기 */
 .home-jump-nav { display: flex; align-items: center; flex: none; gap: 2px; margin-left: auto; }
 .home-jump-nav[hidden] { display: none; }
-.home-jump-nav button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #273953; font-size: 13px; font-weight: 700; letter-spacing: .04em; cursor: pointer; }
+.home-jump-nav button { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #273953; font-size: 13px; font-weight: 700; letter-spacing: .04em; cursor: pointer; }
 .home-jump-nav button:hover { color: var(--brand); }
 .home-jump-nav button:focus-visible { outline: 2px solid var(--brand); outline-offset: -3px; }
 .home-pricing, .home-faq { scroll-margin-top: 76px; }
