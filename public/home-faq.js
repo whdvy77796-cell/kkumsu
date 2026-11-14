@@ -50,7 +50,7 @@ export const HOME_FAQ = Object.freeze([
 ]);
 
 export function makeHomeFaq(h) {
-  return h('section', { class: 'home-faq', 'aria-labelledby': 'home-faq-title' },
+  return h('section', { id: 'home-faq', class: 'home-faq', tabindex: '-1', 'aria-labelledby': 'home-faq-title' },
     h('div', { class: 'faq-heading' },
       h('p', { class: 'faq-eyebrow' }, 'FAQ'),
       h('h2', { id: 'home-faq-title' }, '자주 묻는 질문'),

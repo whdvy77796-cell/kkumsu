@@ -17,7 +17,7 @@ export function makeHomePricing(h, focusStart) {
     h('span', { class: 'pricing-level-number' }, `${i + 1}단계${i === 0 ? ' · 예정' : ''}`),
     h('span', { class: 'pricing-level-range' }, step.range),
     h('strong', { class: 'pricing-level-price' }, step.price)));
-  return h('section', { class: 'home-pricing', 'aria-labelledby': 'home-pricing-title' },
+  return h('section', { id: 'home-pricing', class: 'home-pricing', tabindex: '-1', 'aria-labelledby': 'home-pricing-title' },
     h('div', { class: 'pricing-heading' },
       h('p', { class: 'pricing-eyebrow' }, '여기봐AI 가격 안내'),
       h('h2', { id: 'home-pricing-title' }, '가게 소개, 부담 없이 시작하세요'),

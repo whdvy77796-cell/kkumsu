@@ -17,6 +17,7 @@ import { makeHomePricing } from './home-pricing.js';
 import { makeHomeFaq } from './home-faq.js';
 import { makeHomeReadiness } from './home-readiness.js';
 import { setupHomeLogo } from './logo-home.js';
+import { setupHomeJumpNav } from './home-jump-nav.js';
 import { makeAccountUI } from './account-ui.js';
 import { allowOwnerHashChange } from './account-navigation.js';
 import { makeAiAccessPanel } from './ai-access-ui.js';
@@ -27,6 +28,7 @@ const navbarInner = document.getElementById('navbarInner');
 const storeName = document.getElementById('storeName');
 const toastEl = document.getElementById('toast');
 setupHomeLogo(document, window);
+const homeJumpNav = setupHomeJumpNav(document, window);
 
 // ───────── 화면 도우미
 function append(el, kids) {
@@ -126,6 +128,7 @@ async function post(path, body, timeoutMs) {
 // ───────── 화면 이동
 let navSeq = 0;
 function route() {
+  homeJumpNav.hide();
   navSeq++;
   const hash = location.hash || '#/';
   const linked = /^#\/r\/([A-Za-z0-9_-]{16,32})\.([A-Za-z0-9_-]{16,100})$/.exec(hash);
@@ -313,6 +316,7 @@ function renderHome() {
     makeHomeFaq(h),
   );
   setNavbar(btn('무료로 페이지 만들기', focusStart, true));
+  homeJumpNav.show();
   if (wantStart) { wantStart = false; setTimeout(focusStart, 60); }
 }
 
