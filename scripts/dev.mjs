@@ -37,6 +37,11 @@ const MIME = {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (routes[url.pathname]) return routes[url.pathname](req, res);
+  if (url.pathname === '/sitemap-stores.xml' || /^\/sitemaps\/stores\/[^/]+$/.test(url.pathname)) {
+    const page = url.pathname.split('/')[3];
+    req.url = '/api/stores?' + new URLSearchParams(page ? { view: 'sitemap-page', page } : { view: 'sitemap-index' });
+    return routes['/api/stores'](req, res);
+  }
   if (url.pathname === '/stores' || /^\/stores\/[A-Za-z0-9_-]{22}$/.test(url.pathname)) {
     const id = url.pathname.split('/')[2];
     req.url = '/api/stores?' + new URLSearchParams({ view: id ? 'page' : 'directory', ...(id ? { id } : {}), ...(url.searchParams.has('page') ? { page: url.searchParams.get('page') } : {}) });
