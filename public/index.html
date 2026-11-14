@@ -31,9 +31,27 @@
       <nav id="homeJumpNav" class="home-jump-nav" aria-label="홈페이지 바로가기" hidden>
         <button type="button" data-home-jump="price">PRICE</button>
         <button type="button" data-home-jump="faq">FAQ</button>
+        <button type="button" id="contactOpen" aria-haspopup="dialog" aria-controls="contactDialog">고객문의</button>
       </nav>
     </div>
   </header>
+  <dialog class="contact-dialog" id="contactDialog" aria-labelledby="contactTitle" aria-describedby="contactDescription">
+    <div class="contact-dialog-inner">
+      <div class="contact-dialog-heading">
+        <h2 id="contactTitle">고객문의</h2>
+        <button class="contact-close" type="button" id="contactClose" aria-label="고객문의 닫기">×</button>
+      </div>
+      <p id="contactDescription">이용 중 궁금한 점이 있으면 이메일로 문의해 주세요.</p>
+      <p class="contact-address-label">문의 이메일</p>
+      <p class="contact-address" id="contactAddress"></p>
+      <div class="contact-actions">
+        <a id="contactMail">이메일 보내기</a>
+        <button type="button" id="contactCopy">주소 복사</button>
+      </div>
+      <p class="contact-status" id="contactStatus" role="status" aria-live="polite"></p>
+      <p class="contact-help">메일 앱이 열리지 않으면 주소를 복사해 사용하시는 메일에서 보내주세요.</p>
+    </div>
+  </dialog>
   <main><div class="wrap" id="view" aria-live="polite"></div></main>
   <footer class="site-foot"><div class="wrap" id="siteFoot"></div></footer>
   <div class="navbar" id="navbar" hidden><div class="wrap" id="navbarInner"></div></div>

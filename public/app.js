@@ -18,6 +18,7 @@ import { makeHomeFaq } from './home-faq.js';
 import { makeHomeReadiness } from './home-readiness.js';
 import { setupHomeLogo } from './logo-home.js';
 import { setupHomeJumpNav } from './home-jump-nav.js';
+import { setupContactMenu } from './contact-menu.js';
 import { makeAccountUI } from './account-ui.js';
 import { allowOwnerHashChange } from './account-navigation.js';
 import { makeAiAccessPanel } from './ai-access-ui.js';
@@ -29,6 +30,7 @@ const storeName = document.getElementById('storeName');
 const toastEl = document.getElementById('toast');
 setupHomeLogo(document, window);
 const homeJumpNav = setupHomeJumpNav(document, window);
+setupContactMenu(document, window, BUSINESS.email);
 
 // ───────── 화면 도우미
 function append(el, kids) {
