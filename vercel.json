@@ -12,6 +12,9 @@
     "api/page-draft.js": {
       "maxDuration": 180
     },
+    "api/store-translate.js": {
+      "maxDuration": 180
+    },
     "api/store-search.js": {
       "maxDuration": 180
     },
