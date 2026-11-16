@@ -1,5 +1,6 @@
 // 소개 페이지의 첫 단계. 기존 매출 진단 상태(maechul.v3)는 읽거나 수정하지 않는다.
 import { makeReadinessBenefits, makeReadinessCard, makeReadinessReview } from './readiness-ui.js';
+import { initialBusinessDetails, businessSection } from './business-details.js';
 
 const PAGE_KEY = 'yeogibwa.page.start.v1';
 
@@ -346,6 +347,11 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     const d = state.pageDraft;
     d.store ||= { name: string(c.name), address: string(c.address), verifiedFacts: [] };
     d.answers ||= {};
+    // Existing drafts and uncertain publication attempts must not acquire new content.
+    if (!d.businessDetails || typeof d.businessDetails !== 'object' || Array.isArray(d.businessDetails)) {
+      d.businessDetails = initialBusinessDetails(d.draft || d.publishAttempt || d.publication ? {} : c);
+    }
+    for (const key of ['phone', 'hours', 'menu']) d.businessDetails[key] = string(d.businessDetails[key]);
     const available = factOptions();
     d.store.verifiedFacts = [...new Set((Array.isArray(d.store.verifiedFacts) ? d.store.verifiedFacts : []).filter(x => available.includes(x)))].slice(0, 8);
     for (const [key] of QUESTION_FIELDS) d.answers[key] = string(d.answers[key]);
@@ -520,13 +526,20 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
           suggestionPanel(key, d, max, updateReadiness),
           na ? h('label', { class: 'readiness-na', for: 'readiness-na-' + key }, na, h('span', null, '우리 가게에 해당하지 않아요 ', h('small', null, '(답변을 비운 뒤 선택하면 점수에서 제외)'))) : null);
       }),
+      h('fieldset', { class: 'card', disabled: draftBusy },
+        h('legend', null, '가게 이용 정보 확인 · 선택'),
+        h('p', { class: 'small muted' }, 'AI가 찾은 정보는 확인 전 제안이에요. 해당 가게·지점의 최신 정보인지 직접 확인하고 고쳐 주세요. 찾지 못한 항목은 아래에 입력하거나 비워 둘 수 있어요. 전체 참고 링크가 각 항목의 근거임을 보장하지 않아요.'),
+        field('page-business-phone', '가게 대표 전화번호', d.businessDetails.phone, 30, value => { d.businessDetails.phone = value; save(); }, { help: '찾은 번호가 없으면 입력해 주세요. 공개할 권한이 있는 번호만 적어 주세요.', disabled: draftBusy }),
+        field('page-business-hours', '영업시간·휴무', d.businessDetails.hours, 200, value => { d.businessDetails.hours = value; save(); }, { help: '찾지 못한 시간은 직접 적거나 비워 주세요. 예: 월-금 09:00-18:00', disabled: draftBusy }),
+        field('page-business-menu', '메뉴·상품과 가격', d.businessDetails.menu, 1500, value => { d.businessDetails.menu = value; save(); }, { multiline: true, help: '메뉴와 가격을 한 줄씩 적어 주세요. 예: 아메리카노: 4,500원. 가격이 없으면 메뉴 이름만 적어도 돼요.', disabled: draftBusy }),
+        sourceCard(state.result || {})),
       existing ? h('p', { class: 'card note' }, '이미 초안을 만들었어요. 답변 변경은 AI에 다시 전송하지 않아요. 초안의 문장은 내용 수정에서 직접 고쳐 주세요.') :
         h('div', { class: 'card note page-disclosure' },
           h('h3', null, 'AI 초안 생성을 위한 별도 전송 동의'),
           h('p', null, '전송 내용: 가게명·주소·직접 선택한 특징·위 5개 답변. 여기에 직접 선택하지 않은 AI 검색 특징(최대 8개 중 나머지)도 ‘검증되지 않은 참고 정보’로 함께 보내요. 초안과 고객 예상 질문·답변 생성 시 OpenRouter 및 연결된 AI 제공자에게 한 번에 전송해요.'),
           h('p', { class: 'small' }, '예상 질문과 답변은 실제 고객 질문 기록이 아니라 AI가 예상한 내용이에요. 검색 특징은 틀리거나 오래됐을 수 있으니 초안의 사실을 꼭 검토해 주세요.'),
           h('p', { class: 'small' }, '답변과 편집 내용은 이 탭의 sessionStorage에 임시저장되며, 새로고침해도 유지돼요. 탭을 닫거나 저장 공간을 지우면 사라질 수 있어요. 외부로 전송된 정보에는 각 제공자의 보관정책이 적용돼요.'),
-          h('p', { class: 'small' }, '연락처, 고객 정보 등 개인정보 입력은 자제해 주세요. 이 동의는 앞선 가게 검색 동의와 별도예요.'),
+          h('p', { class: 'small' }, '공개할 권한이 있는 가게 대표 연락처 외 개인 연락처나 고객 정보는 입력하지 마세요. 위 가게 이용 정보는 AI 초안 생성에 보내지 않고, 확인 후 공개할 때만 서버로 전송해요. 이 동의는 앞선 가게 검색 동의와 별도예요.'),
           h('label', { class: 'page-consent', for: 'page-draft-consent' },
             h('input', { id: 'page-draft-consent', type: 'checkbox', disabled: draftBusy, onchange: e => { e.target.removeAttribute?.('aria-invalid'); consent = !!e.target.checked; } }),
             '위 전송 내용과 보관 안내를 확인했고 AI 초안 생성을 위한 전송에 동의합니다.')),
@@ -635,6 +648,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
         h('p', { class: 'small muted' }, string(d.store.name), ' · ', string(d.store.address)),
         draft.headline?.text ? h('h1', null, draft.headline.text) : null,
         draft.intro?.text ? h('p', { class: 'page-intro' }, draft.intro.text) : null,
+        businessSection(d.businessDetails) ? h('section', { class: 'page-preview-section' }, h('h2', null, '가게 이용 정보'), h('p', { style: 'white-space: pre-line' }, businessSection(d.businessDetails).body), h('p', { class: 'small muted' }, '검색으로 찾은 정보는 반드시 최신 여부를 확인해 주세요.')) : null,
         draft.sections.filter(x => x.heading || x.body).map(x => h('section', { class: 'page-preview-section' }, x.heading ? h('h2', null, x.heading) : null, x.body ? h('p', null, x.body) : null)),
         draft.faqs.some(x => x.question && x.answer) ? h('section', { class: 'page-preview-faq' }, h('h2', null, '고객 질문과 답변 (예상)'), h('p', { class: 'small muted' }, '실제 고객 질문 기록이 아니라 가게 정보를 바탕으로 만든 예상 질문과 답변이에요. 가게에 맞는지 확인한 뒤 ‘내용 수정’에서 고치거나 삭제할 수 있어요. 검색·AI 추천을 보장하지 않아요.'), draft.faqs.filter(x => x.question && x.answer).map(x => h('div', null, h('h3', null, x.question), h('p', null, x.answer)))) : null),
       readinessReview, readiness.element,
@@ -689,7 +703,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     return {
       name: string(d.store.name).trim(), address: string(d.store.address).trim(),
       headline: string(draft.headline?.text).trim(), intro: string(draft.intro?.text).trim(),
-      sections: draft.sections.map(x => ({ heading: string(x.heading).trim(), body: string(x.body).trim() })).filter(x => x.heading || x.body),
+      sections: [...draft.sections.map(x => ({ heading: string(x.heading).trim(), body: string(x.body).trim() })).filter(x => x.heading || x.body), ...[businessSection(d.businessDetails)].filter(Boolean)],
       faqs: draft.faqs.map(x => ({ question: string(x.question).trim(), answer: string(x.answer).trim() })).filter(x => x.question || x.answer),
     };
   }
@@ -697,7 +711,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     if (!data.name || data.name.length > 60) return '가게명을 1~60자로 확인해 주세요.';
     if (data.address.length < 4 || data.address.length > 120) return '주소를 4~120자로 확인해 주세요.';
     if (!data.headline || data.headline.length > 200 || !data.intro || data.intro.length > 2000) return '제목과 소개글을 입력하고 글자 수를 확인해 주세요.';
-    if (data.sections.length > 8 || data.sections.some(x => !x.heading || !x.body || x.heading.length > 200 || x.body.length > 4000)) return '소개 항목의 제목과 내용을 모두 확인해 주세요.';
+    if (data.sections.length > 8 || data.sections.some(x => !x.heading || !x.body || x.heading.length > 200 || x.body.length > 4000)) return '안내 항목은 최대 8개예요. 가게 이용 정보를 추가하려면 내용 수정에서 다른 안내 항목을 줄이고 제목과 내용을 확인해 주세요.';
     if (data.faqs.length > 12 || data.faqs.some(x => !x.question || !x.answer || x.question.length > 300 || x.answer.length > 2000)) return '질문과 답변을 모두 확인해 주세요.';
     // 이전 버전에서 응답이 끊긴 공개 요청은 새 필드를 추가하지 않고 원본 그대로 재확인한다.
     if (data.situations !== undefined && (!Array.isArray(data.situations) || data.situations.length > 8 || data.situations.some(x => !x.question || !x.answer || x.question.length > 300 || x.answer.length > 2000))) return '공개로 선택한 예상 질문과 답변을 모두 확인해 주세요.';
