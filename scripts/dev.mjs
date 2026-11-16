@@ -13,6 +13,7 @@ const routes = {
   '/api/store-search': (await import('../api/store-search.js')).default,
   '/api/page-search': (await import('../api/page-search.js')).default,
   '/api/page-draft': (await import('../api/page-draft.js')).default,
+  '/api/store-translate': (await import('../api/store-translate.js')).default,
   '/api/report': (await import('../api/report.js')).default,
   '/api/research': (await import('../api/research.js')).default,
   '/api/stores': (await import('../api/stores.js')).default,

@@ -1,3 +1,4 @@
+import { makeManageTranslations } from './manage-translations.js';
 // 가게 페이지 발행 후: 관리(수정·삭제), 신고, 링크·QR·공유 화면. 브라우저 ESM 모듈.
 // 비밀번호는 저장·표시·URL 노출을 하지 않고, 이 모듈의 클로저 메모리에만 잠시 둔다. innerHTML은 쓰지 않는다.
 import qrcode from './vendor/qrcode.mjs';
@@ -156,16 +157,28 @@ export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpd
       // Existing pages that already published the previous separate questions
       // retain their owner controls. New pages use only the single FAQ list.
       const hasLegacySituations = d.situations.length > 0;
+      // 저장된 번역이 있는 가게만: 한국어를 바꾸면 번역이 공개 화면에서 숨겨진다(명시적으로 재번역 가능).
+      const tr = initial.translations;
+      const hasTranslations = !!tr && typeof tr === 'object' && !Array.isArray(tr) && Object.keys(tr).length > 0;
+      const TR_WARN = '한국어 정보를 바꾸면 기존 번역은 공개 화면에서 숨겨집니다. 아래에서 새 번역을 검토한 뒤 저장할 수 있어요.';
       let verified = false;
       let status = { text: '', cls: 'muted' };
       let confirmDelete = false;
       let deleteChecked = false;
+      let editGen = 0, verifiedEl = null;
+      const editHash = globalThis.location?.hash;
+      const translation = makeManageTranslations({ h, btn, post,
+        alive: () => globalThis.location?.hash === editHash,
+        canRequest: () => !busy,
+        readSource: () => { const result = cleanStoreData(d); if (result.error) throw new Error(result.error); return result.data; }
+      });
+      const changed = () => { editGen++; verified = false; if (verifiedEl) verifiedEl.checked = false; translation.invalidate(); };
 
       function draw() {
         const field = (key, label, max, area, obj, idx) => {
           const fid = `f-${key}${idx}`;
           const el = h(area ? 'textarea' : 'input', { id: fid, maxlength: max, rows: area ? 5 : null, type: area ? null : 'text', value: obj[key] });
-          el.addEventListener?.('input', () => { obj[key] = el.value; });
+          el.addEventListener?.('input', () => { obj[key] = el.value; changed(); });
           return h('div', { class: 'field' }, h('label', { for: fid }, `${label} (최대 ${max}자)`), el);
         };
         const list = (kind) => {
@@ -177,7 +190,7 @@ export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpd
           const delLabel = isSec ? '이 안내 항목 삭제' : isSit ? '이 예상 질문 삭제' : '이 질문 삭제';
           const prefix = isSit ? '예상 질문' : '질문';
           const max = isSec || isSit ? LIMITS.max : LIMITS.faqs;
-          const add = btn(addLabel, () => { if (arr.length >= max) return; arr.push(isSec ? { heading: '', body: '' } : { question: '', answer: '' }); draw(); });
+          const add = btn(addLabel, () => { if (arr.length >= max) return; arr.push(isSec ? { heading: '', body: '' } : { question: '', answer: '' }); changed(); draw(); });
           add.disabled = arr.length >= max;
           return h('fieldset', { class: 'card' },
             h('legend', null, `${title} (${arr.length}/${max})`),
@@ -186,27 +199,36 @@ export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpd
               isSec
                 ? [field('heading', `제목 ${i + 1}`, LIMITS.heading, false, it, `-s${i}`), field('body', `내용 ${i + 1}`, LIMITS.body, true, it, `-s${i}`)]
                 : [field('question', `${prefix} ${i + 1}`, LIMITS.question, false, it, `${isSit ? '-t' : '-q'}${i}`), field('answer', `답변 ${i + 1}`, LIMITS.answer, true, it, `${isSit ? '-t' : '-q'}${i}`)],
-              btn(delLabel, () => { arr.splice(i, 1); draw(); }))),
+              btn(delLabel, () => { arr.splice(i, 1); changed(); draw(); }))),
             add,
             arr.length >= max ? h('p', { class: 'muted' }, `최대 ${max}개까지예요.`) : null);
         };
         const msg = h('p', { class: status.cls, role: 'status', 'aria-live': 'polite' }, status.text);
         const ok = h('input', { type: 'checkbox', id: 'verified' });
-        ok.checked = verified;
+        ok.checked = verified; verifiedEl = ok;
         ok.addEventListener?.('change', () => { verified = ok.checked; });
         const save = btn('저장하기', () => onSave(), true);
         async function onSave() {
           if (busy) return;
           verified = ok.checked;
-          const { data, error } = cleanStoreData(d);
+          let { data, error } = cleanStoreData(d);
           if (error) { setNote(msg, error, 'error'); return; }
           if (!verified) { setNote(msg, '바뀐 내용이 사실과 맞는지 확인했다는 항목에 체크해 주세요.', 'error'); return; }
+          if (translation.pending) { setNote(msg, '번역 요청이 끝난 뒤 저장해 주세요.', 'error'); return; }
+          const genAtSend = editGen;
           busy = true; save.disabled = true; setNote(msg, '저장하는 중이에요…', 'muted');
           try {
+            if (translation.hasReviewed) data = await translation.attach(data);
+            if (editGen !== genAtSend || globalThis.location?.hash !== editHash) throw new Error('저장 전 내용이 바뀌었어요. 다시 확인해 주세요.');
             await post('/api/stores', { action: 'update', id, password, data, consent: true }, 30000);
-            Object.assign(d, data); onUpdated?.(id, data); verified = false;
+            if (globalThis.location?.hash !== editHash) { busy = false; return; }
+            if (editGen === genAtSend) Object.assign(d, data);
+            onUpdated?.(id, data); verified = false;
+            translation.invalidate('저장 요청이 완료됐어요. 새 번역은 다시 검토해 주세요.');
             status = { text: hidden ? '내용을 저장했어요. 신고로 숨겨진 페이지는 수정만으로 다시 공개되지 않아요.' : '저장했어요. 공개 페이지에 반영됐는지 확인해 보세요.', cls: 'ok' };
-          } catch (e) { status = { text: msgOf(e), cls: 'error' }; }
+            if (editGen !== genAtSend) status.text += ' 저장 중 새로 입력한 내용은 아직 저장되지 않았어요.';
+            if (hasTranslations) status.text += ' ' + TR_WARN;
+          } catch (e) { translation.invalidate('저장 실패 또는 결과 불확실: 기존 번역은 지우지 않았어요. 원문을 다시 확인해 주세요.'); status = { text: msgOf(e), cls: 'error' }; }
           busy = false; draw();
         }
         const delBox = h('input', { type: 'checkbox', id: 'del-ok' });
@@ -231,10 +253,12 @@ export function makeStoreTools({ h, show, setNavbar, btn, post, onDeleted, onUpd
         show(h('section', { class: 'card manage' },
           h('h1', null, '내용 수정'),
           hidden ? h('p', { class: 'card warn', role: 'status' }, '신고가 쌓여 이 페이지가 숨겨졌어요. 내용을 수정하거나 삭제할 수 있지만, 수정만으로 다시 공개되지는 않아요.') : null,
-          h('p', { class: 'muted' }, '관리 화면이에요. 손님에게는 공개 페이지(/stores/…)만 보여요. AI는 쓰지 않고, 입력한 내용 그대로 저장돼요.'),
+          hasTranslations ? h('p', { class: 'card warn', role: 'status', 'data-translation-warning': '1' }, TR_WARN) : null,
+          h('p', { class: 'muted' }, '관리 화면이에요. 손님에게는 공개 페이지(/stores/…)만 보여요. 일반 수정에는 AI를 쓰지 않고, 입력한 내용 그대로 저장돼요.'),
           field('name', '가게 이름', LIMITS.name, false, d, ''), field('address', '주소', LIMITS.address, false, d, ''),
           field('headline', '한 줄 소개', LIMITS.headline, false, d, ''), field('intro', '소개글', LIMITS.intro, true, d, ''),
           list('sections'), list('faqs'), hasLegacySituations ? list('situations') : null,
+          translation.render(),
           h('label', { for: 'verified' }, ok, ' 바뀐 내용이 사실과 맞는지 직접 확인했어요.'),
           msg, save, viewLink(),
           h('hr'), h('h2', null, '페이지 삭제'), delArea));

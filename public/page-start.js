@@ -2,6 +2,8 @@
 import { makeReadinessBenefits, makeReadinessCard, makeReadinessReview } from './readiness-ui.js';
 import { initialBusinessDetails, businessSection } from './business-details.js';
 
+import { translationSourceHash, translationFingerprint, syncTranslations, matchingTranslations, validTranslations, translationPreviews } from './page-translations.js';
+
 const PAGE_KEY = 'yeogibwa.page.start.v1';
 
 export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPublished }) {
@@ -9,6 +11,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
   let busy = false;
   let draftBusy = false;
   let publishing = false;
+  let translating = false;
   let draftTipTimer = null;
 
   function stopDraftTips() {
@@ -26,6 +29,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     } catch { return {}; }
   }
   function save() {
+    if (state.pageDraft?.draft) syncTranslations(state.pageDraft, koreanPublicationData(state.pageDraft));
     try { sessionStorage.setItem(PAGE_KEY, JSON.stringify(state)); } catch { /* 현재 탭 메모리로 계속 */ }
   }
   function home() { location.hash = '#/'; }
@@ -67,7 +71,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     return typeof globalThis.confirm === 'function' && globalThis.confirm(message);
   }
   async function begin(name, address) {
-    if (busy || draftBusy || publishing || state.pageDraft?.publishAttempt) return;
+    if (busy || draftBusy || publishing || translating || state.pageDraft?.publishAttempt) return;
     if (hasDraftWork() && !askBeforeDiscard('새 가게를 검색하면 이 탭에서 작성하던 가게 소개와 수정 내용이 지워져요. 계속할까요?')) return;
     if (state.status === 'uncertain' && name === state.name && address === state.address && !askBeforeDiscard('이전 검색이 이미 처리됐을 수 있어요. 같은 가게를 다시 검색하면 비용이 중복될 수 있어요. 새 요청을 보내시겠어요?')) return;
     busy = true;
@@ -651,6 +655,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
         businessSection(d.businessDetails) ? h('section', { class: 'page-preview-section' }, h('h2', null, '가게 이용 정보'), h('p', { style: 'white-space: pre-line' }, businessSection(d.businessDetails).body), h('p', { class: 'small muted' }, '검색으로 찾은 정보는 반드시 최신 여부를 확인해 주세요.')) : null,
         draft.sections.filter(x => x.heading || x.body).map(x => h('section', { class: 'page-preview-section' }, x.heading ? h('h2', null, x.heading) : null, x.body ? h('p', null, x.body) : null)),
         draft.faqs.some(x => x.question && x.answer) ? h('section', { class: 'page-preview-faq' }, h('h2', null, '고객 질문과 답변 (예상)'), h('p', { class: 'small muted' }, '실제 고객 질문 기록이 아니라 가게 정보를 바탕으로 만든 예상 질문과 답변이에요. 가게에 맞는지 확인한 뒤 ‘내용 수정’에서 고치거나 삭제할 수 있어요. 검색·AI 추천을 보장하지 않아요.'), draft.faqs.filter(x => x.question && x.answer).map(x => h('div', null, h('h3', null, x.question), h('p', null, x.answer)))) : null),
+      translationPanel(d),
       readinessReview, readiness.element,
       ['partial', 'missing', 'invalid', 'empty'].includes(draft.situationsStatus) && draft.situationsNotice ? h('p', { class: 'card note small', role: 'status' }, draft.situationsNotice) : null,
       d.researchedCount > 0 ? h('p', { class: 'card note small page-researched-note', role: 'status' }, '초안 작성에 직접 확인하지 않은 AI 검색 특징 ' + d.researchedCount + '개가 검증되지 않은 참고 정보로 함께 쓰였을 수 있어요. 초안의 모든 사실을 직접 검토하고 맞지 않으면 ‘내용 수정’에서 고치거나 지워 주세요.') : null,
@@ -682,7 +687,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
         draft.sections.map((x, i) => h('fieldset', { class: 'page-edit-section' }, h('legend', null, '소개 섹션 ' + (i + 1)),
           editField('page-edit-section-' + i + '-heading', '섹션 제목', x, 'heading', 200), editField('page-edit-section-' + i + '-body', '섹션 내용', x, 'body', 4000, true), evidenceNote(x),
           h('button', { class: 'btn small', type: 'button', onclick: () => remove(draft.sections, i) }, '소개 섹션 삭제'))),
-        h('button', { class: 'btn small', type: 'button', disabled: draft.sections.length >= 8, onclick: () => add(draft.sections, { heading: '', body: '', evidence: [] }, 8) }, '소개 섹션 추가'),
+        h('button', { class: 'btn small', type: 'button', disabled: draft.sections.length >= (businessSection(d.businessDetails) ? 7 : 8), onclick: () => add(draft.sections, { heading: '', body: '', evidence: [] }, businessSection(d.businessDetails) ? 7 : 8) }, '소개 섹션 추가'),
         h('h3', null, '고객 질문과 답변 (FAQ)'),
         h('p', { class: 'small muted' }, '실제 질문 기록이 아닌 예상 질문과 답변이에요. 사장님이 확인한 사실만 남기고, 맞지 않으면 고치거나 삭제해 주세요. 여기 있는 항목이 그대로 공개돼요.'),
         draft.faqs.map((x, i) => h('fieldset', { class: 'page-edit-section' }, h('legend', null, 'FAQ ' + (i + 1)),
@@ -698,14 +703,71 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
   }
 
   // 공개용으로 확정한 데이터만 서버로 보내고, 답변 원문·키워드 제안은 보내지 않는다.
-  function publicationData(d) {
-    const draft = cleanDraft(d.draft);
+  function koreanPublicationData(d) {
+    const draft = cleanDraft(d.edit || d.draft);
+    const store = d.editStore || d.store;
     return {
-      name: string(d.store.name).trim(), address: string(d.store.address).trim(),
+      name: string(store.name).trim(), address: string(store.address).trim(),
       headline: string(draft.headline?.text).trim(), intro: string(draft.intro?.text).trim(),
       sections: [...draft.sections.map(x => ({ heading: string(x.heading).trim(), body: string(x.body).trim() })).filter(x => x.heading || x.body), ...[businessSection(d.businessDetails)].filter(Boolean)],
       faqs: draft.faqs.map(x => ({ question: string(x.question).trim(), answer: string(x.answer).trim() })).filter(x => x.question || x.answer),
     };
+  }
+  function publicationData(d) {
+    const data = koreanPublicationData(d);
+    syncTranslations(d, data);
+    const translations = matchingTranslations(d, data);
+    // Review is a separate publication step; generated translations alone never qualify.
+    if (translations && d.translation.reviewedFingerprint === translationFingerprint(data)) data.translations = translations;
+    return data;
+  }
+  function translationPanel(d) {
+    const source = koreanPublicationData(d);
+    syncTranslations(d, source);
+    const translations = matchingTranslations(d, source);
+    const note = h('p', { role: 'status', 'aria-live': 'polite', class: 'small' }, d.translation?.status === 'pending'
+      ? (translating ? '번역 생성 중이에요. 중복 요청하지 않아요.' : '이전 응답을 확인하지 못했어요. 이미 비용이 발생했을 수 있으며 자동 재시도하지 않았어요.')
+      : d.translation?.error || '한국어 확인 → 3개 언어 번역 생성 → 전체 검토 → 공개 순서로 진행해요.');
+    const consent = h('input', { type: 'checkbox', id: 'translation-consent', disabled: translating || !!d.publishAttempt });
+    const generate = h('button', { type: 'button', class: 'btn block', id: 'translation-generate', disabled: translating || !!d.publishAttempt,
+      onclick: async () => {
+        if (translating || publishing || draftBusy || d.publishAttempt) return;
+        if (!consent.checked) { note.textContent = 'AI 전송과 비용 발생 가능성에 먼저 동의해 주세요.'; return; }
+        const data = koreanPublicationData(d);
+        const issue = publicationProblem(data);
+        if (issue) { note.textContent = issue; return; }
+        const sourceCharacters = [data.name, data.address, data.headline, data.intro, ...data.sections.flatMap(x => [x.heading, x.body]), ...data.faqs.flatMap(x => [x.question, x.answer])].reduce((sum, text) => sum + text.length, 0);
+        if (sourceCharacters > 4000) { note.textContent = '번역할 한국어 원문은 합계 4,000자 이내로 줄여 주세요. 요청하지 않았어요.'; return; }
+        const fingerprint = translationFingerprint(data);
+        const request = { status: 'pending', fingerprint, requestFingerprint: fingerprint };
+        d.translation = request; translating = true; save();
+        generate.disabled = true; consent.checked = false; consent.disabled = true;
+        note.textContent = '번역 생성 중이에요. 중복 요청하지 않아요.';
+        try {
+          const result = await post('/api/store-translate', { consent: true, data }, 90000);
+          // Editing, navigation, or replacement of the draft must not attach a stale response.
+          if (state.pageDraft !== d || d.translation !== request || translationFingerprint(koreanPublicationData(d)) !== fingerprint) return;
+          if (!validTranslations(result?.translations, data)) throw new Error('번역 응답이 완전하지 않아요.');
+          const expectedHash = await translationSourceHash(data);
+          // Digest verification is asynchronous: recheck edits made while it was running.
+          if (state.pageDraft !== d || d.translation !== request || translationFingerprint(koreanPublicationData(d)) !== fingerprint) return;
+          if (result.translations.sourceHash !== expectedHash) throw Object.assign(new Error('번역 원문 검증에 실패했어요. 응답이 현재 한국어 원문과 일치하지 않아 번역을 사용하지 않았어요.'), { code: 'TRANSLATION_SOURCE_MISMATCH' });
+          request.translations = result.translations; request.status = 'ready';
+        } catch (err) {
+          if (d.translation === request) {
+            request.status = 'error';
+            request.error = '번역 결과를 확인하지 못했어요. 요청은 이미 처리되어 비용이 발생했을 수 있어요. 자동 재시도하지 않았어요. 한국어 초안은 보존했으며 한국어로만 공개할 수 있어요. 다시 누르면 운영자에게 AI 비용이 발생하는 새 요청이 될 수 있어요. 현재 점주 결제는 없어요.';
+            if (['TRANSLATION_CRYPTO_UNAVAILABLE', 'TRANSLATION_SOURCE_MISMATCH'].includes(err?.code)) request.error = err.message + ' ' + request.error;
+          }
+        } finally {
+          translating = false; save();
+          if (location.hash === '#/page-preview') renderPreview();
+        }
+      } }, translating ? '번역 생성 중…' : '동의하고 영어·일본어·중국어 번역 1회 생성');
+    return h('section', { class: 'card page-translation-controls' }, h('h2', null, '다음 단계: 영어·일본어·중국어 번역 만들기'),
+      h('p', { class: 'small' }, '한국어 원문은 합계 4,000자 이내로 정리해 주세요. 번역 포함 전체 공개 요청은 64KB 이내여야 해요. 최종 한국어 공개 내용만 번역해요. 생성만으로 공개되지 않으며 공개 전 별도 검토 확인이 필요해요. 한국어를 수정하면 기존 번역은 무효 처리돼요.'),
+      h('label', { for: 'translation-consent', class: 'page-consent' }, consent, h('span', null, '가게명·주소·소개·전화·영업시간·메뉴와 가격·FAQ 등 입력한 한국어 공개 내용을 OpenRouter 및 연결 AI에 전송하는 데 동의합니다. 번역 요청과 재요청마다 운영자의 AI 이용량 및 실제 비용이 발생할 수 있으며, 현재 무료 베타에서 점주 결제는 없음을 이해합니다.')),
+      generate, note, translationPreviews(h, translations));
   }
   function publicationProblem(data) {
     if (!data.name || data.name.length > 60) return '가게명을 1~60자로 확인해 주세요.';
@@ -732,23 +794,32 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     applyEdits(d);
     d.view = '#/page-publish'; save();
     const attempt = d.publishAttempt;
-    const data = attempt?.data || publicationData(d);
+    const source = koreanPublicationData(d);
+    syncTranslations(d, source);
+    const translations = attempt?.data?.translations || matchingTranslations(d, source);
+    const data = attempt?.data || { ...source, ...(translations ? { translations } : {}) };
     const issue = publicationProblem(data);
     const error = h('p', { class: 'page-error', role: 'alert', 'aria-live': 'polite' });
     const password = h('input', { type: 'password', id: 'publish-password', autocomplete: 'new-password', minlength: 8, maxlength: 64, required: true });
     const again = h('input', { type: 'password', id: 'publish-password-again', autocomplete: 'new-password', minlength: 8, maxlength: 64, required: true });
     const consent = h('input', { type: 'checkbox', id: 'publish-consent' });
+    const translationReview = h('input', { type: 'checkbox', id: 'publish-translation-review' });
     const submit = h('button', { class: 'btn primary block', type: 'submit', disabled: publishing || !!issue }, publishing ? '공개 요청 중…' : attempt ? '같은 공개 요청 확인하기 · 0원' : '결제하기 · 베타 무료 0원으로 공개');
     async function publish(e) {
       e.preventDefault(); if (publishing) return;
       if (issue) { error.textContent = issue; return; }
+      if (translating) { error.textContent = '번역 요청이 끝난 뒤 공개 내용을 다시 확인해 주세요.'; return; }
+      if (translations && !translationReview.checked) { error.textContent = '영어·일본어·중국어 번역까지 검토했다는 확인이 필요해요.'; translationReview.focus?.(); return; }
+      if (!attempt && translationFingerprint(koreanPublicationData(d)) !== translationFingerprint(source)) { error.textContent = '한국어 내용이 변경됐어요. 미리보기에서 다시 확인해 주세요.'; return; }
       if (!consent.checked) { error.textContent = '공개 내용과 게시 동의를 확인해 주세요.'; consent.focus(); return; }
       if (password.value.length < 8 || password.value.length > 64 || password.value !== again.value) { error.textContent = '관리 비밀번호 8~64자와 확인 입력이 같은지 확인해 주세요.'; password.focus(); return; }
       const key = password.value; password.value = ''; again.value = '';
       let current = d.publishAttempt;
       const hadPriorAttempt = !!current;
       if (!current) {
-        try { current = { id: newPublicationId(), data, status: 'pending' }; }
+        if (translations) d.translation.reviewedFingerprint = translationFingerprint(source);
+        const finalData = publicationData(d);
+        try { current = { id: newPublicationId(), data: JSON.parse(JSON.stringify(finalData)), status: 'pending' }; }
         catch { error.textContent = '안전한 공개 주소를 만들지 못했어요. 다른 브라우저에서 다시 시도해 주세요.'; return; }
         d.publishAttempt = current;
       }
@@ -783,7 +854,9 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
       issue ? h('p', { class: 'card warn', role: 'alert' }, issue, ' ', h('a', { href: '#/page-edit' }, '내용 수정')) : null,
       h('article', { class: 'card page-draft-content' }, h('p', { class: 'small muted' }, data.name, ' · ', data.address), h('h3', null, data.headline), h('p', null, data.intro), data.sections.map(x => h('section', null, h('h3', null, x.heading), h('p', null, x.body))), data.faqs.length ? h('section', null, h('h3', null, '고객 질문과 답변 (예상)'), h('p', { class: 'small muted' }, '실제 고객 질문 기록이 아닌 예상 질문과 답변이에요.'), data.faqs.map(x => h('div', null, h('h4', null, x.question), h('p', null, x.answer)))) : null,
         (data.situations || []).length ? h('section', null, h('h3', null, '이럴 때 찾는 가게 · 예상 질문'), h('p', { class: 'small muted' }, '실제 질문 기록이 아닌 예상 질문이에요.'), data.situations.map(x => h('div', null, h('h4', null, x.question), h('p', null, x.answer)))) : null),
+      translationPreviews(h, translations),
       h('form', { class: 'card page-form', novalidate: true, onsubmit: publish },
+        translations ? h('label', { class: 'page-consent', for: 'publish-translation-review' }, translationReview, h('span', null, '영어·일본어·중국어 번역 전체를 한국어 원문과 비교해 검토했습니다. AI 번역 오류 가능성과 한국어 원문 우선을 이해하며 이 번역을 함께 공개합니다.')) : h('p', { class: 'card warn' }, '검토할 유효한 번역이 없어 한국어로만 공개해요.'),
         h('h3', null, '공개 페이지 관리 비밀번호'),
         h('p', { class: 'small muted' }, '나중에 수정하거나 삭제할 때 필요해요. 비밀번호는 복구할 수 없으니 안전하게 보관해 주세요. 비밀번호는 공개되지 않아요.'),
         h('label', { class: 'field', for: 'publish-password' }, h('span', { class: 'lab' }, '관리 비밀번호 8~64자'), password),
@@ -811,5 +884,5 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     if (d?.publication?.id === id) { d.publication.data = data; save(); }
   }
 
-  return { begin, renderSearch, renderConfirmed, renderQuestions, renderPreview, renderEdit, renderPublish, renderPublished, clearPublication, recordPublicationUpdate, info: () => ({ name: state.name || '', address: state.address || '', status: state.status || '', draftStatus: state.pageDraft?.status || '', resumeHash: state.pageDraft?.view || (state.status === 'confirmed' ? '#/page-confirmed' : '#/page-search') }), busy: () => busy || draftBusy || publishing || !!state.pageDraft?.publishAttempt };
+  return { begin, renderSearch, renderConfirmed, renderQuestions, renderPreview, renderEdit, renderPublish, renderPublished, clearPublication, recordPublicationUpdate, info: () => ({ name: state.name || '', address: state.address || '', status: state.status || '', draftStatus: state.pageDraft?.status || '', resumeHash: state.pageDraft?.view || (state.status === 'confirmed' ? '#/page-confirmed' : '#/page-search') }), busy: () => busy || draftBusy || publishing || translating || !!state.pageDraft?.publishAttempt };
 }
