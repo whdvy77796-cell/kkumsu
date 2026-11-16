@@ -116,7 +116,7 @@ test('body byte limit includes Vercel pre-parsed JSON and no storage fallback in
 
 test('SSR escapes every field, has canonical/disclosure/accessibility and no scripts',()=>{
  const dangerous={...DATA,name:'<img src=x onerror=bad()>',headline:'"quoted"',intro:'&lt;script&gt;',sections:[{heading:'<b>',body:'<svg/onload=bad>'}],faqs:[{question:'<iframe>',answer:'</title>'}]};
- const html=renderStore(scope,{id:ID,data:dangerous});assert.ok(!/<script|<img\s+src=x|<svg|<iframe|style=|onclick=/i.test(html));assert.ok(html.includes('&lt;img'));assert.ok(html.includes(DISCLOSURE));assert.ok(html.includes('<link rel="canonical" href="https://www.lookhereai.com/stores/'+ID+'">'));assert.ok(html.includes('<meta property="og:url" content="https://www.lookhereai.com/stores/'+ID+'">'));assert.ok(html.includes('/#/manage/'+ID));assert.ok(html.includes('/#/report-store/'+ID));assert.ok(html.includes('href="/styles.css"'));
+ const html=renderStore(scope,{id:ID,data:dangerous});assert.ok(!/<script|<img\s+src=x|<svg|<iframe|style=|onclick=/i.test(stripJsonLd(html).rest));assert.ok(html.includes('&lt;img'));assert.ok(html.includes(DISCLOSURE));assert.ok(html.includes('<link rel="canonical" href="https://www.lookhereai.com/stores/'+ID+'">'));assert.ok(html.includes('<meta property="og:url" content="https://www.lookhereai.com/stores/'+ID+'">'));assert.ok(html.includes('/#/manage/'+ID));assert.ok(html.includes('/#/report-store/'+ID));assert.ok(html.includes('href="/styles.css"'));
  const preview=renderStore({...scope,production:false},{id:ID,data:DATA});assert.ok(preview.includes('noindex,nofollow'));assert.ok(!preview.includes('rel="canonical"'));
 });
 
@@ -169,6 +169,24 @@ test('Redis helper sends one EVAL and restores Lua empty arrays; no partial inde
 const SITUATIONS=[{question:'혼자 조용히 쉬고 싶을 때는?',answer:'창가 좌석과 따뜻한 차를 소개합니다.'}];
 const withSituations=(situations=SITUATIONS)=>({...DATA,situations});
 const pageOptions={method:'GET',url:'/api/stores?view=page&id='+ID};
+const JSONLD_OPEN='<script type="application/ld+json">';
+// Strictly validate exactly one JSON-LD block (placed right before </head>, no raw '<' inside, valid schema.org graph)
+// and return the HTML with only that block removed, so every other forbidden-script/XSS and byte check stays intact.
+function stripJsonLd(html){
+ const first=html.indexOf(JSONLD_OPEN);
+ assert.notEqual(first,-1,'JSON-LD block must be present');
+ assert.equal(html.indexOf(JSONLD_OPEN,first+1),-1,'exactly one JSON-LD block');
+ const end=html.indexOf('</script>',first+JSONLD_OPEN.length);
+ assert.notEqual(end,-1,'JSON-LD block must be closed');
+ const body=html.slice(first+JSONLD_OPEN.length,end);
+ assert.ok(!body.includes('<'),'no raw < inside JSON-LD');
+ let value;try{value=JSON.parse(body);}catch{assert.fail('JSON-LD must be valid JSON');}
+ assert.equal(value['@context'],'https://schema.org');assert.ok(Array.isArray(value['@graph'])&&value['@graph'].length>0,'JSON-LD @graph');
+ const rest=html.slice(0,first)+html.slice(end+'</script>'.length);
+ assert.ok(html.slice(end+'</script>'.length).startsWith('</head>'),'JSON-LD sits immediately before </head>');
+ assert.ok(!/<script|<\/script/i.test(rest),'no other script markup remains');
+ return {value,rest};
+}
 const noPrivate=r=>assert.ok(!/"(?:password|salt|hash|revision|createdAt|updatedAt|expiresAt|reporter)"\s*:/.test(r.body),r.body);
 
 test('legacy six-field records retain exact shapes and SSR apart from canonical metadata',async()=>{
@@ -182,10 +200,11 @@ test('legacy six-field records retain exact shapes and SSR apart from canonical 
  const meta='<link rel="canonical" href="https://www.lookhereai.com/stores/'+ID+'"><meta property="og:url" content="https://www.lookhereai.com/stores/'+ID+'">';
  const previousMeta='<link rel="canonical" href="https://www.kkumsu.com/stores/'+ID+'">';
  assert.ok(page.body.includes(meta),'new canonical and social URL are present');
- const normalized=page.body.replace(meta,previousMeta);
+ const normalized=stripJsonLd(page.body).rest.replace(meta,previousMeta);
  assert.equal(createHash('sha256').update(normalized).digest('hex'),'5a07efab4f2ac938c4d2c3f9b6a841e14c37feac44b656cf33a5c3b07224e011','all other bytes remain identical');
  assert.ok(!page.body.includes('이럴 때 찾는 가게'));
  assert.equal(renderStore(scope,{id:ID,data:withSituations([])}),page.body,'explicit empty renders no new section');
+ assert.ok(stripJsonLd(page.body).rest.includes(meta));
 });
 
 test('situations exact schema, pair limits, normalization, malformed and unsafe input rejection',()=>{
@@ -251,7 +270,7 @@ test('SSR escapes situations even for unvalidated stored data and never treats a
  const html=renderStore(scope,{id:ID,data:dangerous});
  assert.ok(html.includes('&lt;/dt&gt;&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &#39;quoted&#39;'));
  assert.ok(html.includes('&lt;img src=x onerror=bad()&gt;<br>line</p><p>&lt;a href=&quot;https://evil.test&quot;&gt;bad&lt;/a&gt;'));
- assert.ok(!/<script|<img\s+src=x|<a href="https:\/\/evil/.test(html));
+ assert.ok(!/<script|<img\s+src=x|<a href="https:\/\/evil/.test(stripJsonLd(html).rest));
  const unsafeId=renderStore(scope,{id:'" onclick="bad',data:DATA});assert.ok(!unsafeId.includes('" onclick="bad'));
 });
 
@@ -312,4 +331,23 @@ test('up to twelve customer questions are accepted and server-rendered without c
  const html=renderStore(scope,{id:ID,data:normalized}); assert.match(html,/고객 질문과 답변/); assert.match(html,/실제 검색 기록이 아닌 예상 질문/);
  assert.ok(html.includes('질문 12')); assert.ok(html.includes('답변 12'));
  assert.throws(()=>normalizeData({...data,faqs:[...data.faqs,{question:'초과',answer:'초과'}]}));
+});
+
+test('JSON-LD: hostile </script> text is escaped; multiple or malformed blocks fail the strict check',()=>{
+ const evil='</script><script>alert(1)</script><!--';
+ const html=renderStore(scope,{id:ID,data:{...DATA,name:evil,intro:evil,faqs:[{question:evil,answer:evil}]}});
+ const {value,rest}=stripJsonLd(html);
+ assert.ok(JSON.stringify(value).includes(evil),'hostile text round-trips only as JSON data');
+ assert.ok(!/<script|<\/script/i.test(rest));
+ assert.equal((html.match(/<\/script/gi)||[]).length,1,'only the JSON-LD block closes a script');
+ const good=renderStore(scope,{id:ID,data:DATA}),block=good.slice(good.indexOf(JSONLD_OPEN),good.indexOf('</script>')+9);
+ assert.doesNotThrow(()=>stripJsonLd(good));
+ assert.throws(()=>stripJsonLd(good.replace(block,'')),/JSON-LD block must be present/);
+ assert.throws(()=>stripJsonLd(good.replace('</head>',block+'</head>')),/exactly one/);
+ assert.throws(()=>stripJsonLd(good.replace(block,block.replace('{"@context"','{"@context" ,'))),/valid JSON/);
+ assert.throws(()=>stripJsonLd(good.replace(block,block.replace('{"@context"','{"x":"</b>","@context"'))),/raw </);
+ assert.throws(()=>stripJsonLd(good.replace(block,block.replace('https://schema.org','https://evil.test'))));
+ assert.throws(()=>stripJsonLd(good.replace(block,block.replace('</script>',''))));
+ assert.throws(()=>stripJsonLd(good.replace('</head>','<script>alert(1)</script></head>')));
+ assert.throws(()=>stripJsonLd(good.replace('<body','<script>alert(1)</script><body')),/other script/);
 });
