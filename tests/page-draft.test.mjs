@@ -44,8 +44,8 @@ test('origin, protocol, malformed JSON, content type, oversized streamed and pre
 
 test('one call, no tools, no raw cache, known cost, separate counter, correct contract', async () => {
   const store = spyStore(), f = fake(reply()); const out = await call(OK, { store, fetcher: f });
-  assert.equal(out.statusCode, 200); assert.equal(out.body.cached, false); assert.equal(out.body.mock, false); assert.ok(Date.parse(out.body.createdAt)); assert.deepEqual(Object.keys(out.body).sort(), ['cached', 'createdAt', 'draft', 'mock']);
-  assert.equal(out.body.draft.omittedCount, 0); assert.equal(f.calls.length, 1); assert.equal(f.calls[0].body.max_tokens, 3200); assert.equal('tools' in f.calls[0].body, false); assert.equal('max_tool_calls' in f.calls[0].body, false);
+  assert.equal(out.statusCode, 200); assert.equal(out.body.cached, false); assert.equal(out.body.mock, false); assert.ok(Date.parse(out.body.createdAt)); assert.deepEqual(Object.keys(out.body).sort(), ['cached', 'createdAt', 'draft', 'highlights', 'highlightsNotice', 'mock']); assert.deepEqual(out.body.highlights, []); assert.ok(out.body.highlightsNotice);
+  assert.equal(out.body.draft.omittedCount, 0); assert.equal(f.calls.length, 1); assert.equal(f.calls[0].body.max_tokens, 4600); assert.equal('tools' in f.calls[0].body, false); assert.equal('max_tool_calls' in f.calls[0].body, false);
   assert.equal(budget(store), 20000); assert.equal(store.touched.some(([m]) => m === 'getJson' || m === 'setJson'), false);
   assert.ok([...store.kv.keys()].some(k => k.includes(':ip:pageDraft:'))); assert.ok([...store.kv.keys()].every(k => !k.includes(':ip:report:') && !k.includes(':lock:')));
   assert.ok([...store.kv.values()].every(v => typeof v === 'number')); assert.ok(!JSON.stringify([...store.kv]).includes(OK.answers.offer));
@@ -421,4 +421,28 @@ test('admission restrictions block group hypotheticals in AI and fallback result
   }
   const normal=clone(body);normal.answers.visit='주차는 제공하지 않습니다.';
   assert.deepEqual(normalizeDraft(withSituations([person]),validateDraftInput(normal)).situations,[person]);
+});
+
+
+// Highlights are produced by the same single draft request (no second AI call) and fail closed to [] without affecting the Korean draft.
+const hlRows = () => [
+  { ko: '주문 후 만드는 김밥', en: 'Gimbap made after you order', zh: '点单后现做的紫菜包饭', ja: '注文後に作るキンパ' },
+  { ko: '김밥과 떡볶이로 간단한 식사를 준비해 보세요.', en: 'Prepare a simple meal with gimbap and tteokbokki.', zh: '用紫菜包饭和炒年糕准备简单的一餐。', ja: 'キンパとトッポッキで簡単な食事をどうぞ。' },
+  { ko: '주문 후 준비하는 김밥', en: 'Gimbap prepared after ordering', zh: '点单后准备的紫菜包饭', ja: '注文後に準備するキンパ' },
+];
+test('highlights arrive in the same single AI call with the Korean draft and carry a review notice', async () => {
+  const f = fake(reply({ ...good(), highlights: hlRows() })); const out = await call(OK, { fetcher: f });
+  assert.equal(out.statusCode, 200); assert.equal(f.calls.length, 1, 'no second translation call');
+  assert.deepEqual(out.body.highlights, hlRows()); assert.ok(out.body.highlightsNotice); assert.equal(out.body.draft.headline.text, good().headline.text);
+});
+test('missing, malformed, FAQ-sourced or number-changing highlights are omitted fail-closed while the Korean draft is kept', async () => {
+  const bad = [undefined, 'oops', [], hlRows().slice(0, 2), [...hlRows().slice(0, 2), { ...hlRows()[2], extra: 'x' }],
+    [...hlRows().slice(0, 2), { ko: '포장 가능합니다', en: 'Takeout available', zh: '可以打包', ja: '持ち帰り可能' }],
+    [...hlRows().slice(0, 2), { ...hlRows()[2], en: 'Gimbap prepared after ordering, 3 pieces' }]];
+  for (const highlights of bad) {
+    const body = { ...good() }; if (highlights !== undefined) body.highlights = highlights;
+    const f = fake(reply(body)); const out = await call(OK, { fetcher: f });
+    assert.equal(out.statusCode, 200); assert.equal(f.calls.length, 1); assert.deepEqual(out.body.highlights, []); assert.ok(out.body.highlightsNotice);
+    assert.equal(out.body.draft.headline.text, good().headline.text); assert.equal(out.body.draft.intro.text, good().intro.text);
+  }
 });
