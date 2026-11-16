@@ -1,3 +1,4 @@
+import { makeManageTranslations, effectiveTranslationSource } from './manage-translations.js';
 // 사장님 계정: 대시보드(로그인 상태·가게 목록·기존 페이지 연결·로그아웃)와 계정 수정 화면. 브라우저 ESM 모듈.
 // innerHTML은 쓰지 않는다(모든 문자열은 h()가 텍스트로 넣는다). 비밀번호는 저장·표시·URL 노출 없이 요청 본문에만 쓴다.
 // 수정 중인 내용은 브라우저 저장소(localStorage 등)에 저장하지 않고 이 모듈의 메모리에만 둔다.
@@ -325,6 +326,10 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
       sections: original.sections.map((s) => ({ heading: s.heading, body: s.body })),
       faqs: original.faqs.map((f) => ({ question: f.question, answer: f.answer })),
     };
+    // 저장된 번역이 있는 가게만: 한국어를 바꾸면 번역이 공개 화면에서 숨겨진다(명시적으로 재번역 가능).
+    const trs = original.translations;
+    const hasTranslations = !!trs && typeof trs === 'object' && !Array.isArray(trs) && Object.keys(trs).length > 0;
+    const TR_WARN = '한국어 정보를 바꾸면 기존 번역은 공개 화면에서 숨겨집니다. 아래에서 새 번역을 검토한 뒤 저장할 수 있어요.';
     // situations(예상 질문): 이 필드가 이미 있는 기존 페이지에서만 편집 구역을 보여준다. 없는 새 페이지에는 만들지 않는다.
     let hasSit = Array.isArray(original.situations); // 저장 응답에서 다른 곳이 추가한 예상 질문이 확인되면 true로 바뀔 수 있다
     const pairs = (arr) => arr.map((x) => ({ question: str(x?.question), answer: str(x?.answer) }));
@@ -352,10 +357,19 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
     let overwriteOk = false;
     let gen = 0; // 수정 세대: 입력·추가·삭제마다 늘어난다. 저장 요청 중에 새로 입력했는지 알아낸다.
     let sitGen = 0; // 예상 질문만의 수정 세대(저장 요청 중에 예상 질문을 고쳤는지 구분)
+    let preservedSource = original;
+    const translation = makeManageTranslations({ h, btn, post,
+      alive: () => !stale(my, hash0), canRequest: () => !busy && !conflict,
+      readSource: () => {
+        const result = buildUpdateData(d, sitChanged());
+        if (result.error) throw new Error(result.error);
+        return effectiveTranslationSource(result.data, preservedSource);
+      }
+    });
     let okEl = null; // 현재 그려진 '사실 확인' 체크박스
     const markDirty = () => {
       if (stale(my, hash0)) return; // 떠난(오래된) 편집 화면이 지금 화면의 공유 상태를 바꾸지 않게 한다
-      dirty = true; gen += 1;
+      dirty = true; gen += 1; translation.invalidate();
       confirmed = false; // 내용이 바뀌었으니 다시 확인하게 한다
       if (okEl) okEl.checked = false;
     };
@@ -426,6 +440,7 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
           if (stale(my, hash0)) { busy = false; return; } // 떠난 화면: 아무것도 바꾸지 않는다
           if (!validStoreShape(r?.data) || !isValidRevision(r?.revision)) throw new Error('최신 내용의 버전 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
           latest = { data: r.data, revision: r.revision };
+          translation.invalidate('최신 서버 내용 확인 후 한국어를 먼저 저장하고 새 번역을 요청해 주세요.');
           overwriteOk = false;
           const unchanged = r.revision === revision;
           status = { text: `서버의 최신 내용을 불러왔어요.${unchanged ? ' 조회 시점에는 서버 버전이 그대로예요. 이전 요청이 아직 처리 중일 수도 있어요.' : ' 버전이 바뀌어 있어요(방금 요청이 반영됐거나 다른 변경이 있었을 수 있어요).'} 아래에서 내용을 확인하세요. 내가 입력한 내용은 그대로 남아 있어요.`, cls: 'muted' };
@@ -445,8 +460,8 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
         if (busy) return;
         confirmed = ok.checked;
         overwriteOk = ow.checked;
-        const withSit = sitChanged();
-        const { data, error } = buildUpdateData(d, withSit);
+        let withSit = sitChanged();
+        let { data, error } = buildUpdateData(d, withSit);
         if (error) { setNote(msg, error, 'error'); return; }
         if (!confirmed) { setNote(msg, '바뀐 내용이 사실과 맞고 공개 페이지에 반영해도 된다는 항목에 체크해 주세요.', 'error'); return; }
         if (conflict && !latest) { setNote(msg, '먼저 서버의 최신 내용을 불러와 확인해 주세요.', 'error'); return; }
@@ -456,8 +471,14 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
         const genAtSend = gen;
         const sitGenAtSend = sitGen;
         const prevBaseline = sitBaseline;
+        if (translation.pending) { setNote(msg, '번역 요청이 끝난 뒤 저장해 주세요.', 'error'); return; }
         busy = true; save.disabled = true; setNote(msg, '반영하는 중이에요…', 'muted');
+        let updateSent = false;
         try {
+          if (translation.hasReviewed) data = await translation.attach(data);
+          if (gen !== genAtSend || stale(my, hash0)) throw new Error('저장 검증 중 원문이 바뀌었어요.');
+          withSit = Object.hasOwn(data, 'situations');
+          updateSent = true;
           const r = await post('/api/owner-stores', { action: 'update', id, consent: true, expectedRevision, data }, 30000);
           // 이 편집 화면이 이미 떠난 뒤 응답이 왔다(요청은 성공했을 수 있다): 공유 상태(dirty)나 새 편집 화면은 절대 건드리지 않는다.
           if (stale(my, hash0)) { busy = false; return; }
@@ -467,9 +488,12 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
           const chk = checkReturned(r, withSit, sent);
           if (!isValidRevision(r?.revision) || !chk.ok) {
             // 저장 결과를 확인할 수 없다: 변경사항 표시를 지우지 않고, 다시 저장하려면 최신본 확인을 거치게 한다.
+            translation.invalidate('저장 결과가 불확실해 임시 번역을 폐기했어요. 최신본을 확인해 주세요.');
             conflict = { kind: 'unverified' }; latest = null; overwriteOk = false;
             status = { text: '저장이 되었는지 확인하지 못했어요(새 버전 정보가 없어요). 입력한 내용은 그대로 두었어요. 최신 내용을 불러와 확인한 뒤 다시 시도해 주세요.', cls: 'error' };
           } else {
+            preservedSource = r.data || { ...data };
+            translation.invalidate('저장됐어요. 새 번역을 요청하기 전 최신 한국어를 확인해 주세요.');
             revision = r.revision; // 서버에 반영된 새 버전
             conflict = null; latest = null; overwriteOk = false; confirmed = false;
             const full = gen === genAtSend; // false: 저장하는 동안 새로 입력한 내용이 있다 → 지우지도 '저장됨'으로 표시하지도 않는다
@@ -490,10 +514,14 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
             }
             status = !full ? { text: '이전 입력은 반영됐지만, 저장하는 동안 새로 고친 내용이 있어요. 그 내용은 아직 반영되지 않았어요. 확인 항목에 다시 체크하고 반영하기를 눌러 주세요.', cls: 'ok' } : { text: hidden ? '내용을 저장했어요. 신고로 숨겨진 페이지는 수정만으로 다시 공개되지 않아요.' : '반영했어요. 공개 페이지에서 확인해 보세요.', cls: 'ok' };
             if (sitNote) status.text += sitNote;
+            if (hasTranslations) status.text += ' ' + TR_WARN;
           }
         } catch (e) {
           if (stale(my, hash0)) { busy = false; return; } // 떠난 화면의 오류는 새 화면에 영향을 주지 않는다.
-          if (isConflictError(e)) {
+          if (!updateSent) {
+            status = { text: msgOf(e), cls: 'error' }; // Local verification failed: no write was attempted.
+          } else if (isConflictError(e)) {
+            translation.invalidate('다른 수정과 충돌해 임시 번역을 폐기했어요. 최신본을 확인해 주세요.');
             conflict = { kind: 'conflict' }; latest = null; overwriteOk = false;
             status = { text: '다른 기기나 다른 창에서 이 가게 정보가 먼저 바뀌었어요. 아무것도 덮어쓰지 않았고, 내가 입력한 내용은 그대로 남아 있어요. 최신 내용을 불러와 확인해 주세요.', cls: 'error' };
           } else if (isDefinitiveRejection(e)) {
@@ -527,7 +555,8 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
       show(h('section', { class: 'card manage' },
         h('h1', null, '내용 수정'),
         hidden ? h('p', { class: 'card warn', role: 'status' }, '신고가 쌓여 이 페이지가 숨겨졌어요. 수정만으로 다시 공개되지는 않아요.') : null,
-        h('p', { class: 'muted' }, '손님에게 보이는 공개 주소(/stores/…)는 바뀌지 않아요. AI는 쓰지 않고, 입력한 내용 그대로 저장돼요. 입력 중인 내용은 이 기기에 저장되지 않으니, 나가기 전에 반영하기를 눌러 주세요.'),
+        hasTranslations ? h('p', { class: 'card warn', role: 'status', 'data-translation-warning': '1' }, TR_WARN) : null,
+        h('p', { class: 'muted' }, '손님에게 보이는 공개 주소(/stores/…)는 바뀌지 않아요. 일반 수정에는 AI를 쓰지 않고, 입력한 내용 그대로 저장돼요. 입력 중인 내용은 이 기기에 저장되지 않으니, 나가기 전에 반영하기를 눌러 주세요.'),
         h('p', { class: 'card note' }, '가게 정보가 인터넷의 다른 정보(지도, 후기, 다른 사이트)와 다르면 어느 쪽이 맞는지 직접 확인해 한쪽으로 맞춰 주세요. 서로 다르면 손님이 헷갈릴 수 있어요.'),
         h('p', { class: 'card note', 'data-consistency-note': '1' }, '한 곳의 조건을 바꿔도 소개글, 안내 항목, 다른 질문·답변에 있는 같은 조건은 자동으로 바뀌지 않아요. 예를 들어 한 질문에서 ‘반려견 테라스만’ 같은 조건을 고쳤다면, 다른 곳에 서로 어긋나는 내용이 남아 있지 않은지 직접 확인하고 해당하는 곳을 모두 고쳐 주세요. 내용을 자동으로 고쳐 쓰지는 않아요.'),
         conflictPanel, latestPanel,
@@ -536,7 +565,7 @@ export function makeAccountUI({ h, show, setNavbar, btn, post, fetcher, storeNam
         field('headline', '한 줄 소개', LIMITS.headline, false, d, 'acc-headline'),
         field('intro', '소개글', LIMITS.intro, true, d, 'acc-intro'),
         sectionBlock, faqBlock,
-        sitBlock,
+        sitBlock, translation.render(),
         h('section', { class: 'card' }, h('h2', null, '사진'), h('p', { class: 'muted', role: 'status' }, '사진 기능 준비 중이에요. 아직 사진을 올릴 수 없어요.')),
         h('label', { for: 'acc-confirm' }, ok, ' 바뀐 내용이 사실과 맞고, 공개 페이지에 반영해도 됩니다.'),
         msg, save));
