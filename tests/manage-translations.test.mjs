@@ -61,28 +61,35 @@ async function editor(original = base(), updater = async data => ({ revision:R2,
   const confirm=()=>{const x=get(x=>x.attrs?.id==='acc-confirm');x.checked=true;x.handlers.change();};
   return {ui,state,get,control,check,click,type,confirm};
 }
-const translateAndReview=async e=>{e.check('data-translation-consent');await e.click('다국어 다시 번역');e.check('data-translation-reviewed');};
 test('UI Korean-only save still starts synchronously and preserves in-flight typing',async()=>{
  let release; const gate=new Promise(r=>{release=r;});const e=await editor(base(),async data=>{await gate;return {revision:R2,data};});
  e.type('acc-name','먼저 보낸 이름');e.confirm();const saving=e.click('변경사항 반영하기');assert.equal(e.state.calls.length,1);e.type('acc-name','나중 입력');release();await saving;
  assert.equal(e.ui.isEditingDirty(),true);assert.equal(e.get(x=>x.attrs?.id==='acc-name').value,'나중 입력');assert.equal(e.state.calls[0].b.expectedRevision,R1);
 });
-test('UI reviewed translations include preserved situations under the original CAS revision',async()=>{
- const original={...base(),situations:[{question:'합성 질문',answer:'좌석 2개'}]};const e=await editor(original);await translateAndReview(e);
- assert.equal(e.state.calls.length,1,'translation does not save');e.confirm();await e.click('변경사항 반영하기');assert.equal(e.state.calls.length,2);
- const outgoing=e.state.calls[1].b;assert.equal(outgoing.expectedRevision,R1);assert.deepEqual(outgoing.data.situations,original.situations);assert.equal(outgoing.data.translations.sourceHash,await translationSourceHash(outgoing.data));
+const noTranslateUi = e => {
+  assert.equal(e.get(x => x.tag === 'button' && /번역/.test(x.children.join(''))), null);
+  assert.equal(e.control('data-translation-consent'), null); assert.equal(e.control('data-translation-reviewed'), null); assert.equal(e.control('data-manage-translations'), null);
+};
+const storeTranslateCalls = e => e.state.calls.filter(x => x.p === '/api/store-translate');
+test('UI has no translate button, consent or review; save is one CAS update and never calls the translate API',async()=>{
+ const original={...base(),situations:[{question:'합성 질문',answer:'좌석 2개'}],translations:{sourceHash:'x'.repeat(64),en:base()},highlights:{sourceHash:'y'.repeat(64),lines:[]}};const e=await editor(original);noTranslateUi(e);
+ e.type('acc-name','새 이름');e.confirm();await e.click('변경사항 반영하기');
+ assert.equal(e.state.calls.length,1);assert.equal(storeTranslateCalls(e).length,0);
+ const call=e.state.calls[0];assert.equal(call.p,'/api/owner-stores');assert.equal(call.b.action,'update');assert.equal(call.b.expectedRevision,R1);assert.equal(call.b.data.name,'새 이름');
+ assert.equal(Object.hasOwn(call.b.data,'translations'),false,'edit never uploads generated translations');assert.equal(Object.hasOwn(call.b.data,'highlights'),false,'edit never uploads highlights');
+ assert.equal(Object.hasOwn(call.b.data,'situations'),false,'untouched preserved situations are not sent; the server keeps them');
 });
-test('UI edit during reviewed hash verification aborts before POST, not a server conflict',async()=>{
- const e=await editor();await translateAndReview(e);e.confirm();const saving=e.click('변경사항 반영하기');e.type('acc-intro','검증 중 새 소개');await saving;
- assert.equal(e.state.calls.length,1);assert.equal(e.ui.isEditingDirty(),true);assert.equal(e.control('data-conflict'),null);assert.equal(e.get(x=>x.attrs?.id==='acc-intro').value,'검증 중 새 소개');
- e.confirm();await e.click('변경사항 반영하기');assert.equal(e.state.calls.length,2);assert.equal(e.state.calls[1].b.data.translations,undefined);
+test('UI Korean edit sends no translation request even for a page without stored translations, and keeps the original CAS revision',async()=>{
+ const e=await editor();noTranslateUi(e);e.type('acc-intro','새 소개');e.confirm();await e.click('변경사항 반영하기');
+ assert.equal(e.state.calls.length,1);assert.equal(storeTranslateCalls(e).length,0);assert.equal(e.state.calls[0].b.expectedRevision,R1);
 });
-test('UI navigation during reviewed hash verification never posts or redraws old editor',async()=>{
- const e=await editor();await translateAndReview(e);e.confirm();const saving=e.click('변경사항 반영하기');location.hash='#/my-stores/'+OTHER;await e.ui.renderAccountEdit(OTHER);e.type('acc-name','새 편집기 입력');const shown=e.state.nodes;await saving;
- assert.equal(e.state.calls.length,1);assert.equal(e.state.nodes,shown);assert.equal(e.ui.isEditingDirty(),true);assert.equal(e.get(x=>x.attrs?.id==='acc-name').value,'새 편집기 입력');
+test('UI navigation during an in-flight save never redraws the old editor or posts a second request',async()=>{
+ let release;const gate=new Promise(r=>{release=r;});const e=await editor(base(),async data=>{await gate;return {revision:R2,data};});e.type('acc-name','먼저 보낸 이름');e.confirm();const saving=e.click('변경사항 반영하기');
+ assert.equal(e.state.calls.length,1);location.hash='#/my-stores/'+OTHER;await e.ui.renderAccountEdit(OTHER);e.type('acc-name','새 편집기 입력');const shown=e.state.nodes;release();await saving;
+ assert.equal(e.state.calls.length,1);assert.equal(e.state.nodes,shown);assert.equal(e.ui.isEditingDirty(),true);assert.equal(e.get(x=>x.attrs?.id==='acc-name').value,'새 편집기 입력');assert.equal(storeTranslateCalls(e).length,0);
 });
-test('UI late translated update response cannot clear another editor dirty state',async()=>{
- let release;const gate=new Promise(r=>{release=r;});const e=await editor(base(),async data=>{await gate;return {revision:R2,data};});await translateAndReview(e);e.confirm();const saving=e.click('변경사항 반영하기');
- while(e.state.calls.length<2) await new Promise(r=>setTimeout(r,1));location.hash='#/my-stores/'+OTHER;await e.ui.renderAccountEdit(OTHER);e.type('acc-name','새 입력');const shown=e.state.nodes;release();await saving;
+test('UI late update response cannot clear another editor dirty state',async()=>{
+ let release;const gate=new Promise(r=>{release=r;});const e=await editor(base(),async data=>{await gate;return {revision:R2,data};});e.confirm();const saving=e.click('변경사항 반영하기');
+ while(e.state.calls.length<1) await new Promise(r=>setTimeout(r,1));location.hash='#/my-stores/'+OTHER;await e.ui.renderAccountEdit(OTHER);e.type('acc-name','새 입력');const shown=e.state.nodes;release();await saving;
  assert.equal(e.state.nodes,shown);assert.equal(e.ui.isEditingDirty(),true);assert.equal(e.get(x=>x.attrs?.id==='acc-name').value,'새 입력');
 });

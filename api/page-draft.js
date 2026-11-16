@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto';
 import { HttpError, send, readJson, createStore, runMetered, limits } from '../lib/guard.mjs';
 import { chat, extractJson, DEFAULT_MODEL, costMicro } from '../lib/ai.mjs';
 import { mockEnabled } from '../lib/mock.mjs';
+import { normalizeHighlightLines } from '../lib/store-highlights.mjs';
 
 export const INPUT_LIMITS = Object.freeze({ name: 60, address: 120, fact: 200, facts: 8, offer: 500, difference: 500, audience: 500, visit: 500, keywords: 300, bytes: 18000 });
 export const OUTPUT_LIMITS = Object.freeze({ headline: 120, intro: 800, heading: 100, body: 1000, question: 160, answer: 700, keyword: 80, sections: 5, faqs: 4, keywords: 8, situations: 8 });
@@ -61,7 +62,8 @@ name/address는 사장님이 가게를 확인한 후 수정할 수 있는 기본
 추측, 사실 발명, 매출/성과/순위/AI 노출 보장, 확인되지 않은 가격/영업시간/숫자, 과장 표현을 금지합니다. 항목마다 직접 뒷받침하는 입력 ID만 evidence에 넣으세요. name만으로 메뉴나 시설을 추측하지 마세요. 사실 근거가 없거나 keywords만 근거인 소개/제목/섹션/FAQ는 생략하세요. 숫자는 해당 항목이 인용한 사실 evidence 원문에 실제 있는 숫자만 사용하세요. keywords 숫자는 사실 숫자 근거가 아닙니다.
 읽기 쉽게 한 단락 한 주제로 쓰고, 제목·소개·가게만의 구체적인 가치·고객 상황·방문 정보에 집중하세요. 미리보기에서 사장님에게 미확인 검색 정보가 사용되었다는 안내를 별도로 표시하므로, 고객이 읽을 소개·답변에 '참고 정보에 따르면', 'AI 검색 결과', '아직 확인되지 않은 정보'처럼 작성 과정을 반복하지 마세요. 제공된 정보의 범위 내에서 자연스러운 초안을 쓰고, 사장님이 공개 전에 사실을 확인합니다. FAQ는 질문에 바로 답하세요. 답변 근거 없는 질문은 만들지 마세요. 이 글은 실제 손님이 가게 홈페이지에서 읽는 소개글입니다. '사장님이 알려주셨습니다', '입력하신 정보', '손님에게 알리고 싶은 곳', 'AI가 작성했습니다'처럼 설문이나 작성 과정을 설명하지 말고, 확인한 사실과 이용 상황을 손님에게 자연스럽게 직접 안내하세요. 정상적인 문장과 자연스러운 바꿔쓰기는 허용하되 의미를 보태지 마세요. HTML/마크다운/링크/코드 없이 일반 텍스트만 씁니다.
 situations는 공개 소개 페이지의 고객 질문·답변에 자동으로 함께 들어갈 자연스러운 가상 질문과 답변입니다. 실제 검색량·인기 질문·추천 보증·후기·고객 경험이 아닙니다. 손님이 AI에게 '여성 두 명이 종로에서 식사할 곳 추천좀?'처럼 실제로 물을 법한 대화체 질문과, 가게 이름을 자연스럽게 넣어 질문에 관련된 메뉴·위치·분위기를 설명하는 답변을 서로 다르게 후보 7개 만드세요. 시스템이 검증을 통과한 후보에서 최대 5개를 골라 기존 질문과 함께 보여줍니다. 예를 들어 근거에 메뉴와 공간·분위기가 있으면 동행, 지역, 대표 메뉴 등 질문 관점을 달리해 다섯 가지 이상을 만드세요. 제공 정보가 너무 부족하여 질문을 뒷받침할 수 없다면 후보를 더 적게 만들거나 []로 둡니다. 새 조사나 외부 호출은 없습니다. 질문의 여성 두 명 등 동행 인원은 가상의 손님 상황일 수 있지만, 답변에서 해당 손님에게 적합하다거나 출입·예약이 가능하다고 단정하려면 근거가 있어야 합니다. 인원이 명시되지 않았더라도 질문에서 '여자 둘이 가기 좋은 곳?'이라고 물을 수 있습니다. 이때 답변은 인원 적합성을 만들어내지 말고 가게의 확인된 메뉴·공간·분위기를 자연스럽게 설명하면 됩니다. 질문의 구체적 시설, 영업시간, 가격, 이용 조건, 헌팅·합석 같은 특수 서비스는 확인된 내용 또는 research에 있을 때만 쓰세요. 답변에서는 제공된 사실로 해당 질문에 관련된 가게 정보를 설명하고 근거 없는 조건을 붙이지 마세요. keywords와 상호·주소만으로 방문 자격이나 분위기를 추론하지 마세요. evidence는 실질적으로 뒷받침하는 사실 ID를 반드시 포함하세요. answer는 가게명을 포함하며 부정/불확실성을 그대로 보존합니다. '헌팅 불가'에서 헌팅을 권하거나 '주차 모름'에서 주차 가능을 말하지 마세요. 실제 사람이 방문했다는 1인칭 후기, 인기/자주 찾는/추천/유명/최고 등의 주장은 답변에 쓰지 마세요. selected 및 기타 추가 필드를 만들지 마세요.
-형식: {"headline":{"text":"제목","evidence":["offer"]},"intro":{"text":"소개","evidence":["offer"]},"sections":[{"heading":"제목","body":"본문","evidence":["fact0"]}],"faqs":[{"question":"질문?","answer":"직접 답변","evidence":["visit"]}],"keywords":[{"text":"검색어 제안","evidence":["offer"]}],"situations":[{"question":"자연스러운 가상 질문?","answer":"가게명을 넣은 사실 기반 직접 답변","evidence":["offer"]}]}
+highlights는 이 요청 안에서 함께 만드는 영어·중국어 간체·일본어 핵심 소개입니다. 별도 요청이나 도구를 사용하지 마세요. 3~4개의 서로 다른 행을 만들고 각 행은 정확히 {ko,en,zh,ja}입니다. ko는 위에서 생성한 한국어 headline.text/intro.text/sections.heading 또는 sections.body의 연속된 정확한 발췌문이며 한 줄 200자 이내입니다. FAQ와 situations의 질문·답변, 입력 원문만에 있는 내용은 발췌하지 마세요. en/zh/ja는 그 ko의 충실한 번역으로 각각 400자 이내이며 영어/중국어 간체/일본어의 실제 문자를 사용하세요. 원문의 부정·불확실성·숫자·단위를 유지하고 내용을 추가하지 마세요. 번역의 수량은 아라비아 숫자로 쓰고 숫자 값과 등장 순서 및 횟수를 원문과 일치시키세요. 숫자는 ASCII 아라비아 숫자만 사용하세요. HTML/마크다운/링크/코드 없이 일반 텍스트 한 줄만 쓰세요. 근거 있는 서로 다른 발췌문이 3개 미만이면 highlights는 []로 두세요.
+형식: {"highlights":[{"ko":"정확한 한국어 발췌문","en":"English translation","zh":"简体中文翻译","ja":"日本語の翻訳"}],"headline":{"text":"제목","evidence":["offer"]},"intro":{"text":"소개","evidence":["offer"]},"sections":[{"heading":"제목","body":"본문","evidence":["fact0"]}],"faqs":[{"question":"질문?","answer":"직접 답변","evidence":["visit"]}],"keywords":[{"text":"검색어 제안","evidence":["offer"]}],"situations":[{"question":"자연스러운 가상 질문?","answer":"가게명을 넣은 사실 기반 직접 답변","evidence":["offer"]}]}
 headline/intro는 근거 없으면 null, 나머지는 빈 배열로 둡니다. 최대 글자 수: 제목120, 소개800, 섹션 제목100/본문1000, FAQ 질문160/답700, 키워드80. 섹션 최대5개, FAQ 최대4개, 키워드 최대8개, situations 후보 최대8개(질문160/답700). 실제 제공되지 않은 evidence ID를 쓰지 마세요.`;
 
 // This is a syntactic support check, NOT semantic verification. The owner must review.
@@ -315,6 +317,27 @@ export function mergeCustomerQuestions(draft, input) {
   return { ...draft, faqs, situations: [], situationsStatus, situationsNotice };
 }
 
+// Independent, fail-closed optional translations. These structural/script/number
+// checks are NOT semantic translation verification and never relax Korean guards.
+export const HIGHLIGHTS_NOTICE = '핵심 번역이 없거나 형식·원문·숫자 검사를 통과하지 못해 생략했어요. 한국어 초안은 유지했고 추가 AI 호출은 하지 않았어요.';
+const HIGHLIGHTS_REVIEW = '핵심 번역의 원문·문자·숫자 형식만 확인했어요. 의미의 정확성을 보증하지 않으므로 공개 전 번역을 검토해 주세요.';
+export function normalizeHighlights(value, draft, input) {
+  try {
+    // Only already-normalized final Korean fields are eligible. FAQ/scenarios
+    // stay outside the eligible excerpt list in the shared store validator.
+    const source = {
+      name: input.store.name, address: input.store.address,
+      headline: draft.headline.text, intro: draft.intro.text,
+      sections: draft.sections.map(({ heading, body }) => ({ heading, body })),
+      faqs: draft.faqs.map(({ question, answer }) => ({ question, answer })),
+    };
+    return { highlights: normalizeHighlightLines(value, source), highlightsNotice: HIGHLIGHTS_REVIEW };
+  } catch {
+    // Never echo provider values, details, or exception messages to callers/logs.
+    return { highlights: [], highlightsNotice: HIGHLIGHTS_NOTICE };
+  }
+}
+
 const hasUsage = (u) => object(u) && ((Number.isFinite(u.cost) && u.cost >= 0) || ([u.prompt_tokens ?? u.input_tokens, u.completion_tokens ?? u.output_tokens].every(n => Number.isFinite(n) && n >= 0)));
 
 export async function makePageDraft({ env, fetcher = fetch, input, meter }) {
@@ -334,7 +357,7 @@ export async function makePageDraft({ env, fetcher = fetch, input, meter }) {
   let r;
   try {
     r = await chat({ env, fetcher: privateFetch, model, system: PAGE_DRAFT_SYSTEM,
-      user: JSON.stringify({ inputData: inputEvidence(input) }), maxTokens: 3200,
+      user: JSON.stringify({ inputData: inputEvidence(input) }), maxTokens: 4600,
       reasoningEffort: 'low', timeoutMs: 65000, responseFormat: { type: 'json_object' } });
   } catch (err) {
     if (err?.charged === 'unknown') meter.markUnknown();
@@ -345,8 +368,10 @@ export async function makePageDraft({ env, fetcher = fetch, input, meter }) {
   meter.add(r.costMicro);
   if (!r.text.trim()) throw new HttpError(502, 'AI_EMPTY', 'AI 초안 내용이 비어 있어요. 자동으로 다시 호출하지 않았어요.');
   if (r.text.length > 50000) throw new HttpError(502, 'AI_FORMAT', 'AI 초안이 허용된 크기를 넘었어요.');
-  const draft = mergeCustomerQuestions(normalizeDraft(extractJson(r.text), input), input);
-  return { draft, createdAt: new Date().toISOString(), cached: false, mock: false };
+  const raw = extractJson(r.text);
+  const draft = mergeCustomerQuestions(normalizeDraft(raw, input), input);
+  const highlights = normalizeHighlights(raw.highlights, draft, input);
+  return { draft, ...highlights, createdAt: new Date().toISOString(), cached: false, mock: false };
 }
 
 export function draftLockKey(input, salt) {
@@ -374,7 +399,7 @@ export function createHandler(deps = {}) {
           sections: input.store.verifiedFacts.slice(0, 5).map((body, i) => ({ heading: '사장님이 확인한 특징', body, evidence: [`fact${i}`] })),
           situations: [], faqs: [], keywords: input.answers.keywords ? [{ text: input.answers.keywords.slice(0, 80), evidence: ['keywords'] }] : [],
         }, input));
-        return send(res, 200, { draft, createdAt: new Date().toISOString(), cached: false, mock: true });
+        return send(res, 200, { draft, highlights: [], highlightsNotice: '모의 초안에서는 번역을 생성하지 않아요. 추가 AI 호출은 하지 않았어요.', createdAt: new Date().toISOString(), cached: false, mock: true });
       }
       if (!env.OPENROUTER_API_KEY) throw new HttpError(503, 'AI_CONFIG', 'AI 연결 설정이 아직 안 됐어요.');
       store = deps.store || createStore(env, fetcher);
