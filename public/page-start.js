@@ -320,7 +320,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
       h('p', { class: 'small muted' }, '가게가 맞는지 확인하신 단계예요. 영업시간·메뉴·특징의 정확성은 아직 별도로 확인이 필요해요.')),
       h('div', { class: 'card page-next-note' }, h('h3', null, '질문 5개로 소개 초안을 만들어요'),
         h('p', null, '대표 메뉴·서비스만 필수예요. 알고 계신 내용만 적어 주세요.'),
-        h('p', { class: 'small muted' }, '초안을 확인한 뒤 베타 기간에는 무료로 공개하고 QR과 소개글을 만들 수 있어요.'),
+        h('p', { class: 'small muted' }, '초안을 확인한 뒤 무료로 공개하고 QR과 소개글을 만들 수 있어요.'),
         h('button', { type: 'button', class: 'btn primary block', onclick: () => { location.hash = '#/page-questions'; } }, '질문 답하기')),
       candidateCard(chosen, state.confirmedIndex, true),
       sourceCard(state.result));
@@ -662,7 +662,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
       d.researchedCount > 0 ? h('p', { class: 'card note small page-researched-note', role: 'status' }, '초안 작성에 직접 확인하지 않은 AI 검색 특징 ' + d.researchedCount + '개가 검증되지 않은 참고 정보로 함께 쓰였을 수 있어요. 초안의 모든 사실을 직접 검토하고 맞지 않으면 ‘내용 수정’에서 고치거나 지워 주세요.') : null,
       draft.keywords.some(x => x.text) ? h('aside', { class: 'card note page-keywords' }, h('h3', null, '확인할 키워드 제안'), h('p', { class: 'small muted' }, '희망 검색어는 사실 근거가 아니에요. 실제 가게와 맞는지 확인해 주세요. 소개 본문이나 공개 페이지의 확정 키워드·메타데이터로 반영되지 않았으며 검색 노출을 보장하지 않아요.'), draft.keywords.filter(x => x.text).map(x => h('span', null, x.text))) : null,
       h('div', { class: 'page-actions' }, h('button', { class: 'btn block', type: 'button', onclick: () => { location.hash = '#/page-edit'; } }, '내용 수정'),
-        h('button', { class: 'btn primary block', type: 'button', onclick: () => { location.hash = '#/page-publish'; } }, '결제하기 · 베타 무료 0원'),
+        h('button', { class: 'btn primary block', type: 'button', onclick: () => { location.hash = '#/page-publish'; } }, '무료 공개하기'),
         d.publication?.id ? h('a', { class: 'btn block', href: '/#/manage/' + d.publication.id }, '이미 공개한 페이지 관리') : null))); 
     setNavbar(btn('질문으로', () => { location.hash = '#/page-questions'; }), btn('처음으로', home));
   }
@@ -788,7 +788,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     const password = h('input', { type: 'password', id: 'publish-password', autocomplete: 'new-password', minlength: 8, maxlength: 64, required: true });
     const again = h('input', { type: 'password', id: 'publish-password-again', autocomplete: 'new-password', minlength: 8, maxlength: 64, required: true });
     const consent = h('input', { type: 'checkbox', id: 'publish-consent' });
-    const submit = h('button', { class: 'btn primary block', type: 'submit', disabled: publishing || !!issue }, publishing ? '공개 요청 중…' : attempt ? '같은 공개 요청 확인하기 · 0원' : '결제하기 · 베타 무료 0원으로 공개');
+    const submit = h('button', { class: 'btn primary block', type: 'submit', disabled: publishing || !!issue }, publishing ? '공개 요청 중…' : attempt ? '같은 공개 요청 확인하기' : '무료로 공개하기');
     async function publish(e) {
       e.preventDefault(); if (publishing) return;
       if (issue) { error.textContent = issue; return; }
@@ -846,7 +846,7 @@ export function makePageStart({ h, show, setNavbar, btn, post, storeName, onPubl
     }
     show(h('div', { class: 'page-publish' },
       h('h2', null, '공개하기 전 마지막 확인'),
-      h('p', { class: 'card note' }, h('b', null, '베타 기간 무료 · 결제 금액 0원'), '실제 결제창이 열리거나 돈이 청구되지 않아요. 공개 후 가게 페이지, QR 코드와 공유 소개글을 이용할 수 있어요.'),
+      h('p', { class: 'card note' }, h('b', null, '무료로 공개해요'), '결제창이나 결제 없이 공개할 수 있어요. 공개 후 가게 페이지, QR 코드와 공유 소개글을 이용할 수 있어요.'),
       h('p', { class: 'small muted' }, '공개하면 누구나 볼 수 있고 검색엔진이나 다른 서비스가 수집·복사할 수 있어요. 검색 노출과 AI 추천을 보장하지 않아요. 삭제해도 외부의 사본이나 검색 결과가 바로 사라지지 않을 수 있어요.'),
       d.publication?.id ? h('p', { class: 'card warn' }, '이미 공개한 페이지가 있어요. 다시 공개하면 별도의 페이지가 만들어져요. 기존 내용을 바꾸려면 ', h('a', { href: '/#/manage/' + d.publication.id }, '기존 페이지 관리'), '를 이용해 주세요.') : null,
       attempt ? h('p', { class: 'card warn', role: 'status' }, '이전 요청이 이미 공개됐을 수 있어요. 같은 내용과 비밀번호로 결과를 확인해요. 확인 전까지 요청 내용은 고정돼요. ', h('a', { href: '/#/manage/' + attempt.id }, '요청한 주소 관리하기')) : null,
