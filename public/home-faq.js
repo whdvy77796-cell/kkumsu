@@ -1,5 +1,4 @@
-// 홈페이지 FAQ: 실제 운영 중인 베타 조건과 공개 전 안내만 담는다.
-import { FIRST_HOME_PRICE, HOME_PRICE_STEPS } from './home-pricing.js';
+// 홈페이지 FAQ: 현재 무료 이용 조건과 공개 전 안내를 담는다.
 
 export const HOME_FAQ = Object.freeze([
   Object.freeze({
@@ -19,10 +18,8 @@ export const HOME_FAQ = Object.freeze([
   Object.freeze({
     question: '이용 요금은 얼마인가요?',
     paragraphs: Object.freeze([
-      '현재 베타 기간에는 페이지 제작·공개와 QR코드·공유 문구가 무료이며, 실제 결제는 운영하지 않아요.',
-      `유료 서비스 도입 시 ${HOME_PRICE_STEPS[0].range}의 공개 가격은 1회 ${FIRST_HOME_PRICE}으로 예정되어 있어요. 월 정기결제는 없을 예정이에요.`,
-      '이미 무료로 공개한 페이지를 자동으로 유료 상품으로 전환하거나 결제를 요구하지 않아요. 이후 무료 서비스 운영 정책을 바꿀 때는 미리 안내할게요.',
-      '새 유료 상품은 가게 1곳을 1년간 공개하는 1회 결제로 준비하고 있어요. 자동 갱신은 없고 결제일과 공개 시작일 중 더 늦은 날부터 7일 안에는 이용 여부와 관계없이 전액 환불받을 수 있도록 준비해요.',
+      '페이지 제작·공개와 QR코드·공유 문구를 무료로 이용할 수 있어요. 결제는 운영하지 않아요.',
+      '이미 공개한 페이지와 주소도 그대로 이용할 수 있어요. 서비스 정책이 바뀐다면 미리 안내할게요.',
     ]),
   }),
   Object.freeze({

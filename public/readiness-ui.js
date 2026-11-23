@@ -101,7 +101,7 @@ export function makeReadinessBenefits(h, d) {
           h('p', null, '가게 특징으로 소개글과 손님 예상 질문·답변을 만든 뒤, 내용을 확인하고 수정할 수 있어요.'),
           h('p', null, '준비도 점수는 입력한 정보와 확인 여부를 기준으로 해요.'),
           h('p', null, '페이지를 공개한 후 링크와 QR코드, SNS 공유 문구를 이용할 수 있어요.')),
-        h('p', { class: 'readiness-benefits-note' }, '현재 베타 기간에는 무료로 공개할 수 있어요. AI·검색 봇의 방문과 검색 노출·추천은 보장하지 않아요.')),
+        h('p', { class: 'readiness-benefits-note' }, '가게 소개 페이지는 무료로 공개할 수 있어요. AI·검색 봇의 방문과 검색 노출·추천은 보장하지 않아요.')),
       score.element),
     update: score.update,
   };

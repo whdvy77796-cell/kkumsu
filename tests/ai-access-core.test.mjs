@@ -55,17 +55,18 @@ test('late events extend counted since but never backdate seven-day receipt cove
 // Protocol double executes the decoded plan against the synchronous MemoryStore
 // semantics. This tests EVAL wiring/retry boundaries, NOT a real Lua interpreter.
 function redisDouble(){
- const backing=new MemoryStore(),calls=[],readCalls=[];
+ const backing=new MemoryStore(),calls=[],readCalls=[]; let mockNow=now;
  return {backing,calls,readCalls,corrupt:null,failBefore:0,loseAfter:0,async cmd(args){
   if(args[0]==='EVAL'&&args[1]===AI_ACCESS_READ_LUA){
    const n=Number(args[2]),keys=args.slice(3);readCalls.push(args);
    assert.equal(args.length,3+n);assert.equal(keys.length,n);assert.ok(n>=1&&n<=9);assert.equal(keys.length,new Set(keys).size);assert.ok(keys.every(k=>k.startsWith(aiAccessPrefix(scope)+':')));
    if(this.corrupt)return this.corrupt(keys);
-   const out=keys.map(k=>{const exp=backing.aiAccessExpiry?.get(k);const h=exp!==undefined&&exp<=Date.now()?{}:backing.kv.get(k)||{};return Object.entries(h).flatMap(([a,v])=>[a,String(v)]);});
+   const out=keys.map(k=>{const exp=backing.aiAccessExpiry?.get(k);const h=exp!==undefined&&exp<=mockNow?{}:backing.kv.get(k)||{};return Object.entries(h).flatMap(([a,v])=>[a,String(v)]);});
    return JSON.stringify(out.map(x=>x.length?x:{}));
   }
   assert.equal(args[0],'EVAL');assert.equal(args[1],AI_ACCESS_LUA);
   const n=Number(args[2]),keys=args.slice(3,3+n),p=JSON.parse(args[3+n]);
+  mockNow=p.now;
   calls.push({keys,p});assert.equal(keys.length,new Set(keys).size);assert.ok(p.events.length<=REDIS_BATCH_SIZE);
   assert.ok(keys.every(k=>k.startsWith(aiAccessPrefix(scope))));
   if(this.failBefore===calls.length)throw new Error('synthetic Redis unavailable');

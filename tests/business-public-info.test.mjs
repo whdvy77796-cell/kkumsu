@@ -36,7 +36,7 @@ test('사업자 정보만 채워도 운영 환경의 테스트 키로 결제가 
   };
   const cfg = payConfig(production);
   assert.equal(cfg.mode, 'off');
-  assert.equal(cfg.reason, 'test_keys_in_production');
+  assert.equal(cfg.reason, 'free_service');
   assert.equal(payConfig({ ...production, MAECHUL_PAYWALL: 'off' }).mode, 'off');
 });
 

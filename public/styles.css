@@ -792,7 +792,7 @@ body.has-navbar .site-foot { padding-bottom: calc(112px + env(safe-area-inset-bo
 .pricing-lead { margin: 0; color: #596a82; font-size: 16px; line-height: 1.6; word-break: keep-all; }
 .pricing-beta { display: flex; align-items: flex-start; gap: 12px; max-width: 960px; margin: 0 auto 20px; padding: 14px 16px; border: 1px solid #cbdcff; border-radius: 14px; color: #314765; background: #f3f7ff; font-size: 13px; line-height: 1.6; word-break: keep-all; }
 .pricing-beta strong { flex: 0 0 auto; color: #1646c7; }
-.pricing-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; max-width: 960px; margin: 0 auto; }
+.pricing-plans { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; max-width: 640px; margin: 0 auto; }
 .pricing-plan { min-width: 0; padding: 28px; border: 1px solid #dfe7f3; border-radius: 20px; background: #fff; }
 .pricing-paid { position: relative; border: 2px solid #1f4fe0; background: #f8faff; }
 .pricing-plan-label { margin: 0 0 7px; color: #617087; font-size: 13px; font-weight: 800; }

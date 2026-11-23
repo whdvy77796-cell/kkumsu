@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { HOME_FAQ, makeHomeFaq } from '../public/home-faq.js';
-import { FIRST_HOME_PRICE } from '../public/home-pricing.js';
 
 const h = (tag, attrs, ...children) => ({ tag, attrs: attrs || {}, children: children.flat(Infinity).filter(x => x != null && x !== false) });
 const textOf = n => n == null ? '' : typeof n === 'object' ? n.children.map(textOf).join(' ') : String(n);
@@ -25,7 +24,8 @@ test('FAQ contains six concise, initially closed native disclosure items', () =>
 
 test('prices distinguish current free beta, a planned price, and undecided existing-page terms', () => {
   const text = textOf(makeHomeFaq(h));
-  for (const value of ['현재 베타 기간', '무료', '결제는 운영하지 않아요', '유료 서비스 도입 시', '첫 100명', FIRST_HOME_PRICE, '예정', '이미 무료로 공개한 페이지', '자동으로 유료 상품으로 전환하거나 결제를 요구하지 않아요']) assert.ok(text.includes(value), value);
+  for (const value of ['무료', '결제는 운영하지 않아요', '이미 공개한 페이지와 주소도 그대로', '정책이 바뀐다면 미리 안내']) assert.ok(text.includes(value), value);
+  assert.doesNotMatch(text, /3,900원|유료 서비스 도입|유료 전환/);
   assert.match(text, /추천·인용 여부나 시점은 보장하지 않아요/);
   assert.match(text, /실제 손님 방문을 뜻하지 않아요/);
 });
