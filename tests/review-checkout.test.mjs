@@ -93,7 +93,7 @@ test('fail params are clipped, control chars removed; cancel and other errors bo
 });
 
 test('button starts disabled and is only enabled after a validated key', () => {
-  assert.match(html, /<button[^>]*id="rc-pay"[^>]*\sdisabled/);
+  assert.doesNotMatch(html, /<button|<script/);
   const code = js.replace(/\/\/.*$/gm, '');
   assert.ok(code.indexOf('btn.disabled = true; ') < code.indexOf('await loadClientKey('));
   assert.ok(code.indexOf('await loadClientKey(') < code.indexOf('btn.disabled = false;'));
@@ -116,17 +116,15 @@ test('static safety: only the safe config GET, no order/confirm calls, no hard-c
   assert.equal(code.match(/(test|live)_[a-z]*ck_[A-Za-z0-9_-]{6,}/g), null, 'no key literal');
 });
 
-test('page copy states test-only, no charge, no order/publication, free beta, live not active; isolated', () => {
-  for (const s of ['테스트 전용', '테스트 키가 연결된 경우에만', '실제 결제(청구)는 일어나지 않습니다', '주문이 만들어지지 않고', '실제로 공개되지도 않습니다', '계속 무료', '실제 결제는 아직 활성화되지 않았습니다', '3,900원']) {
-    assert.ok(html.includes(s), s);
-  }
+test('심사용 결제 화면이 종료되고 무료 안내만 표시된다', () => {
+  assert.match(html, /무료 이용 안내/);
+  assert.match(html, /결제 없이 무료/);
+  assert.match(html, /결제창은 열리지 않습니다/);
   assert.match(html, /name="robots" content="noindex/);
-  assert.match(html, /src="https:\/\/js\.tosspayments\.com\/v2\/standard"/);
-  assert.ok(!/<script>[^<]/.test(html), 'no inline script (CSP script-src self)');
-  // no other public page links to it (direct URL only)
+  assert.doesNotMatch(html, /<script|3,900원|<button/);
   const dir = new URL('../public/', import.meta.url);
   for (const f of readdirSync(dir)) {
     if (/^review-(checkout|order-simulation)\./.test(f) || !/\.(html|js)$/.test(f)) continue;
-    assert.ok(!readFileSync(new URL(f, dir), 'utf8').includes('review-checkout'), f + ' must not reference the test page');
+    assert.ok(!readFileSync(new URL(f, dir), 'utf8').includes('review-checkout'), f);
   }
 });

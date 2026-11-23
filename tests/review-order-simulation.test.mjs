@@ -77,9 +77,7 @@ test('simulation never calls order or payment APIs, persists data or asks for re
   assert.deepEqual(js.match(/\/api\/[A-Za-z0-9_/-]+/g), ['/api/review-checkout-config']);
   assert.doesNotMatch(js, /localStorage|sessionStorage|XMLHttpRequest|sendBeacon|payments\/confirm|document\.cookie|innerHTML|outerHTML|method:\s*'(POST|PUT|PATCH|DELETE)'/);
   assert.match(html, /name="robots" content="noindex/);
-  assert.match(html, /토스 결제나 결제 승인과 연결되지 않습니다/);
-  assert.match(html, /실제 주문·가게 공개·청구는 발생하지 않습니다/);
-  assert.match(html, /새로고침하면 사라집니다/);
-  assert.match(html, /공개 URL과 QR은 생성하지 않습니다/);
-  assert.equal((html.match(/<button[^>]*\sdisabled/g) || []).length, 4);
+  assert.match(html, /무료 이용 안내/);
+  assert.match(html, /결제창은 열리지 않습니다/);
+  assert.doesNotMatch(html, /<button|<script/);
 });

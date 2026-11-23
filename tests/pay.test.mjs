@@ -107,15 +107,17 @@ test('결제 모드: 키·환경·사업자 정보에 따라 off/test/live', () 
   assert.equal(payConfig({}).reason, 'no_keys');
   assert.equal(payConfig(TEST_ENV).mode, 'test');
   assert.equal(payConfig({ ...TEST_ENV, VERCEL_ENV: 'production' }).mode, 'off', '운영 사이트에서 테스트 키는 막는다');
-  assert.equal(payConfig({ ...TEST_ENV, VERCEL_ENV: 'production' }).reason, 'test_keys_in_production');
+  assert.equal(payConfig({ ...TEST_ENV, VERCEL_ENV: 'production' }).reason, 'free_service');
   const live = { ...TEST_ENV, VERCEL_ENV: 'production', TOSS_CLIENT_KEY: 'live_ck_1', TOSS_SECRET_KEY: 'live_sk_2' };
   assert.equal(payConfig(live, {}).mode, 'off', '사업자 정보 없이는 실제 결제를 안 켠다');
-  assert.equal(payConfig(live, {}).reason, 'business_info');
-  assert.equal(payConfig(live, BIZ).mode, 'live');
-  assert.equal(payConfig({ ...live, TOSS_SECRET_KEY: 'test_sk_2' }, BIZ).reason, 'key_mismatch');
+  assert.equal(payConfig(live, {}).reason, 'free_service');
+  assert.equal(payConfig(live, BIZ).mode, 'off');
+  assert.equal(payConfig({ ...live, TOSS_SECRET_KEY: 'test_sk_2' }, BIZ).reason, 'free_service');
   // 결제위젯(결제창형) 키: gck/gsk 짝
   assert.equal(payConfig({ ...TEST_ENV, TOSS_CLIENT_KEY: 'test_gck_docs_a', TOSS_SECRET_KEY: 'test_gsk_docs_b' }).mode, 'test');
-  assert.equal(payConfig({ ...live, TOSS_CLIENT_KEY: 'live_gck_a', TOSS_SECRET_KEY: 'live_gsk_b' }, BIZ).mode, 'live');
+  assert.equal(payConfig({ ...live, TOSS_CLIENT_KEY: 'live_gck_a', TOSS_SECRET_KEY: 'live_gsk_b' }, BIZ).mode, 'off');
+  assert.equal(payConfig({ ...live, VERCEL_ENV: 'preview' }, BIZ).mode, 'off', 'preview에서도 실제 결제 키는 차단');
+  assert.equal(payConfig({ ...TEST_ENV, VERCEL_ENV: 'production', MAECHUL_ALLOW_TEST_PAY: '1' }, BIZ).reason, 'free_service', '운영에서 테스트 결제 우회 금지');
   assert.equal(payConfig({ ...TEST_ENV, TOSS_CLIENT_KEY: 'test_gck_a', TOSS_SECRET_KEY: 'test_sk_b' }).reason, 'key_mismatch', '위젯 키와 개별 연동 키를 섞으면 안 됨');
   assert.equal(payConfig({ ...TEST_ENV, TOSS_CLIENT_KEY: 'test_ck_a', TOSS_SECRET_KEY: 'test_gsk_b' }).reason, 'key_mismatch');
   assert.equal(payConfig({ ...TEST_ENV, MAECHUL_PAYWALL: 'off' }).mode, 'off');
@@ -275,4 +277,18 @@ test('결제: 다른 브라우저로 돌아오면 새 열람 토큰, 이미 승�
   const g = await call(payHandler({ env: TEST_ENV }), { method: 'GET' });
   assert.deepEqual(Object.keys(g.json()).sort(), ['amount', 'clientKey', 'list', 'mode', 'ok', 'orderName', 'reason']);
   assert.ok(!g.body.includes('test_sk'));
+});
+
+test('운영 실결제 키가 있어도 조회는 off이고 주문·승인은 토스에 전달되지 않는다', async () => {
+  const env = { ...TEST_ENV, VERCEL_ENV: 'production', TOSS_CLIENT_KEY: 'live_ck_example', TOSS_SECRET_KEY: 'live_sk_example', MAECHUL_ALLOW_TEST_PAY: '1' };
+  const store = new TtlStore();
+  const fetcher = fakeToss(() => { throw new Error('결제 호출 금지'); });
+  const handler = payHandler({ env, store, fetcher, business: BIZ });
+  const status = await call(handler, { method: 'GET' });
+  assert.equal(status.statusCode, 200); assert.equal(status.json().mode, 'off'); assert.equal(status.json().reason, 'free_service');
+  const order = await call(handler, { body: { action: 'order', rid: 'synthetic12345678', token: 'synthetic-token-1234567890' } });
+  assert.equal(order.statusCode, 409, order.body);
+  const confirm = await call(handler, { body: { action: 'confirm', paymentKey: 'syntheticPaymentKey', orderId: 'MOsynthOrder123456', amount: 9900 } });
+  assert.equal(confirm.statusCode, 409, confirm.body);
+  assert.equal(fetcher.calls.length, 0);
 });

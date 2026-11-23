@@ -18,11 +18,11 @@ function call(method, env) {
 }
 
 test('valid synthetic test_ck_ is returned; response is minimal', () => {
-  assert.deepEqual(reviewCheckoutConfig({ [REVIEW_KEY_ENV]: VALID }), { configured: true, clientKey: VALID });
+  assert.deepEqual(reviewCheckoutConfig({ [REVIEW_KEY_ENV]: VALID }), { configured: false });
   const r = call('GET', { [REVIEW_KEY_ENV]: VALID });
   assert.equal(r.status, 200);
   assert.equal(r.headers['cache-control'], 'no-store');
-  assert.deepEqual(JSON.parse(r.body), { configured: true, clientKey: VALID });
+  assert.deepEqual(JSON.parse(r.body), { configured: false });
 });
 
 test('absent, live, secret, widget, docs-style and malformed keys are rejected', () => {
@@ -60,5 +60,5 @@ test('GET only: other methods get 405 with no-store and no key', () => {
 
 test('production 배포는 안전한 테스트 키가 설정돼도 항상 비활성화', () => {
   assert.deepEqual(reviewCheckoutConfig({ VERCEL_ENV: 'production', YB_TOSS_REVIEW_CLIENT_KEY: 'test_ck_ABCDEFGHIJKLMNOPQRSTUV' }), { configured: false });
-  assert.equal(reviewCheckoutConfig({ VERCEL_ENV: 'preview', YB_TOSS_REVIEW_CLIENT_KEY: 'test_ck_ABCDEFGHIJKLMNOPQRSTUV' }).configured, true);
+  assert.equal(reviewCheckoutConfig({ VERCEL_ENV: 'preview', YB_TOSS_REVIEW_CLIENT_KEY: 'test_ck_ABCDEFGHIJKLMNOPQRSTUV' }).configured, false);
 });
